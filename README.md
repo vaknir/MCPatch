@@ -36,9 +36,10 @@ The current architecture and security invariants are documented in
 ## Status
 
 The repository has its initial architecture, threat model, protocol contracts,
-and build foundation. The Rust bridge now provides a bounded MCP stdio process,
-transport-independent browser connection boundary, and deterministic capability
-registry. Native Messaging and the MV3 extension are the next implementation phase.
+and build foundation. The Rust bridge provides bounded MCP and Native Messaging
+adapters, a transport-independent browser connection boundary, and a deterministic
+capability registry. A zero-permission MV3 extension scaffold is also present;
+local IPC, pairing, and live capabilities are the next implementation slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 

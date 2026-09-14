@@ -45,6 +45,10 @@ The Rust bridge is a local, long-running security boundary. It owns:
 It does not inspect the DOM, possess website credentials, evaluate pack code, or
 provide a general network/filesystem proxy.
 
+The Chromium-facing process is a bounded framing adapter; its caller checks,
+wire-format rules, and local IPC seam are documented in
+[Native Messaging adapter](docs/architecture/native-messaging-adapter.md).
+
 ### Browser extension
 
 The Manifest V3 extension is the trusted adapter to the browser. Its service worker

@@ -32,5 +32,7 @@ All notable MCPatch changes are documented here. The format follows
   Windows endpoints, process election, framing, peer identity, and crash recovery.
 - Minimal strict TypeScript Chromium MV3 extension with synchronous lifecycle
   registration, reproducible build output, and zero browser or host permissions.
+- Bounded Native Messaging host adapter with exact caller-origin policy, strict
+  protocol decoding, bidirectional typed relay, and audit-safe process behavior.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
