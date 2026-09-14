@@ -4,6 +4,23 @@ This package contains the language-neutral contract between the native bridge an
 browser extension. JSON Schema 2020-12 files are canonical; Rust and TypeScript
 bindings must pass the same fixtures.
 
+## TypeScript API
+
+```ts
+import { parseMessage, validateMessage, type Message } from "@mcpatch/protocol";
+
+if (validateMessage(untrustedValue)) {
+  const message: Message = untrustedValue;
+}
+
+const message = parseMessage(untrustedValue); // throws ProtocolValidationError
+```
+
+The runtime validator is deterministic and has no production dependencies or
+runtime code generation, so it is suitable for a Manifest V3 service worker. It
+validates already-decoded JSON values; byte framing and the 1 MiB limit belong to
+the selected transport.
+
 ## Version 1
 
 Every message is a closed JSON object with `protocolVersion: 1` and a `type`
@@ -53,8 +70,9 @@ routes, and approval expiry require runtime validation in addition to JSON Schem
 The transport enforces a maximum encoded message size of 1 MiB before JSON parsing.
 Schema limits include 128-character identifiers, 256 capabilities per context, 128
 top-level tool argument fields, and bounded descriptions/errors. Runtime validators
-must also bound nesting depth, collection sizes, schema complexity, in-flight calls,
-and validation time.
+also constrain context revisions to JavaScript-safe integers and bound JSON nesting
+and traversal work. Transports and stateful runtimes must additionally bound schema
+complexity, in-flight calls, and validation time.
 
 ## Layout
 

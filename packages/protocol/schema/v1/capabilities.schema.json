@@ -23,7 +23,7 @@
         "version": {
           "type": "string",
           "maxLength": 64,
-          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
         },
         "digest": {
           "type": "string",
@@ -190,8 +190,7 @@
           "$ref": "common.schema.json#/$defs/identifier"
         },
         "contextRevision": {
-          "type": "integer",
-          "minimum": 1
+          "$ref": "common.schema.json#/$defs/positiveSafeInteger"
         },
         "origin": {
           "$ref": "common.schema.json#/$defs/origin"
@@ -226,8 +225,7 @@
           "$ref": "common.schema.json#/$defs/identifier"
         },
         "contextRevision": {
-          "type": "integer",
-          "minimum": 1
+          "$ref": "common.schema.json#/$defs/positiveSafeInteger"
         },
         "reason": {
           "enum": ["navigation", "tab_closed", "pack_disabled", "disconnected"]

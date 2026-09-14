@@ -1,9 +1,9 @@
 use serde_json::Value;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use url::Url;
 
 use super::{MAX_TOP_LEVEL_PROPERTIES, invalid};
 use crate::protocol::{Implementation, PROTOCOL_VERSION, ValidationCode, ValidationError};
+
+const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 pub(super) fn validate_protocol_version(version: u32) -> Result<(), ValidationError> {
     if version != PROTOCOL_VERSION {
@@ -16,7 +16,7 @@ pub(super) fn validate_protocol_version(version: u32) -> Result<(), ValidationEr
 }
 
 pub(super) fn validate_revision(revision: u64, field: &str) -> Result<(), ValidationError> {
-    if revision == 0 {
+    if revision == 0 || revision > MAX_SAFE_INTEGER {
         return Err(invalid(ValidationCode::InvalidValue, field));
     }
     Ok(())
@@ -75,36 +75,6 @@ pub(super) fn validate_tool_name(
         });
     if !valid {
         return Err(invalid(ValidationCode::InvalidIdentifier, field));
-    }
-    Ok(())
-}
-
-pub(super) fn validate_origin(
-    value: &str,
-    field: impl Into<String>,
-) -> Result<(), ValidationError> {
-    let field = field.into();
-    let Ok(url) = Url::parse(value) else {
-        return Err(invalid(ValidationCode::InvalidOrigin, field));
-    };
-    let canonical_origin = url.origin().ascii_serialization();
-    let valid = url.scheme() == "https"
-        && !url.cannot_be_a_base()
-        && url.username().is_empty()
-        && url.password().is_none()
-        && url.path() == "/"
-        && url.query().is_none()
-        && url.fragment().is_none()
-        && value == canonical_origin;
-    if !valid {
-        return Err(invalid(ValidationCode::InvalidOrigin, field));
-    }
-    Ok(())
-}
-
-pub(super) fn validate_timestamp(value: &str, field: &str) -> Result<(), ValidationError> {
-    if value.chars().count() > 35 || OffsetDateTime::parse(value, &Rfc3339).is_err() {
-        return Err(invalid(ValidationCode::InvalidValue, field));
     }
     Ok(())
 }
@@ -191,17 +161,7 @@ fn is_ascii_lowercase_or_digit(byte: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{valid_identifier, validate_origin, validate_tool_name};
-
-    #[test]
-    fn origin_requires_canonical_https_origin() {
-        assert!(validate_origin("https://example.com", "origin").is_ok());
-        assert!(validate_origin("https://example.com:8443", "origin").is_ok());
-        assert!(validate_origin("https://example.com:443", "origin").is_err());
-        assert!(validate_origin("https://example.com/", "origin").is_err());
-        assert!(validate_origin("http://example.com", "origin").is_err());
-        assert!(validate_origin("https://user@example.com", "origin").is_err());
-    }
+    use super::{valid_identifier, validate_tool_name};
 
     #[test]
     fn identifiers_are_ascii_and_bounded() {

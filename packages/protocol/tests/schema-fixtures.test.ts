@@ -1,32 +1,18 @@
-import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { Ajv2020, type AnySchema } from "ajv/dist/2020.js";
 import addFormatsModule, { type FormatsPlugin } from "ajv-formats";
 import { describe, expect, it } from "vitest";
 
+import {
+  fixtureNames,
+  invalidDirectory,
+  readJson,
+  schemaDirectory,
+  validDirectory,
+} from "./fixture-helpers.js";
+
 const addFormats = addFormatsModule as unknown as FormatsPlugin;
-
-const schemaDirectory = fileURLToPath(
-  new URL("../schema/v1/", import.meta.url),
-);
-const validDirectory = fileURLToPath(
-  new URL("../fixtures/v1/valid/", import.meta.url),
-);
-const invalidDirectory = fileURLToPath(
-  new URL("../fixtures/v1/invalid/", import.meta.url),
-);
-
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, "utf8")) as unknown;
-}
-
-function fixtureNames(directory: string): string[] {
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".json"))
-    .sort();
-}
 
 function messageType(value: unknown): string | undefined {
   if (

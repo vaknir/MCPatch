@@ -30,8 +30,7 @@
           "$ref": "common.schema.json#/$defs/identifier"
         },
         "contextRevision": {
-          "type": "integer",
-          "minimum": 1
+          "$ref": "common.schema.json#/$defs/positiveSafeInteger"
         },
         "origin": {
           "$ref": "common.schema.json#/$defs/origin"
@@ -71,8 +70,7 @@
           "$ref": "common.schema.json#/$defs/identifier"
         },
         "contextRevision": {
-          "type": "integer",
-          "minimum": 1
+          "$ref": "common.schema.json#/$defs/positiveSafeInteger"
         },
         "origin": {
           "$ref": "common.schema.json#/$defs/origin"
@@ -108,8 +106,7 @@
           "$ref": "common.schema.json#/$defs/identifier"
         },
         "contextRevision": {
-          "type": "integer",
-          "minimum": 1
+          "$ref": "common.schema.json#/$defs/positiveSafeInteger"
         },
         "origin": {
           "$ref": "common.schema.json#/$defs/origin"

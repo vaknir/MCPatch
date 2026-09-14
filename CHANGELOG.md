@@ -17,5 +17,7 @@ All notable MCPatch changes are documented here. The format follows
 - Canonical bridge protocol version 1 schemas and cross-language golden fixtures.
 - Rust protocol types with strict JSON decoding, bounded semantic validation,
   typed errors, and shared-fixture contract tests.
+- Dependency-free TypeScript protocol types and deterministic runtime validation
+  suitable for the Manifest V3 extension boundary.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
