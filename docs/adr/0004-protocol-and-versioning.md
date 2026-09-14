@@ -41,10 +41,17 @@ differentials at the cost of requiring a negotiated protocol change for addition
 
 ### Negotiation
 
-Each new bridge connection begins with `hello`, containing an ordered set of
-supported protocol versions and implementation metadata. The receiver selects the
-highest mutually supported version and returns `hello_ack`. Before acknowledgement,
-all other message types are invalid.
+Each new authenticated bridge connection begins when the transport initiator sends
+`hello`, containing a set of supported protocol versions and implementation
+metadata. The acceptor selects the highest mutually supported version and returns
+`hello_ack`. Selecting a lower shared version is rejected as a downgrade. Before
+the acceptor sends and the initiator verifies that acknowledgement, all other
+message types are invalid.
+
+Handshake messages use the stable version 1 bootstrap envelope. Their
+`supportedProtocolVersions` and `selectedProtocolVersion` fields refer to the
+application-message protocol, so a peer that has dropped application protocol 1
+can still report incompatibility safely.
 
 No shared version closes the connection with a bounded, machine-readable error.
 The selected version is repeated on every message and must match the connection.

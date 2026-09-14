@@ -53,14 +53,17 @@ as a v1 application message. A peer must authenticate the transport before its
 ## Lifecycle rules
 
 1. A connection authenticates at the transport layer.
-2. Each peer sends `hello`; the receiver selects the highest common version.
-3. `hello_ack` fixes the selected version and connection ID.
-4. Other messages are invalid until negotiation completes.
-5. A complete capability snapshot atomically replaces the prior snapshot for the
+2. The transport initiator sends `hello` using the stable bootstrap envelope.
+3. The acceptor selects the highest common application protocol version.
+4. `hello_ack` fixes the selected version and connection ID; a lower shared
+   selection is rejected as a downgrade.
+5. Other messages are invalid until the acceptor sends and the initiator verifies
+   the acknowledgement.
+6. A complete capability snapshot atomically replaces the prior snapshot for the
    same context only when its revision is newer.
-6. Every routed call, result, and approval is bound to context ID, revision, and
+7. Every routed call, result, and approval is bound to context ID, revision, and
    exact normalized origin.
-7. Closing a context or connection revokes its capabilities and pending operations.
+8. Closing a context or connection revokes its capabilities and pending operations.
 
 State rules such as monotonic revisions, unique active request IDs, matching result
 routes, and approval expiry require runtime validation in addition to JSON Schema.
@@ -77,10 +80,11 @@ complexity, in-flight calls, and validation time.
 ## Layout
 
 ```text
-schema/v1/          canonical modular schemas
-fixtures/v1/valid/  one accepted example per message family and edge case
-fixtures/v1/invalid/rejected examples with the violated rule in the filename
-tests/              schema and fixture integrity tests
+schema/v1/            canonical modular schemas
+fixtures/v1/valid/    one accepted example per message family and edge case
+fixtures/v1/invalid/  rejected examples with the violated rule in the filename
+fixtures/negotiation/ shared cross-language version-selection cases
+tests/                schema and fixture integrity tests
 ```
 
 `schema/v1/message.schema.json` is the root schema. Load every sibling schema by its

@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "name": "selects the highest common version",
+      "local": [1, 2, 3],
+      "remote": [2, 3, 4],
+      "selected": 3
+    },
+    {
+      "name": "does not depend on advertised order",
+      "local": [3, 1],
+      "remote": [2, 1, 3],
+      "selected": 3
+    },
+    {
+      "name": "supports the initial protocol",
+      "local": [1],
+      "remote": [1],
+      "selected": 1
+    },
+    {
+      "name": "rejects peers without a common version",
+      "local": [1],
+      "remote": [2],
+      "error": "NO_COMMON_VERSION"
+    },
+    {
+      "name": "rejects an empty local version set",
+      "local": [],
+      "remote": [1],
+      "error": "INVALID_VERSION_SET"
+    },
+    {
+      "name": "rejects duplicate remote versions",
+      "local": [1],
+      "remote": [1, 1],
+      "error": "INVALID_VERSION_SET"
+    },
+    {
+      "name": "rejects version zero",
+      "local": [0, 1],
+      "remote": [1],
+      "error": "INVALID_VERSION_SET"
+    },
+    {
+      "name": "rejects versions above the wire integer limit",
+      "local": [1],
+      "remote": [2147483648],
+      "error": "INVALID_VERSION_SET"
+    }
+  ]
+}

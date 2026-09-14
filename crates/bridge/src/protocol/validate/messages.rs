@@ -19,12 +19,7 @@ pub(super) fn validate_hello(message: &Hello) -> Result<(), ValidationError> {
 
     let mut versions = HashSet::new();
     for version in &message.supported_protocol_versions {
-        if *version == 0 || *version > i32::MAX as u32 {
-            return Err(invalid(
-                ValidationCode::InvalidValue,
-                "supportedProtocolVersions",
-            ));
-        }
+        validate_supported_version(*version, "supportedProtocolVersions")?;
         if !versions.insert(*version) {
             return Err(invalid(
                 ValidationCode::InvalidValue,
@@ -33,19 +28,12 @@ pub(super) fn validate_hello(message: &Hello) -> Result<(), ValidationError> {
         }
     }
 
-    if !versions.contains(&message.protocol_version) {
-        return Err(invalid(
-            ValidationCode::InvalidValue,
-            "supportedProtocolVersions",
-        ));
-    }
-
     Ok(())
 }
 
 pub(super) fn validate_hello_ack(message: &HelloAck) -> Result<(), ValidationError> {
     validate_protocol_version(message.protocol_version)?;
-    validate_protocol_version(message.selected_protocol_version)?;
+    validate_supported_version(message.selected_protocol_version, "selectedProtocolVersion")?;
     validate_identifier(&message.connection_id, "connectionId")?;
     validate_implementation(&message.implementation)
 }

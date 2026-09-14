@@ -37,12 +37,12 @@ describe("TypeScript protocol runtime validation", () => {
     ).toEqual({ code: "UNKNOWN_FIELD", field: "$.executeAnyway" });
   });
 
-  it("requires hello to advertise its selected envelope version", () => {
+  it("accepts a bootstrap hello from an incompatible peer", () => {
     const hello = readFixture(validDirectory, "hello.json") as {
       supportedProtocolVersions: number[];
     };
     hello.supportedProtocolVersions = [2];
-    expect(validateMessage(hello)).toBe(false);
+    expect(validateMessage(hello)).toBe(true);
   });
 
   it("rejects noncanonical origins even when they are valid URLs", () => {
