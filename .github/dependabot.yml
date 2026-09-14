@@ -20,6 +20,12 @@ updates:
       time: "06:15"
       timezone: Asia/Jerusalem
     open-pull-requests-limit: 5
+    ignore:
+      # typescript-eslint 8.70 supports TypeScript <6.1. Remove when its peer range
+      # includes TypeScript 7 and the lint suite passes on that major.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     labels:
       - dependencies
 
