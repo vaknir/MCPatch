@@ -1,9 +1,10 @@
 use std::ffi::OsString;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
     Help,
     McpStdio,
+    NativeHost { caller_origin: OsString },
     Version,
 }
 
@@ -15,12 +16,29 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliErr
     match args.as_slice() {
         [] => Ok(Command::McpStdio),
         [value] if value == "mcp-stdio" => Ok(Command::McpStdio),
+        [value, caller_origin] if value == "native-host" => Ok(Command::NativeHost {
+            caller_origin: caller_origin.clone(),
+        }),
+        [value, caller_origin, parent_window]
+            if value == "native-host" && valid_parent_window(parent_window) =>
+        {
+            Ok(Command::NativeHost {
+                caller_origin: caller_origin.clone(),
+            })
+        }
         [value] if value == "--help" || value == "-h" || value == "help" => Ok(Command::Help),
         [value] if value == "--version" || value == "-V" || value == "version" => {
             Ok(Command::Version)
         }
         _ => Err(CliError),
     }
+}
+
+fn valid_parent_window(value: &OsString) -> bool {
+    value
+        .to_str()
+        .and_then(|value| value.strip_prefix("--parent-window="))
+        .is_some_and(|value| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 #[cfg(test)]
@@ -42,5 +60,39 @@ mod tests {
     fn rejects_unknown_or_extra_arguments() {
         assert!(parse(vec![OsString::from("unknown")]).is_err());
         assert!(parse(vec![OsString::from("mcp-stdio"), OsString::from("extra")]).is_err());
+    }
+
+    #[test]
+    fn parses_native_host_arguments_from_chromium() {
+        let origin = OsString::from("chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/");
+        assert_eq!(
+            parse(vec![OsString::from("native-host"), origin.clone()]),
+            Ok(Command::NativeHost {
+                caller_origin: origin.clone(),
+            })
+        );
+        assert_eq!(
+            parse(vec![
+                OsString::from("native-host"),
+                origin.clone(),
+                OsString::from("--parent-window=42"),
+            ]),
+            Ok(Command::NativeHost {
+                caller_origin: origin,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_native_host_arguments() {
+        assert!(parse(vec![OsString::from("native-host")]).is_err());
+        assert!(
+            parse(vec![
+                OsString::from("native-host"),
+                OsString::from("chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"),
+                OsString::from("--parent-window=not-a-number"),
+            ])
+            .is_err()
+        );
     }
 }

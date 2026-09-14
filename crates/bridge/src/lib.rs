@@ -5,6 +5,7 @@ pub mod browser;
 pub mod cli;
 pub mod logging;
 pub mod mcp;
+pub mod native_host;
 pub mod protocol;
 pub mod routing;
 
