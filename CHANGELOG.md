@@ -30,5 +30,7 @@ All notable MCPatch changes are documented here. The format follows
   binding, and cancellation/revocation hooks.
 - Local IPC and per-user bridge-core lifecycle decision covering secure Unix and
   Windows endpoints, process election, framing, peer identity, and crash recovery.
+- Minimal strict TypeScript Chromium MV3 extension with synchronous lifecycle
+  registration, reproducible build output, and zero browser or host permissions.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
