@@ -1,3 +1,12 @@
+export {
+  AcceptorNegotiation,
+  ProtocolNegotiationError,
+  selectProtocolVersion,
+  verifySelectedVersion,
+  type NegotiationCode,
+  type NegotiationEvent,
+  type NegotiationPhase,
+} from "./negotiation.js";
 export type * from "./types/index.js";
 export { PROTOCOL_VERSION } from "./types/index.js";
 export {

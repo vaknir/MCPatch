@@ -22,6 +22,13 @@ pub(super) fn validate_revision(revision: u64, field: &str) -> Result<(), Valida
     Ok(())
 }
 
+pub(super) fn validate_supported_version(version: u32, field: &str) -> Result<(), ValidationError> {
+    if version == 0 || version > i32::MAX as u32 {
+        return Err(invalid(ValidationCode::InvalidValue, field));
+    }
+    Ok(())
+}
+
 pub(super) fn validate_implementation(
     implementation: &Implementation,
 ) -> Result<(), ValidationError> {

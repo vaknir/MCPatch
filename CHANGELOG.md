@@ -19,5 +19,7 @@ All notable MCPatch changes are documented here. The format follows
   typed errors, and shared-fixture contract tests.
 - Dependency-free TypeScript protocol types and deterministic runtime validation
   suitable for the Manifest V3 extension boundary.
+- Downgrade-resistant protocol version negotiation and shared Rust/TypeScript
+  compatibility cases.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

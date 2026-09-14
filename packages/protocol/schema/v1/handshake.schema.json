@@ -55,7 +55,7 @@
           "const": "hello_ack"
         },
         "selectedProtocolVersion": {
-          "$ref": "common.schema.json#/$defs/protocolVersion"
+          "$ref": "common.schema.json#/$defs/positiveVersion"
         },
         "connectionId": {
           "$ref": "common.schema.json#/$defs/identifier"

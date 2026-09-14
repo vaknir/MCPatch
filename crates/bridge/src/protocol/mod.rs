@@ -1,9 +1,11 @@
 mod error;
+mod negotiation;
 mod strict_json;
 mod types;
 mod validate;
 
 pub use error::{ParseMessageError, ValidationCode, ValidationError};
+pub use negotiation::*;
 pub use types::*;
 
 /// Maximum encoded protocol frame accepted before JSON parsing.

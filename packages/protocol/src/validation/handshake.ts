@@ -52,8 +52,7 @@ export function validateHello(value: unknown): ValidationIssue | undefined {
         ) !== undefined,
     ) ||
     new Set(message.supportedProtocolVersions).size !==
-      message.supportedProtocolVersions.length ||
-    !message.supportedProtocolVersions.includes(message.protocolVersion)
+      message.supportedProtocolVersions.length
   ) {
     return issue("INVALID_VALUE", "supportedProtocolVersions");
   }
@@ -80,7 +79,11 @@ export function validateHelloAck(value: unknown): ValidationIssue | undefined {
     (message.type === "hello_ack"
       ? undefined
       : issue("INVALID_VALUE", "type")) ??
-    validateProtocolVersion(message.selectedProtocolVersion) ??
+    validatePositiveSafeInteger(
+      message.selectedProtocolVersion,
+      "selectedProtocolVersion",
+      2_147_483_647,
+    ) ??
     validateIdentifier(message.connectionId, "connectionId") ??
     validateImplementation(message.implementation)
   );
