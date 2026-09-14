@@ -1,0 +1,52 @@
+{
+  "protocolVersion": 1,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://www.google.com",
+  "capabilities": [
+    {
+      "name": "flights.current_search",
+      "title": "Current flight search",
+      "description": "Return the current visible flight-search criteria.",
+      "origin": "https://www.google.com",
+      "source": "pack",
+      "pack": {
+        "publisher": "dev.mcpatch",
+        "id": "google-flights",
+        "version": "0.1.0",
+        "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      },
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "required": ["origin", "destination"],
+        "properties": {
+          "origin": { "type": "string" },
+          "destination": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "flights.price_insights",
+      "description": "Return price guidance exposed by the current document.",
+      "origin": "https://www.google.com",
+      "source": "native_webmcp",
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      }
+    }
+  ]
+}
