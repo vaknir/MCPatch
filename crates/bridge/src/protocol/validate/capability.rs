@@ -2,10 +2,11 @@ use std::collections::HashSet;
 
 use semver::Version;
 
+use super::formats::validate_origin;
 use super::primitives::{
     valid_lower_hex, valid_pack_id, valid_publisher, validate_bounded_text,
     validate_collection_size, validate_identifier, validate_input_schema, validate_object_limit,
-    validate_origin, validate_protocol_version, validate_revision, validate_tool_name,
+    validate_protocol_version, validate_revision, validate_tool_name,
 };
 use super::{MAX_CAPABILITIES, invalid};
 use crate::protocol::{

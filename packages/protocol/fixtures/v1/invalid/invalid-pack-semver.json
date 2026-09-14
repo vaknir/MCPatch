@@ -1,0 +1,26 @@
+{
+  "protocolVersion": 1,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://example.com",
+  "capabilities": [
+    {
+      "name": "example.read",
+      "description": "Synthetic invalid pack version fixture.",
+      "origin": "https://example.com",
+      "source": "pack",
+      "pack": {
+        "publisher": "dev.mcpatch",
+        "id": "example-pack",
+        "version": "1.0.0-01",
+        "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      },
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object"
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "type": "tool_call",
+  "requestId": "request-01J8QAZ6V4F2K7M3",
+  "contextId": "tab-42",
+  "contextRevision": 9007199254740992,
+  "origin": "https://www.google.com",
+  "tool": "flights.current_search",
+  "args": {}
+}
