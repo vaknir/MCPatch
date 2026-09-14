@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 //! Native MCPatch policy and routing boundary.
 
+pub mod cli;
+pub mod logging;
+pub mod mcp;
 pub mod protocol;
 
 /// The MCPatch product version compiled into the bridge.

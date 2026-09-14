@@ -21,5 +21,7 @@ All notable MCPatch changes are documented here. The format follows
   suitable for the Manifest V3 extension boundary.
 - Downgrade-resistant protocol version negotiation and shared Rust/TypeScript
   compatibility cases.
+- Bounded Rust MCP stdio process with structured stderr logging, lifecycle handling,
+  version negotiation, and an empty tool-list foundation.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

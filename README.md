@@ -35,9 +35,28 @@ The current architecture and security invariants are documented in
 
 ## Status
 
-The repository is establishing its architecture, threat model, protocol contracts,
-and build foundation. Product versioning starts at `0.1.0`; the MCPatch bridge
-protocol and pack manifest have independent compatibility versions.
+The repository has its initial architecture, threat model, protocol contracts,
+and build foundation. The Rust bridge now provides a bounded MCP stdio process;
+browser capability routing is the next implementation phase. Product versioning
+starts at `0.1.0`; the MCPatch bridge protocol and pack manifest have independent
+compatibility versions.
+
+## Bridge development
+
+Run the MCP server over newline-delimited stdio:
+
+```sh
+cargo run --bin mcpatch -- mcp-stdio
+```
+
+The `mcp-stdio` command is also the default when no command is supplied. Standard
+output is reserved exclusively for JSON-RPC frames. Audit-safe structured logs go
+to standard error and can be filtered with `MCPATCH_LOG=off|error|warn|info|debug|trace`.
+Dependency logging is disabled at the bridge boundary so untrusted request content
+is not emitted by upstream libraries.
+
+The bridge currently negotiates MCP `2025-11-25` and `2026-07-28`. It advertises
+an empty tool list until browser capabilities are connected in subsequent slices.
 
 ## License
 
