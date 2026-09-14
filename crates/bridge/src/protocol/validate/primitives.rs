@@ -1,7 +1,9 @@
 use serde_json::Value;
 
 use super::{MAX_TOP_LEVEL_PROPERTIES, invalid};
-use crate::protocol::{Implementation, PROTOCOL_VERSION, ValidationCode, ValidationError};
+use crate::protocol::{
+    Implementation, PROTOCOL_VERSION, ValidationCode, ValidationError, valid_identifier,
+};
 
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
@@ -54,16 +56,6 @@ pub(super) fn validate_identifier(
         return Err(invalid(ValidationCode::InvalidIdentifier, field));
     }
     Ok(())
-}
-
-fn valid_identifier(value: &str, max: usize) -> bool {
-    let bytes = value.as_bytes();
-    !bytes.is_empty()
-        && bytes.len() <= max
-        && bytes[0].is_ascii_alphanumeric()
-        && bytes
-            .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 pub(super) fn validate_tool_name(
@@ -168,7 +160,8 @@ fn is_ascii_lowercase_or_digit(byte: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{valid_identifier, validate_tool_name};
+    use super::validate_tool_name;
+    use crate::protocol::valid_identifier;
 
     #[test]
     fn identifiers_are_ascii_and_bounded() {

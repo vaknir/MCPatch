@@ -23,5 +23,7 @@ All notable MCPatch changes are documented here. The format follows
   compatibility cases.
 - Bounded Rust MCP stdio process with structured stderr logging, lifecycle handling,
   version negotiation, and an empty tool-list foundation.
+- Transport-independent browser connection contract and bounded deterministic fake
+  adapter for policy and routing tests.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
