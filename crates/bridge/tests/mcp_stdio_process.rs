@@ -1,0 +1,166 @@
+use std::{process::Stdio, time::Duration};
+
+use mcpatch_bridge::mcp::MAX_MCP_MESSAGE_BYTES;
+use serde_json::Value;
+use tokio::{
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    process::{Child, Command},
+    time::timeout,
+};
+
+const PROCESS_TIMEOUT: Duration = Duration::from_secs(5);
+
+#[tokio::test]
+async fn initializes_lists_no_tools_and_keeps_logs_off_stdout() {
+    let mut child = spawn_bridge();
+    let mut stdout = BufReader::new(child.stdout.take().expect("stdout must be piped"));
+
+    write_json_line(
+        &mut child,
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"integration-secret-marker","version":"0.1.0"}}}"#,
+    )
+    .await;
+
+    let initialize = read_json_line(&mut stdout).await;
+    assert_eq!(initialize["id"], 1);
+    assert_eq!(initialize["result"]["protocolVersion"], "2025-11-25");
+    assert_eq!(initialize["result"]["serverInfo"]["name"], "mcpatch");
+    assert!(initialize["result"]["capabilities"]["tools"].is_object());
+
+    write_json_line(
+        &mut child,
+        r#"{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}"#,
+    )
+    .await;
+    write_json_line(
+        &mut child,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#,
+    )
+    .await;
+
+    let tools = read_json_line(&mut stdout).await;
+    assert_eq!(tools["id"], 2);
+    assert_eq!(tools["result"]["tools"], serde_json::json!([]));
+
+    let (status, stderr) = finish(child).await;
+    assert!(status.success());
+    assert!(!stderr.contains("integration-secret-marker"));
+    assert!(!stderr.contains("initialize"));
+    assert_json_lines(&stderr);
+}
+
+#[tokio::test]
+async fn rejects_oversized_input_without_echoing_it() {
+    let mut child = spawn_bridge();
+    let mut frame = vec![b'x'; MAX_MCP_MESSAGE_BYTES + 1];
+    frame.push(b'\n');
+
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin must be piped")
+        .write_all(&frame)
+        .await
+        .expect("oversized input must be writable");
+
+    let (status, stderr) = finish(child).await;
+    assert!(status.success());
+    assert!(stderr.contains(r#""event":"mcp_input_rejected""#));
+    assert!(stderr.contains(r#""reason":"message_too_large""#));
+    assert!(
+        stderr.len() < 16 * 1024,
+        "logs must not echo rejected input"
+    );
+    assert_json_lines(&stderr);
+}
+
+#[tokio::test]
+async fn version_command_does_not_start_the_runtime() {
+    let output = timeout(
+        PROCESS_TIMEOUT,
+        Command::new(env!("CARGO_BIN_EXE_mcpatch"))
+            .arg("--version")
+            .output(),
+    )
+    .await
+    .expect("version command timed out")
+    .expect("version command must run");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("stdout must be UTF-8"),
+        format!("mcpatch {}\n", env!("CARGO_PKG_VERSION"))
+    );
+    assert!(output.stderr.is_empty());
+}
+
+fn spawn_bridge() -> Child {
+    Command::new(env!("CARGO_BIN_EXE_mcpatch"))
+        .arg("mcp-stdio")
+        .env("RUST_LOG", "trace")
+        .env("MCPATCH_LOG", "trace")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .expect("bridge must spawn")
+}
+
+async fn write_json_line(child: &mut Child, line: &str) {
+    let stdin = child.stdin.as_mut().expect("stdin must be piped");
+    stdin
+        .write_all(line.as_bytes())
+        .await
+        .expect("JSON-RPC message must be writable");
+    stdin
+        .write_all(b"\n")
+        .await
+        .expect("newline must be writable");
+    stdin.flush().await.expect("stdin must flush");
+}
+
+async fn read_json_line<R>(reader: &mut BufReader<R>) -> Value
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    let mut line = String::new();
+    let bytes = timeout(PROCESS_TIMEOUT, reader.read_line(&mut line))
+        .await
+        .expect("bridge response timed out")
+        .expect("bridge response must be readable");
+    assert!(bytes > 0, "bridge closed stdout before responding");
+    serde_json::from_str(&line).expect("stdout must contain JSON-RPC only")
+}
+
+async fn finish(mut child: Child) -> (std::process::ExitStatus, String) {
+    drop(child.stdin.take());
+    let mut stderr = child.stderr.take().expect("stderr must be piped");
+    let stderr_task = tokio::spawn(async move {
+        let mut bytes = Vec::new();
+        stderr
+            .read_to_end(&mut bytes)
+            .await
+            .expect("stderr must be readable");
+        bytes
+    });
+
+    let status = timeout(PROCESS_TIMEOUT, child.wait())
+        .await
+        .expect("bridge did not stop after EOF")
+        .expect("bridge must be waitable");
+    let stderr = stderr_task.await.expect("stderr task must complete");
+    (
+        status,
+        String::from_utf8(stderr).expect("structured logs must be UTF-8"),
+    )
+}
+
+fn assert_json_lines(stderr: &str) {
+    assert!(!stderr.is_empty());
+    for line in stderr.lines() {
+        let value: Value = serde_json::from_str(line).expect("stderr lines must be JSON");
+        assert_eq!(value["target"], "mcpatch");
+        assert!(value["event"].is_string());
+    }
+}
