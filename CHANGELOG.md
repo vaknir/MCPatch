@@ -25,5 +25,8 @@ All notable MCPatch changes are documented here. The format follows
   version negotiation, and an empty tool-list foundation.
 - Transport-independent browser connection contract and bounded deterministic fake
   adapter for policy and routing tests.
+- Context-scoped capability registry with monotonic snapshots, deterministic
+  collision handling, deny-by-default permissions, schema validation, exact result
+  binding, and cancellation/revocation hooks.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

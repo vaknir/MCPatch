@@ -88,6 +88,12 @@ Native and pack tools with the same logical name do not merge. Native capabiliti
 win, and the collision is recorded without exposing page-controlled metadata as a
 trusted description.
 
+The bridge does not guess which tab is active in protocol version 1. If the same
+tool name is live in multiple contexts or connections, it is hidden from discovery
+and calls fail as ambiguous. Snapshot revision, permission, schema, revocation, and
+result-binding rules are detailed in
+[Capability registry and routing](docs/architecture/capability-routing.md).
+
 ## Call flow
 
 1. The extension observes an eligible browser context and resolves its capabilities.
