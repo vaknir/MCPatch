@@ -28,5 +28,7 @@ All notable MCPatch changes are documented here. The format follows
 - Context-scoped capability registry with monotonic snapshots, deterministic
   collision handling, deny-by-default permissions, schema validation, exact result
   binding, and cancellation/revocation hooks.
+- Local IPC and per-user bridge-core lifecycle decision covering secure Unix and
+  Windows endpoints, process election, framing, peer identity, and crash recovery.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
