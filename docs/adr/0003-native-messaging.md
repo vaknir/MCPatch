@@ -57,7 +57,8 @@ The production channel must enforce these controls:
 
 On Unix, the preferred IPC is a Unix domain socket inside a mode-0700 runtime
 directory. On Windows, use a named pipe with an ACL limited to the interactive user.
-Platform-specific endpoint details require a follow-up implementation ADR.
+The endpoint, peer-identity, process, and stale-state rules are specified in
+[ADR 0007](0007-local-ipc-and-core-lifecycle.md).
 
 ## Consequences
 
