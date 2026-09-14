@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "type": "hello",
+  "role": "extension",
+  "supportedProtocolVersions": [1],
+  "implementation": {
+    "name": "mcpatch-extension",
+    "version": "0.1.0"
+  }
+}

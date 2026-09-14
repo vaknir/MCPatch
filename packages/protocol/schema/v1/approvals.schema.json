@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpatch.dev/protocol/v1/approvals.schema.json",
+  "title": "MCPatch protocol v1 approval messages",
+  "$defs": {
+    "approvalRequired": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "approvalId",
+        "requestId",
+        "contextId",
+        "contextRevision",
+        "origin",
+        "tool",
+        "arguments",
+        "argsHash",
+        "expiresAt"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "approval_required"
+        },
+        "approvalId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "requestId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "origin": {
+          "$ref": "common.schema.json#/$defs/origin"
+        },
+        "tool": {
+          "$ref": "common.schema.json#/$defs/toolName"
+        },
+        "arguments": {
+          "type": "object",
+          "maxProperties": 128
+        },
+        "argsHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "expiresAt": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    },
+    "approvalResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "approvalId",
+        "requestId",
+        "decision"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "approval_result"
+        },
+        "approvalId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "requestId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "decision": {
+          "enum": ["approved", "denied"]
+        }
+      }
+    }
+  }
+}

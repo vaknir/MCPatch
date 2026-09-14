@@ -14,5 +14,6 @@ All notable MCPatch changes are documented here. The format follows
   pack execution, permissions, and approvals.
 - Cargo and pnpm workspaces with formatting, linting, tests, builds, dependency
   audits, CI, and automated dependency updates.
+- Canonical bridge protocol version 1 schemas and cross-language golden fixtures.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

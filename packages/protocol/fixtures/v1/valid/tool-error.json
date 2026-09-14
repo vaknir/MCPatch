@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "type": "tool_error",
+  "requestId": "request-01J8QAZ6V4F2K7M3",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://www.google.com",
+  "code": "EXECUTION_FAILED",
+  "message": "The site capability did not return a result.",
+  "retryable": true
+}

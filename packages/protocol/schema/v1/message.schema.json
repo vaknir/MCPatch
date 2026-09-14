@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpatch.dev/protocol/v1/message.schema.json",
+  "title": "MCPatch protocol v1 message",
+  "oneOf": [
+    {
+      "$ref": "handshake.schema.json#/$defs/hello"
+    },
+    {
+      "$ref": "handshake.schema.json#/$defs/helloAck"
+    },
+    {
+      "$ref": "capabilities.schema.json#/$defs/capabilitySnapshot"
+    },
+    {
+      "$ref": "capabilities.schema.json#/$defs/contextClosed"
+    },
+    {
+      "$ref": "calls.schema.json#/$defs/toolCall"
+    },
+    {
+      "$ref": "calls.schema.json#/$defs/toolResult"
+    },
+    {
+      "$ref": "calls.schema.json#/$defs/toolError"
+    },
+    {
+      "$ref": "calls.schema.json#/$defs/cancel"
+    },
+    {
+      "$ref": "approvals.schema.json#/$defs/approvalRequired"
+    },
+    {
+      "$ref": "approvals.schema.json#/$defs/approvalResult"
+    },
+    {
+      "$ref": "lifecycle.schema.json#/$defs/heartbeat"
+    },
+    {
+      "$ref": "lifecycle.schema.json#/$defs/connectionError"
+    }
+  ]
+}

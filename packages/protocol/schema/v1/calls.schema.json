@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpatch.dev/protocol/v1/calls.schema.json",
+  "title": "MCPatch protocol v1 tool-call messages",
+  "$defs": {
+    "toolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "requestId",
+        "contextId",
+        "contextRevision",
+        "origin",
+        "tool",
+        "args"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "tool_call"
+        },
+        "requestId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "origin": {
+          "$ref": "common.schema.json#/$defs/origin"
+        },
+        "tool": {
+          "$ref": "common.schema.json#/$defs/toolName"
+        },
+        "args": {
+          "type": "object",
+          "maxProperties": 128
+        }
+      }
+    },
+    "toolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "requestId",
+        "contextId",
+        "contextRevision",
+        "origin",
+        "result"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "tool_result"
+        },
+        "requestId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "origin": {
+          "$ref": "common.schema.json#/$defs/origin"
+        },
+        "result": true
+      }
+    },
+    "toolError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "requestId",
+        "contextId",
+        "contextRevision",
+        "origin",
+        "code",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "tool_error"
+        },
+        "requestId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "origin": {
+          "$ref": "common.schema.json#/$defs/origin"
+        },
+        "code": {
+          "$ref": "common.schema.json#/$defs/errorCode"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "cancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "requestId"],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "cancel"
+        },
+        "requestId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        }
+      }
+    }
+  }
+}
