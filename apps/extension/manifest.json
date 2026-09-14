@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "MCPatch",
+  "version": "0.1.0",
+  "description": "Safe, typed website capabilities for MCP clients.",
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  }
+}
