@@ -15,5 +15,7 @@ All notable MCPatch changes are documented here. The format follows
 - Cargo and pnpm workspaces with formatting, linting, tests, builds, dependency
   audits, CI, and automated dependency updates.
 - Canonical bridge protocol version 1 schemas and cross-language golden fixtures.
+- Rust protocol types with strict JSON decoding, bounded semantic validation,
+  typed errors, and shared-fixture contract tests.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
