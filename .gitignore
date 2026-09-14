@@ -1,0 +1,19 @@
+# JavaScript and TypeScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Rust
+target/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp

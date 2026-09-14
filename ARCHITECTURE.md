@@ -108,13 +108,13 @@ invalidates the affected registrations and pending calls.
 
 ## Trust boundaries
 
-| Boundary | Untrusted input | Required controls |
-| --- | --- | --- |
-| MCP client → bridge | method, tool name, arguments, cancellation | framing limits, protocol validation, schema validation, permission policy |
-| Extension → bridge | identity claims, contexts, schemas, results | native-host allowlist, negotiation, message validation, origin binding, size limits |
-| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text |
-| Pack → extension | code, manifest, schemas, network intent | installed immutable bundle, signature/trust policy, manifest validation, least privilege |
-| Registry → runtime | metadata, updates, compatibility claims | signatures, transparency, explicit install/enable, no runtime code loading |
+| Boundary            | Untrusted input                              | Required controls                                                                        |
+| ------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| MCP client → bridge | method, tool name, arguments, cancellation   | framing limits, protocol validation, schema validation, permission policy                |
+| Extension → bridge  | identity claims, contexts, schemas, results  | native-host allowlist, negotiation, message validation, origin binding, size limits      |
+| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text              |
+| Pack → extension    | code, manifest, schemas, network intent      | installed immutable bundle, signature/trust policy, manifest validation, least privilege |
+| Registry → runtime  | metadata, updates, compatibility claims      | signatures, transparency, explicit install/enable, no runtime code loading               |
 
 ## Protocol boundaries
 

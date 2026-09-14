@@ -227,14 +227,14 @@ Mitigations:
 
 The policy vocabulary begins with these non-exclusive classes:
 
-| Class | Meaning | Default policy |
-| --- | --- | --- |
-| `READ` | Reads bounded, task-specific visible state | Enabled-pack policy may allow |
-| `ACTION` | Mutates website or account state | One-time approval |
-| `SENSITIVE` | Reads or changes private/high-impact data | One-time approval |
-| `CREDENTIAL` | Accesses authentication material | Denied in normal runtime |
-| `EXTERNAL_NETWORK` | Contacts an origin outside the matched site policy | Denied unless explicitly installed and approved |
-| `ARBITRARY_EXECUTION` | Evaluates code or performs generic automation | Denied in normal runtime |
+| Class                 | Meaning                                            | Default policy                                  |
+| --------------------- | -------------------------------------------------- | ----------------------------------------------- |
+| `READ`                | Reads bounded, task-specific visible state         | Enabled-pack policy may allow                   |
+| `ACTION`              | Mutates website or account state                   | One-time approval                               |
+| `SENSITIVE`           | Reads or changes private/high-impact data          | One-time approval                               |
+| `CREDENTIAL`          | Accesses authentication material                   | Denied in normal runtime                        |
+| `EXTERNAL_NETWORK`    | Contacts an origin outside the matched site policy | Denied unless explicitly installed and approved |
+| `ARBITRARY_EXECUTION` | Evaluates code or performs generic automation      | Denied in normal runtime                        |
 
 Risk labels shown to users are derived from permissions and reviewed metadata. They
 do not replace enforcement.

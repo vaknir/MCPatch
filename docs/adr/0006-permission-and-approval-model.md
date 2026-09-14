@@ -21,14 +21,14 @@ the tool, origin, or arguments after the user approves, or replay the decision.
 Permissions are non-exclusive and assigned by the accepted installed pack metadata,
 then validated against actual tool behavior:
 
-| Permission | Meaning | Version 1 default |
-| --- | --- | --- |
-| `READ` | Read bounded, task-specific page state | May run for an enabled pack |
-| `ACTION` | Change website or account state | One-time approval per call |
-| `SENSITIVE` | Read or change private/high-impact data | One-time approval per call |
-| `CREDENTIAL` | Access authentication/session material | Always denied |
-| `EXTERNAL_NETWORK` | Extension request outside exact pack origins | Denied |
-| `ARBITRARY_EXECUTION` | Generic script or browser automation | Always denied |
+| Permission            | Meaning                                      | Version 1 default           |
+| --------------------- | -------------------------------------------- | --------------------------- |
+| `READ`                | Read bounded, task-specific page state       | May run for an enabled pack |
+| `ACTION`              | Change website or account state              | One-time approval per call  |
+| `SENSITIVE`           | Read or change private/high-impact data      | One-time approval per call  |
+| `CREDENTIAL`          | Access authentication/session material       | Always denied               |
+| `EXTERNAL_NETWORK`    | Extension request outside exact pack origins | Denied                      |
+| `ARBITRARY_EXECUTION` | Generic script or browser automation         | Always denied               |
 
 All permission checks default to deny. Missing, unknown, contradictory, or
 unsupported permissions reject pack activation or tool dispatch. `READ` does not
