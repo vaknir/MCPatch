@@ -253,6 +253,7 @@ export class PageContextOwner implements PageInvoker {
           name: IMPLEMENTATION_NAME,
           version: IMPLEMENTATION_VERSION,
         },
+        authorizedPackTools: [...authorization.packTools].sort(),
         ...binding,
       })
     ) {

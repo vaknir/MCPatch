@@ -108,6 +108,7 @@ describe("page context owner", () => {
       tabId: 7,
       documentId: "document-1",
       origin: "https://example.com",
+      authorizedPackTools: [PACK_TOOL],
     });
     expect(owner.activeContexts).toHaveLength(1);
     expect(owner.activeContexts[0]?.snapshotRevision).toBe(0);

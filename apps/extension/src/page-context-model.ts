@@ -8,7 +8,7 @@ import type {
 } from "./page-channel.js";
 import type { SessionScheduler } from "./native-session.js";
 
-export const MCPATCH_PAGE_PORT_NAME = "mcpatch.page.v1";
+export const MCPATCH_PAGE_PORT_NAME = "mcpatch.page.v2";
 
 export interface PageMessageSender {
   readonly id?: string;

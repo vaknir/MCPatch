@@ -9,6 +9,7 @@ export interface ChromePageClientRuntimeApi {
 }
 
 export interface PageAdapter {
+  authorizePackTools?(tools: readonly string[]): void;
   capabilities(signal: AbortSignal): Promise<readonly PageCapability[]>;
   execute(
     tool: string,

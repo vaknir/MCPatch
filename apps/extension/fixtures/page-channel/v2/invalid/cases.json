@@ -28,5 +28,10 @@
     "file": "wrong-version.json",
     "direction": "worker_to_page",
     "code": "UNSUPPORTED_VERSION"
+  },
+  {
+    "file": "unsorted-authorized-tools.json",
+    "direction": "worker_to_page",
+    "code": "INVALID_VALUE"
   }
 ]
