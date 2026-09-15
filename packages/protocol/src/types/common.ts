@@ -4,7 +4,7 @@ export type ProtocolVersion = typeof PROTOCOL_VERSION;
 
 export type JsonPrimitive = boolean | null | number | string;
 
-export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export type JsonValue = JsonPrimitive | JsonObject | readonly JsonValue[];
 
 export interface JsonObject {
   [key: string]: JsonValue;

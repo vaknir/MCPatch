@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import { BrowserToolExecutionError } from "@mcpatch/sdk/browser";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PageCapability } from "../src/page-channel.js";
@@ -168,6 +169,46 @@ describe("reviewed page adapter", () => {
         runtimeOptions(),
       ).authorizePackTools?.([SITE_TOOL]),
     ).toThrow(TypeError);
+  });
+
+  it("maps SDK browser errors onto the closed page error contract", async () => {
+    const browserAdapter: PageAdapter = {
+      async capabilities() {
+        throw new BrowserToolExecutionError("CANCELLED");
+      },
+      async execute() {
+        throw new BrowserToolExecutionError("TOOL_UNAVAILABLE");
+      },
+    };
+    const adapter = createReviewedDocumentAdapter(
+      DOCUMENT,
+      `${SITE_ORIGIN}/app/search`,
+      [definition(() => browserAdapter)],
+      runtimeOptions(),
+    );
+    adapter.authorizePackTools?.([SITE_TOOL]);
+
+    await expectAdapterError(adapter.capabilities(signal()), "CANCELLED");
+
+    const routedAdapter = createReviewedDocumentAdapter(
+      DOCUMENT,
+      `${SITE_ORIGIN}/app/search`,
+      [
+        definition(() => ({
+          ...browserAdapter,
+          async capabilities() {
+            return [PACK_CAPABILITY];
+          },
+        })),
+      ],
+      runtimeOptions(),
+    );
+    routedAdapter.authorizePackTools?.([SITE_TOOL]);
+    await routedAdapter.capabilities(signal());
+    await expectAdapterError(
+      routedAdapter.execute(SITE_TOOL, {}, signal()),
+      "TOOL_UNAVAILABLE",
+    );
   });
 });
 

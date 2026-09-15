@@ -26,9 +26,11 @@ economy, round trip. Google Flights performs its own shopping request using the
 tab's live browser session; MCPatch never reads or transports that session. The
 action cannot select an itinerary, book, sign in, or track prices.
 
-The manifest's compiled fallback handlers intentionally return `TOOL_NOT_FOUND`.
-Production calls must cross the reviewed page-capability channel; they must never
-fall back to synthetic or service-worker-local data.
+The browser SDK generates capability routing, subscriptions, and compiled fallback
+handlers that return `TOOL_NOT_FOUND`. Production calls must cross the reviewed
+page-capability channel; they never fall back to synthetic or service-worker-local
+data. The extension consumes the pack's generated page definition directly, with
+no Google-specific extension wrapper or duplicated tool list.
 
 Fixtures under `tests/fixtures` are invented semantic data, not copied website
 markup or live results. See

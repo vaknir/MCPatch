@@ -17,6 +17,9 @@ export default defineConfig({
       "@mcpatch/protocol": fileURLToPath(
         new URL("../../packages/protocol/src/index.ts", import.meta.url),
       ),
+      "@mcpatch/sdk/browser": fileURLToPath(
+        new URL("../../packages/sdk/src/browser.ts", import.meta.url),
+      ),
       "@mcpatch/sdk/runtime": fileURLToPath(
         new URL("../../packages/sdk/src/runtime.ts", import.meta.url),
       ),

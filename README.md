@@ -77,6 +77,10 @@ read-only same-origin subset of native `document.modelContext`. It also runs the
 reviewed Google Flights pack through the authorized page channel; service-worker
 fallback handlers cannot produce real-site results.
 
+The browser SDK now lets a pack register its real per-document handlers and export
+one object. It generates page capability routing, discovery, cancellation, safe
+errors, subscriptions, tool lists, and fail-closed service-worker plumbing.
+
 The bridge owns argument-bound, expiring, single-use approval state for action and
 sensitive tools. The extension presents each decision in its own tab-bound UI and
 fails closed if that trusted surface is unavailable. The first real action is the

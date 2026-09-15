@@ -1,13 +1,16 @@
 import { demoPack } from "@mcpatch/example-packs";
 import {
   GOOGLE_FLIGHTS_ORIGIN,
-  googleFlightsPack,
+  googleFlightsBrowserPack,
 } from "@mcpatch/google-flights-pack";
 import { PROTOCOL_VERSION } from "@mcpatch/protocol";
 
 import type { CompiledPackRuntimeOptions } from "./compiled-pack-validation.js";
 
-export const BUNDLED_PACKS = Object.freeze([demoPack, googleFlightsPack]);
+export const BUNDLED_PACKS = Object.freeze([
+  demoPack,
+  googleFlightsBrowserPack.definition,
+]);
 
 export const PACK_RUNTIME_OPTIONS: CompiledPackRuntimeOptions = Object.freeze({
   runtimeVersion: "0.1.0",

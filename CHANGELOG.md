@@ -8,6 +8,10 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A one-object browser pack SDK at `@mcpatch/sdk/browser` that registers real typed
+  page handlers and generates capability discovery, routing, cancellation, safe
+  errors, subscriptions, tool lists, and fail-closed compiled fallbacks, with safe
+  manifest and permission defaults.
 - A FastMCP-style `MCPatch` pack-authoring facade with typed `.tool(...)`
   registration, directly testable handlers, immutable single-use finalization,
   registration-time identity checks, and explicit runtime JSON Schemas.
@@ -137,6 +141,8 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Fixed
 
+- Protocol and SDK JSON value types now agree on immutable array values, allowing
+  generated browser packs to cross the page boundary without unsafe wrapper casts.
 - Isolated MCP session cancellation from the core-wide shutdown token so an
   initialized client disconnect starts the idle grace period instead of stopping the
   shared core.

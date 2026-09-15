@@ -28,7 +28,7 @@ export {
   extractPriceInsights,
   extractResults,
 } from "./extractor.js";
-export { googleFlightsPack } from "./manifest.js";
+export { googleFlightsBrowserPack, googleFlightsPack } from "./manifest.js";
 export {
   FLIGHTS_CURRENT_SEARCH,
   FLIGHTS_PRICE_INSIGHTS,
