@@ -11,8 +11,11 @@ use std::{
 
 use mcpatch_bridge::{
     bridge_core::{BridgeCoreError, CoreStopReason, UnixBridgeCore},
-    local_ipc::{EndpointRole, InstallChannel, UnixIpcErrorCode, UnixRuntime},
+    local_ipc::{
+        AuthenticatedUnixStream, EndpointRole, InstallChannel, UnixIpcErrorCode, UnixRuntime,
+    },
 };
+use serde_json::{Value, json};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
@@ -111,6 +114,124 @@ async fn shutdown_signal_stops_core_and_releases_ownership() {
     assert_eq!(reason, CoreStopReason::Shutdown);
 
     UnixBridgeCore::start(runtime).await.unwrap();
+}
+
+#[tokio::test]
+async fn core_owns_multiple_independent_mcp_sessions() {
+    let fixture = TestDirectory::new();
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let core = UnixBridgeCore::start(runtime.clone()).await.unwrap();
+    let shutdown = CancellationToken::new();
+    let core_task = tokio::spawn(core.run(Duration::from_secs(60), shutdown.clone()));
+    let mut first = runtime.connect(EndpointRole::Mcp).await.unwrap();
+    let mut second = runtime.connect(EndpointRole::Mcp).await.unwrap();
+
+    initialize_and_list_tools(&mut first, 1).await;
+    initialize_and_list_tools(&mut second, 11).await;
+
+    drop(first);
+    drop(second);
+    shutdown.cancel();
+    assert_eq!(
+        timeout(Duration::from_secs(2), core_task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        CoreStopReason::Shutdown
+    );
+}
+
+#[tokio::test]
+async fn core_bounds_sessions_per_parser_role() {
+    const SESSION_LIMIT: usize = 8;
+    let fixture = TestDirectory::new();
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let core = UnixBridgeCore::start(runtime.clone()).await.unwrap();
+    let shutdown = CancellationToken::new();
+    let core_task = tokio::spawn(core.run(Duration::from_secs(60), shutdown.clone()));
+    let mut retained = Vec::with_capacity(SESSION_LIMIT);
+    for _ in 0..SESSION_LIMIT {
+        retained.push(runtime.connect(EndpointRole::Browser).await.unwrap());
+    }
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    let mut rejected = runtime.connect(EndpointRole::Browser).await.unwrap();
+    assert_eq!(
+        timeout(Duration::from_secs(1), rejected.read_json())
+            .await
+            .unwrap()
+            .unwrap(),
+        None
+    );
+
+    drop(retained);
+    shutdown.cancel();
+    assert_eq!(
+        timeout(Duration::from_secs(2), core_task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        CoreStopReason::Shutdown
+    );
+}
+
+async fn initialize_and_list_tools(stream: &mut AuthenticatedUnixStream, id: u64) {
+    let initialize = json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "core-session-test", "version": "0.1.0"}
+        }
+    });
+    stream
+        .write_json(&serde_json::to_vec(&initialize).unwrap())
+        .await
+        .unwrap();
+    let response: Value = serde_json::from_slice(
+        &timeout(Duration::from_secs(2), stream.read_json())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(response["id"], id);
+    assert_eq!(response["result"]["serverInfo"]["name"], "mcpatch");
+
+    let initialized = json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    });
+    stream
+        .write_json(&serde_json::to_vec(&initialized).unwrap())
+        .await
+        .unwrap();
+    let list_id = id + 1;
+    let list = json!({"jsonrpc": "2.0", "id": list_id, "method": "tools/list", "params": {}});
+    stream
+        .write_json(&serde_json::to_vec(&list).unwrap())
+        .await
+        .unwrap();
+    let response: Value = serde_json::from_slice(
+        &timeout(Duration::from_secs(2), stream.read_json())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(response["id"], list_id);
+    assert_eq!(response["result"]["tools"], json!([]));
 }
 
 static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);

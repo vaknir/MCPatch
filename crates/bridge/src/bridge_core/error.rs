@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tokio::task::JoinError;
 
 #[cfg(unix)]
 use crate::local_ipc::{UnixIpcError, UnixIpcErrorCode};
@@ -15,6 +16,8 @@ pub enum BridgeCoreError {
     #[cfg(windows)]
     #[error("local transport failed")]
     Transport(#[from] WindowsIpcError),
+    #[error("core session task failed")]
+    SessionTask(#[source] JoinError),
 }
 
 impl BridgeCoreError {
@@ -32,6 +35,7 @@ impl BridgeCoreError {
                 WindowsIpcErrorCode::WorkerFailed => "core_worker_failed",
                 _ => "core_transport_failed",
             },
+            Self::SessionTask(_) => "core_session_task_failed",
         }
     }
 }

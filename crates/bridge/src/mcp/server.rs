@@ -10,7 +10,7 @@ use crate::PRODUCT_VERSION;
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
     &[ProtocolVersion::V_2025_11_25, ProtocolVersion::V_2026_07_28];
 
-/// MCP-facing adapter. Browser capabilities will be injected in later slices.
+/// Core-owned MCP handler. Browser capabilities will be injected in later slices.
 #[derive(Clone, Debug, Default)]
 pub struct BridgeMcpServer;
 

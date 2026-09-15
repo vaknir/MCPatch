@@ -1,4 +1,7 @@
-use std::io::{self, Read, Write};
+use std::{
+    io::{self, Read, Write},
+    time::Duration,
+};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -13,25 +16,55 @@ pub async fn read_json_frame<R>(reader: &mut R) -> Result<Option<Vec<u8>>, Local
 where
     R: AsyncRead + Unpin,
 {
+    read_json_frame_inner(reader, None).await
+}
+
+/// Read a frame while bounding only the interval after its first byte arrives.
+pub(crate) async fn read_json_frame_with_partial_timeout<R>(
+    reader: &mut R,
+    partial_timeout: Duration,
+) -> Result<Option<Vec<u8>>, LocalFrameError>
+where
+    R: AsyncRead + Unpin,
+{
+    read_json_frame_inner(reader, Some(partial_timeout)).await
+}
+
+async fn read_json_frame_inner<R>(
+    reader: &mut R,
+    partial_timeout: Option<Duration>,
+) -> Result<Option<Vec<u8>>, LocalFrameError>
+where
+    R: AsyncRead + Unpin,
+{
     let mut header = [0_u8; size_of::<u32>()];
     match reader.read(&mut header[..1]).await {
         Ok(0) => return Ok(None),
         Ok(_) => {}
         Err(error) => return Err(read_error(LocalFrameErrorCode::ReadFailed, error)),
     }
-    reader
-        .read_exact(&mut header[1..])
-        .await
-        .map_err(|error| read_error(LocalFrameErrorCode::TruncatedHeader, error))?;
+    let remainder = async {
+        reader
+            .read_exact(&mut header[1..])
+            .await
+            .map_err(|error| read_error(LocalFrameErrorCode::TruncatedHeader, error))?;
 
-    let length = validate_length(header)?;
-    let mut payload = vec![0_u8; length];
-    reader
-        .read_exact(&mut payload)
-        .await
-        .map_err(|error| read_error(LocalFrameErrorCode::TruncatedPayload, error))?;
-    validate_payload(&payload)?;
-    Ok(Some(payload))
+        let length = validate_length(header)?;
+        let mut payload = vec![0_u8; length];
+        reader
+            .read_exact(&mut payload)
+            .await
+            .map_err(|error| read_error(LocalFrameErrorCode::TruncatedPayload, error))?;
+        validate_payload(&payload)?;
+        Ok(Some(payload))
+    };
+
+    match partial_timeout {
+        Some(bound) => tokio::time::timeout(bound, remainder)
+            .await
+            .map_err(|_| LocalFrameError::without_source(LocalFrameErrorCode::ReadFailed))?,
+        None => remainder.await,
+    }
 }
 
 /// Validate, write, and flush one little-endian local IPC JSON frame.
@@ -139,6 +172,8 @@ fn write_error(error: io::Error) -> LocalFrameError {
 mod tests {
     use std::io::Cursor;
 
+    use tokio::{io::AsyncWriteExt, time::timeout};
+
     use super::*;
 
     #[test]
@@ -166,5 +201,24 @@ mod tests {
 
         let error = read_json_frame_blocking(&mut Cursor::new(frame)).unwrap_err();
         assert_eq!(error.code(), LocalFrameErrorCode::InvalidJson);
+    }
+
+    #[tokio::test]
+    async fn partial_timeout_starts_only_after_the_first_byte() {
+        let (mut writer, mut reader) = tokio::io::duplex(16);
+        let mut read = tokio::spawn(async move {
+            read_json_frame_with_partial_timeout(&mut reader, Duration::from_millis(20)).await
+        });
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!read.is_finished(), "an idle peer must not be timed out");
+        writer.write_all(&[1]).await.unwrap();
+
+        let error = timeout(Duration::from_secs(1), &mut read)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.code(), LocalFrameErrorCode::ReadFailed);
     }
 }
