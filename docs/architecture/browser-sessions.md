@@ -51,3 +51,23 @@ Production bounds are intentionally independent:
 Tests use injected shorter deadlines and deterministic connection namespaces. Unix
 and Windows core paths construct the same session manager and shared registry, so the
 platform transports do not define protocol behavior.
+
+## Extension-side supervision
+
+The Manifest V3 service worker owns exactly one `runtime.connectNative` port to the
+fixed production host name `dev.mcpatch.bridge`. It installs startup and installation
+listeners synchronously before opening the port. The extension sends `hello`, waits
+at most five seconds for `hello_ack`, recomputes the highest common version from the
+bridge's advertised set, and exposes the assigned connection ID only after that
+check succeeds.
+
+While ready, the extension sends a heartbeat every 15 seconds. Malformed,
+wrong-version, wrong-direction, and fatal messages close the port. Disconnects retry
+after 250 ms, 500 ms, one second, two seconds, and then five seconds; every timer is
+kept below Chromium's 30-second worker idle interval. A reconnect creates a fresh
+session and does not queue or replay application traffic from the prior connection.
+
+The extension targets Chromium 105 or newer because an open Native Messaging port
+has kept extension service workers alive since that release. Its manifest grants
+only `nativeMessaging`; this session layer has no website authority, content script,
+external messaging surface, dynamic code generation, or remote code.
