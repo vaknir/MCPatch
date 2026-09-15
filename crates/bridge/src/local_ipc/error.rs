@@ -90,6 +90,7 @@ impl UnixIpcError {
 pub enum WindowsIpcErrorCode {
     CoreAlreadyRunning,
     EndpointInUse,
+    EndpointUnavailable,
     IdentityUnavailable,
     Io,
     MutexUnavailable,

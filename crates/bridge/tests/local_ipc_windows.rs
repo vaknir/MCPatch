@@ -9,7 +9,8 @@ use std::{
 use mcpatch_bridge::{
     bridge_core::{BridgeCoreError, CoreStopReason, WindowsBridgeCore},
     local_ipc::{
-        EndpointRole, InstallChannel, WindowsIpcErrorCode, WindowsRuntime, write_json_frame,
+        EndpointRole, InstallChannel, LocalCoreConnectionErrorCode, LocalRuntime,
+        WindowsIpcErrorCode, WindowsRuntime, write_json_frame,
     },
 };
 use tokio::{
@@ -121,6 +122,41 @@ async fn authenticates_the_client_before_reading_a_bounded_frame() {
             .recv_timeout(Duration::from_secs(5))
             .expect("authenticated server read must complete"),
         Some(br#"{"type":"test"}"#.to_vec())
+    );
+    server.join().unwrap();
+}
+
+#[tokio::test]
+async fn adapter_connection_authenticates_server_and_classifies_unavailable() {
+    let runtime = WindowsRuntime::current(InstallChannel::Production).unwrap();
+    let adapter_runtime = LocalRuntime::from(runtime.clone());
+    let unavailable = adapter_runtime
+        .connect(EndpointRole::Browser)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        unavailable.code(),
+        LocalCoreConnectionErrorCode::Unavailable
+    );
+
+    let listener = runtime.bind_after_election(EndpointRole::Browser).unwrap();
+    let server = thread::spawn(move || {
+        let mut stream = listener.accept_authenticated().unwrap();
+        assert_eq!(
+            stream.read_json().unwrap(),
+            Some(br#"{"type":"hello"}"#.to_vec())
+        );
+        stream.write_json(br#"{"type":"hello_ack"}"#).unwrap();
+    });
+
+    let mut connection = adapter_runtime
+        .connect(EndpointRole::Browser)
+        .await
+        .unwrap();
+    connection.send_json(br#"{"type":"hello"}"#).await.unwrap();
+    assert_eq!(
+        connection.receive_json().await.unwrap(),
+        Some(br#"{"type":"hello_ack"}"#.to_vec())
     );
     server.join().unwrap();
 }

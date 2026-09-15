@@ -2,10 +2,12 @@ use std::{io, path::Path};
 
 use firehazard::winapi::shared::winerror::ERROR_ACCESS_DENIED;
 use interprocess::os::windows::named_pipe::{PipeListener, PipeListenerOptions, pipe_mode};
+use tokio::net::windows::named_pipe::ClientOptions;
 
 use super::{
-    identity::current_process_logon_sid, security::security_descriptor_for,
-    stream::AuthenticatedWindowsStream,
+    identity::current_process_logon_sid,
+    security::security_descriptor_for,
+    stream::{AuthenticatedWindowsClientStream, AuthenticatedWindowsStream},
 };
 use crate::local_ipc::{EndpointRole, InstallChannel, WindowsIpcError, WindowsIpcErrorCode};
 
@@ -51,6 +53,19 @@ impl WindowsRuntime {
         role: EndpointRole,
     ) -> Result<WindowsEndpointListener, WindowsIpcError> {
         self.bind(role, true)
+    }
+
+    /// Connect to a fixed role endpoint and authenticate the server logon SID.
+    pub async fn connect(
+        &self,
+        role: EndpointRole,
+    ) -> Result<AuthenticatedWindowsClientStream, WindowsIpcError> {
+        let stream = ClientOptions::new()
+            .open(self.pipe_name(role))
+            .map_err(|error| {
+                WindowsIpcError::with_source(WindowsIpcErrorCode::EndpointUnavailable, error)
+            })?;
+        AuthenticatedWindowsClientStream::authenticate(stream, &self.expected_logon_sid)
     }
 
     fn bind(

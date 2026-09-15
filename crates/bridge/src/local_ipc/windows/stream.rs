@@ -4,14 +4,40 @@ use std::{
 };
 
 use interprocess::os::windows::named_pipe::{DuplexPipeStream, pipe_mode};
+use tokio::net::windows::named_pipe::NamedPipeClient;
 
-use super::identity::current_thread_logon_sid;
+use super::identity::{current_thread_logon_sid, named_pipe_server_logon_sid};
 use crate::local_ipc::{
-    LocalFrameError, WindowsIpcError, WindowsIpcErrorCode, read_json_frame_blocking,
-    write_json_frame_blocking,
+    LocalFrameError, WindowsIpcError, WindowsIpcErrorCode, read_json_frame,
+    read_json_frame_blocking, write_json_frame, write_json_frame_blocking,
 };
 
 type BytePipeStream = DuplexPipeStream<pipe_mode::Bytes>;
+
+/// Async named-pipe client whose server logon SID was checked before use.
+#[derive(Debug)]
+pub struct AuthenticatedWindowsClientStream {
+    inner: NamedPipeClient,
+}
+
+impl AuthenticatedWindowsClientStream {
+    pub(super) fn authenticate(
+        inner: NamedPipeClient,
+        expected_logon_sid: &str,
+    ) -> Result<Self, WindowsIpcError> {
+        let observed = named_pipe_server_logon_sid(inner.as_handle())?;
+        authorize_logon_sid(expected_logon_sid, &observed)?;
+        Ok(Self { inner })
+    }
+
+    pub async fn read_json(&mut self) -> Result<Option<Vec<u8>>, LocalFrameError> {
+        read_json_frame(&mut self.inner).await
+    }
+
+    pub async fn write_json(&mut self, payload: &[u8]) -> Result<(), LocalFrameError> {
+        write_json_frame(&mut self.inner, payload).await
+    }
+}
 
 /// Blocking named-pipe stream whose client logon SID was checked.
 #[derive(Debug)]
