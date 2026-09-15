@@ -55,14 +55,14 @@ export async function buildArtifactManifest({
 export async function describeFiles(root) {
   const files = [];
   await visit(root, "", files);
-  files.sort((left, right) => left.path.localeCompare(right.path, "en"));
+  files.sort((left, right) => compareText(left.path, right.path));
   return files;
 }
 
 async function visit(root, relativeDirectory, files) {
   const directory = path.join(root, relativeDirectory);
   const entries = await readdir(directory, { withFileTypes: true });
-  entries.sort((left, right) => left.name.localeCompare(right.name, "en"));
+  entries.sort((left, right) => compareText(left.name, right.name));
   for (const entry of entries) {
     const relativePath = path.join(relativeDirectory, entry.name);
     if (relativePath === "artifact-manifest.json") {
@@ -97,4 +97,11 @@ async function visit(root, relativeDirectory, files) {
 
 function toPortablePath(value) {
   return value.split(path.sep).join("/");
+}
+
+function compareText(left, right) {
+  if (left < right) {
+    return -1;
+  }
+  return left > right ? 1 : 0;
 }
