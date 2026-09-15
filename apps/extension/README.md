@@ -16,7 +16,8 @@ reviewed example pack into one local service-worker module, then copies the
 manifest. It fails if dynamic `eval` or `Function` code generation enters the
 bundle. Load `apps/extension/dist` with **Load unpacked** on
 `chrome://extensions` for local development. The native-host manifest must allow
-the resulting extension ID. There is no toolbar UI or real-site capability.
+the resulting extension ID. There is no toolbar enablement behavior or real-site
+capability yet.
 
 The runtime requires Chromium 105 or newer. That is the first release where an
 open Native Messaging port keeps an extension service worker alive. A failed
@@ -54,6 +55,11 @@ Only `nativeMessaging`. The manifest contains no `host_permissions`,
 `optional_permissions`, content scripts, or externally connectable surface. Future
 site access must be optional, requested from a user gesture, and scoped to an exact
 enabled pack origin.
+
+ADR 0008 fixes the Phase 6 direction: `storage`, `scripting`, and `activeTab` may be
+added as baseline permissions, while each site remains an optional HTTPS host grant.
+Reviewed scripts will be registered dynamically in the isolated world, and their
+top-level document ports—not `tabs` or `webNavigation`—will own context lifecycle.
 
 The service worker uses package-local ES modules only. Runtime-downloaded code,
 `eval`, dynamic code generation, and remote script imports are prohibited by the
