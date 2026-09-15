@@ -5,6 +5,7 @@ import {
   GOOGLE_FLIGHTS_ORIGIN,
   GOOGLE_FLIGHTS_SEARCH_PATH,
   GOOGLE_FLIGHTS_TOOLS,
+  googleFlightsBrowserPack,
   googleFlightsPack,
 } from "@mcpatch/google-flights-pack";
 import { describe, expect, it } from "vitest";
@@ -23,6 +24,7 @@ describe("bundled Google Flights production pack", () => {
       (candidate) => candidate.pack === googleFlightsPack,
     );
     expect(definition).toBeDefined();
+    expect(definition).toBe(googleFlightsBrowserPack.page);
     expect(definition?.tools).toEqual(GOOGLE_FLIGHTS_TOOLS);
     expect(typeof definition?.create).toBe("function");
     expect(BUNDLED_PACKS).toContain(googleFlightsPack);

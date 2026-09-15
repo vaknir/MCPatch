@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import { BrowserToolExecutionError } from "@mcpatch/sdk/browser";
 import {
   canonicalizePageLocation,
   packMatchesLocation,
@@ -158,7 +159,14 @@ class ReviewedDocumentAdapter implements PageAdapter {
     if (adapter === undefined) {
       throw new PageAdapterExecutionError("TOOL_UNAVAILABLE");
     }
-    return adapter.execute(tool, args, signal);
+    try {
+      return await adapter.execute(tool, args, signal);
+    } catch (error) {
+      if (error instanceof BrowserToolExecutionError) {
+        throw new PageAdapterExecutionError(error.code);
+      }
+      throw error;
+    }
   }
 
   subscribe(listener: () => void): () => void {
@@ -206,6 +214,9 @@ async function discover(
     capabilities = await adapter.capabilities(signal);
   } catch (error) {
     if (error instanceof PageAdapterExecutionError) throw error;
+    if (error instanceof BrowserToolExecutionError) {
+      throw new PageAdapterExecutionError(error.code);
+    }
     adapterFailed();
   }
   abortIfNeeded(signal);

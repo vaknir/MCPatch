@@ -1,4 +1,10 @@
-import { MCPatch, PackToolExecutionError } from "@mcpatch/sdk/runtime";
+import { MCPatch } from "@mcpatch/sdk/browser";
+
+import {
+  createGoogleFlightsPageAdapter,
+  type GoogleFlightsPageAdapter,
+} from "./adapter.js";
+import { createGoogleFlightsDocumentSource } from "./document-source.js";
 
 import {
   FLIGHTS_CURRENT_SEARCH,
@@ -9,6 +15,10 @@ import {
   GOOGLE_FLIGHTS_LANDING_PATH,
   GOOGLE_FLIGHTS_ORIGIN,
   GOOGLE_FLIGHTS_SEARCH_PATH,
+  type CurrentSearchResult,
+  type FlightResultsResult,
+  type PriceInsightsResult,
+  type SearchAcceptedResult,
 } from "./model.js";
 
 const EMPTY_INPUT_SCHEMA = {
@@ -32,8 +42,7 @@ const FINGERPRINT = {
 const AIRPORT_CODE = { type: "string", minLength: 3, maxLength: 3 } as const;
 const ISO_DATE = { type: "string", minLength: 10, maxLength: 10 } as const;
 
-const mcp = new MCPatch({
-  manifestVersion: 1,
+const mcp = new MCPatch<GoogleFlightsPageAdapter>({
   publisher: "flights",
   id: "google-flights",
   name: "Google Flights",
@@ -42,11 +51,6 @@ const mcp = new MCPatch({
   version: "0.2.1",
   digest:
     "sha256:86d045a8ad5f247a84deb08392f44e392b59782115013c57f601fba47bd8ff02",
-  compatibility: {
-    runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
-    bridgeProtocol: { minimum: 1, maximum: 1 },
-  },
-  execution: { kind: "bundled" },
   matches: [
     {
       origin: GOOGLE_FLIGHTS_ORIGIN,
@@ -56,7 +60,6 @@ const mcp = new MCPatch({
       ],
     },
   ],
-  networkPolicy: { extensionRequests: "none" },
 });
 
 mcp.tool(
@@ -66,7 +69,6 @@ mcp.tool(
     description:
       "Read bounded, visible search-form state from the current compatible Google Flights page.",
     risk: "read",
-    permissions: ["READ"],
     inputSchema: EMPTY_INPUT_SCHEMA,
     outputSchema: {
       type: "object",
@@ -97,7 +99,12 @@ mcp.tool(
       },
     },
   },
-  adapterRequired,
+  async (input, { site, signal }) =>
+    (await site.execute(
+      FLIGHTS_CURRENT_SEARCH,
+      input,
+      signal,
+    )) as unknown as CurrentSearchResult,
 );
 
 mcp.tool(
@@ -107,7 +114,6 @@ mcp.tool(
     description:
       "Open one adult economy round-trip results for exact IATA airport codes in the current compatible Google Flights tab.",
     risk: "action",
-    permissions: ["ACTION"],
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -130,7 +136,12 @@ mcp.tool(
       },
     },
   },
-  adapterRequired,
+  async (input, { site, signal }) =>
+    (await site.execute(
+      FLIGHTS_SEARCH,
+      input,
+      signal,
+    )) as unknown as SearchAcceptedResult,
 );
 
 mcp.tool(
@@ -140,7 +151,6 @@ mcp.tool(
     description:
       "Read at most 20 complete, visible flight summaries from the current compatible results page.",
     risk: "read",
-    permissions: ["READ"],
     inputSchema: EMPTY_INPUT_SCHEMA,
     outputSchema: {
       type: "object",
@@ -196,7 +206,12 @@ mcp.tool(
       },
     },
   },
-  adapterRequired,
+  async (input, { site, signal }) =>
+    (await site.execute(
+      FLIGHTS_RESULTS,
+      input,
+      signal,
+    )) as unknown as FlightResultsResult,
 );
 
 mcp.tool(
@@ -206,7 +221,6 @@ mcp.tool(
     description:
       "Read the bounded short assessment visible in the current Google Flights price-insight region.",
     risk: "read",
-    permissions: ["READ"],
     inputSchema: EMPTY_INPUT_SCHEMA,
     outputSchema: {
       type: "object",
@@ -222,10 +236,15 @@ mcp.tool(
       },
     },
   },
-  adapterRequired,
+  async (input, { site, signal }) =>
+    (await site.execute(
+      FLIGHTS_PRICE_INSIGHTS,
+      input,
+      signal,
+    )) as unknown as PriceInsightsResult,
 );
 
-export const googleFlightsPack = mcp.build({
+export const googleFlightsBrowserPack = mcp.build({
   fixtures: [
     {
       id: "page-adapter-required-search",
@@ -257,8 +276,14 @@ export const googleFlightsPack = mcp.build({
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
   ],
+  create: (document) =>
+    createGoogleFlightsPageAdapter(createGoogleFlightsDocumentSource(document)),
+  async discover({ site, signal }) {
+    return (await site.capabilities(signal)).map(
+      (capability) => capability.name,
+    );
+  },
+  subscribe: (site, listener) => site.subscribe(listener),
 });
 
-function adapterRequired(): never {
-  throw new PackToolExecutionError("TOOL_NOT_FOUND");
-}
+export const googleFlightsPack = googleFlightsBrowserPack.definition;

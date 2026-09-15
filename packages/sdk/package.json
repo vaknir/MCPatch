@@ -1,6 +1,6 @@
 {
   "name": "@mcpatch/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Safe MCPatch pack contracts and authoring SDK",
   "type": "module",
@@ -17,6 +17,10 @@
     "./runtime": {
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
     },
     "./schema/v1/*": "./schema/v1/*"
   },

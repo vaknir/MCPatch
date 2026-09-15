@@ -19,6 +19,9 @@ const protocolEntry = fileURLToPath(
 const sdkRuntimeEntry = fileURLToPath(
   new URL("../../../packages/sdk/src/runtime.ts", import.meta.url),
 );
+const sdkBrowserEntry = fileURLToPath(
+  new URL("../../../packages/sdk/src/browser.ts", import.meta.url),
+);
 const examplePacksEntry = fileURLToPath(
   new URL("../../../packs/examples/src/index.ts", import.meta.url),
 );
@@ -62,6 +65,7 @@ const sharedBuildOptions = {
     "@mcpatch/example-packs": examplePacksEntry,
     "@mcpatch/google-flights-pack": googleFlightsPackEntry,
     "@mcpatch/protocol": protocolEntry,
+    "@mcpatch/sdk/browser": sdkBrowserEntry,
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,
   },
   bundle: true,
