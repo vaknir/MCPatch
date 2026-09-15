@@ -49,6 +49,9 @@ upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
+The supported transport proof and the remaining packaged-browser gap are described
+in [docs/local-demo.md](docs/local-demo.md).
+
 ## Bridge development
 
 Run the MCP server over newline-delimited stdio:
