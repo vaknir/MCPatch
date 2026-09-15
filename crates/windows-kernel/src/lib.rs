@@ -5,8 +5,12 @@
 mod named_mutex;
 #[cfg(windows)]
 mod named_pipe;
+#[cfg(windows)]
+mod process;
 
 #[cfg(windows)]
 pub use named_mutex::*;
 #[cfg(windows)]
 pub use named_pipe::*;
+#[cfg(windows)]
+pub use process::*;

@@ -11,8 +11,8 @@ use std::{
 use futures_util::future::BoxFuture;
 
 use super::{
-    CoreConnector, CoreRendezvousErrorCode, CoreSpawner, RendezvousClock, RendezvousPolicy,
-    backoff::JitteredBackoff, rendezvous_with,
+    CoreConnector, CoreRendezvousErrorCode, CoreSpawner, JitterSeedSource, RendezvousClock,
+    RendezvousPolicy, backoff::JitteredBackoff, rendezvous_with, rendezvous_with_seed_source,
 };
 use crate::local_ipc::{
     EndpointRole, InstallChannel, LocalCoreConnectionError, LocalCoreConnectionErrorCode,
@@ -170,6 +170,32 @@ async fn reports_spawn_failure_without_retrying() {
 }
 
 #[tokio::test]
+async fn reports_entropy_failure_after_unavailable_without_spawning() {
+    let connector = ScriptedConnector::new([Err(connection_error(
+        LocalCoreConnectionErrorCode::Unavailable,
+    ))]);
+    let spawner = FakeSpawner::succeeds();
+    let clock = FakeClock::default();
+
+    let error = rendezvous_with_seed_source(
+        &connector,
+        &spawner,
+        &clock,
+        InstallChannel::Production,
+        EndpointRole::Mcp,
+        TEST_POLICY,
+        &FailingJitterSeed,
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(error.code(), CoreRendezvousErrorCode::EntropyUnavailable);
+    assert_eq!(connector.calls(), 1);
+    assert_eq!(spawner.calls(), 0);
+    assert!(clock.sleeps().is_empty());
+}
+
+#[tokio::test]
 async fn bounds_a_stalled_initial_connection_without_spawning() {
     let connector = PendingConnector;
     let spawner = FakeSpawner::succeeds();
@@ -284,6 +310,14 @@ struct ScriptedConnector {
 }
 
 struct PendingConnector;
+
+struct FailingJitterSeed;
+
+impl JitterSeedSource for FailingJitterSeed {
+    fn generate(&self) -> Result<u64, getrandom::Error> {
+        Err(getrandom::Error::UNEXPECTED)
+    }
+}
 
 impl CoreConnector for PendingConnector {
     type Connection = u8;

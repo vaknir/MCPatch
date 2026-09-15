@@ -36,5 +36,8 @@ All notable MCPatch changes are documented here. The format follows
   protocol decoding, bidirectional typed relay, and audit-safe process behavior.
 - User-private Unix local IPC primitives with distinct role endpoints, strict
   little-endian JSON framing, peer-UID authentication, and safe socket cleanup.
+- Authenticated cross-platform adapter connections, bounded connect-first core
+  rendezvous, and isolated current-executable process start with no inherited adapter
+  standard streams or Windows handles.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

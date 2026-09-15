@@ -98,6 +98,8 @@ jobs:
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked authenticates_the_client_before_reading_a_bounded_frame -- --exact --nocapture
       - name: Test Windows adapter connection
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked adapter_connection_authenticates_server_and_classifies_unavailable -- --exact --nocapture
+      - name: Test Windows isolated spawn configuration
+        run: cargo test --package mcpatch-windows-kernel --lib --all-features --locked process::tests
       - name: Test Windows protected core election
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked protected_mutex_elects_one_core_and_releases_cleanly -- --exact --nocapture
       - name: Test Windows simultaneous core election

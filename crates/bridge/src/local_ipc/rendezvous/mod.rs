@@ -1,5 +1,6 @@
 mod backoff;
 mod error;
+mod process;
 
 #[cfg(test)]
 mod tests;
@@ -10,6 +11,7 @@ use futures_util::future::BoxFuture;
 
 use self::backoff::JitteredBackoff;
 pub use self::error::{CoreRendezvousError, CoreRendezvousErrorCode};
+pub use self::process::connect_or_start_core;
 use crate::local_ipc::{
     EndpointRole, InstallChannel, LocalCoreConnection, LocalCoreConnectionError,
     LocalCoreConnectionErrorCode, LocalRuntime,
@@ -93,6 +95,18 @@ pub trait RendezvousClock: Sync {
     fn sleep(&self, duration: Duration) -> BoxFuture<'_, ()>;
 }
 
+pub(super) trait JitterSeedSource: Sync {
+    fn generate(&self) -> Result<u64, getrandom::Error>;
+}
+
+struct FixedJitterSeed(u64);
+
+impl JitterSeedSource for FixedJitterSeed {
+    fn generate(&self) -> Result<u64, getrandom::Error> {
+        Ok(self.0)
+    }
+}
+
 /// Apply connect-first, one-spawn, bounded retry semantics.
 pub async fn rendezvous_with<C, S, T>(
     connector: &C,
@@ -108,12 +122,42 @@ where
     S: CoreSpawner,
     T: RendezvousClock,
 {
+    rendezvous_with_seed_source(
+        connector,
+        spawner,
+        clock,
+        channel,
+        role,
+        policy,
+        &FixedJitterSeed(jitter_seed),
+    )
+    .await
+}
+
+pub(super) async fn rendezvous_with_seed_source<C, S, T, E>(
+    connector: &C,
+    spawner: &S,
+    clock: &T,
+    channel: InstallChannel,
+    role: EndpointRole,
+    policy: RendezvousPolicy,
+    jitter_seed: &E,
+) -> Result<C::Connection, CoreRendezvousError>
+where
+    C: CoreConnector,
+    S: CoreSpawner,
+    T: RendezvousClock,
+    E: JitterSeedSource,
+{
     match before_deadline(connector.connect(role), clock, policy.timeout).await? {
         Ok(connection) => return Ok(connection),
         Err(error) if error.code() == LocalCoreConnectionErrorCode::Unavailable => {}
         Err(error) => return Err(error.into()),
     }
 
+    let jitter_seed = jitter_seed
+        .generate()
+        .map_err(CoreRendezvousError::Entropy)?;
     before_deadline(spawner.spawn(channel), clock, policy.timeout)
         .await?
         .map_err(CoreRendezvousError::Spawn)?;
