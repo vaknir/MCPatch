@@ -75,6 +75,9 @@ All notable MCPatch changes are documented here. The format follows
 - Separately versioned Pack Manifest v1 types, closed JSON Schema, bounded semantic
   validator, compatibility policy, and shared valid/invalid golden cases for both
   declarative metadata and reviewed extension-bundled packs.
+- Strict pack authoring primitives with common JSON Schema type inference,
+  immutable definitions, a minimal execution context, and separate serializable
+  manifests and reviewed compiled-handler tables.
 
 ### Fixed
 

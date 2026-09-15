@@ -1,7 +1,7 @@
 export const PACK_MANIFEST_VERSION = 1 as const;
 
 export type JsonPrimitive = boolean | null | number | string;
-export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export type JsonValue = JsonPrimitive | JsonObject | readonly JsonValue[];
 export type JsonObject = { [key: string]: JsonValue };
 
 export type PackRisk = "action" | "read" | "sensitive";
