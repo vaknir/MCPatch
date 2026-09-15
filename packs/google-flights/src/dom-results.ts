@@ -16,7 +16,8 @@ import type {
   SemanticTextCandidate,
 } from "./model.js";
 
-const RESULT_COUNT = /(?:^|\s)([1-9]\d{0,3} results? returned)(?:\s|$)/u;
+const RESULT_COUNT =
+  /(?:^|\s)([1-9]\d{0,3} results? returned)(?:\.(?=\s|$)|\s|$)/u;
 
 export function collectCards(
   document: Document,
@@ -24,7 +25,7 @@ export function collectCards(
 ): SemanticFlightCard[] {
   const elements = semanticElements(
     document,
-    '[role="link"][tabindex="0"][aria-label^="From "][aria-label*="Total duration"][aria-label*="Select flight"]',
+    'a[aria-label^="From "][aria-label*="Total duration"][aria-label*="Select flight"],[role="link"][aria-label^="From "][aria-label*="Total duration"][aria-label*="Select flight"]',
     signal,
   );
   return elements.map((element) => {
@@ -79,7 +80,11 @@ export function collectResultSemantics(
   );
   const errors = exactStatusMatches(
     statuses,
-    new Set(["Unable to load flights", "Something went wrong"]),
+    new Set([
+      "Unable to load flights",
+      "Something went wrong",
+      "Oops, something went wrong",
+    ]),
     signal,
   );
   if (

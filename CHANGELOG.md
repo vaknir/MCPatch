@@ -9,8 +9,9 @@ All notable MCPatch changes are documented here. The format follows
 ### Added
 
 - A typed `flights.search` ACTION for one-adult economy round trips between exact
-  airport codes and bounded future dates, using only fixed reviewed form semantics,
-  one attempt per document, and an acknowledgement before navigation.
+  airport codes and bounded future dates. It generates one fixed same-origin search
+  URL, lets Google use the tab's browser session, and acknowledges before navigation
+  without form automation, captured-request replay, or credential transport.
 - An extension-owned, tab-bound one-time approval UI with a closed hash-only
   presentation channel, bounded prompts, one-shot decisions, and fail-closed sender,
   lifecycle, timeout, malformed-message, and presentation handling.

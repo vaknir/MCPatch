@@ -6,6 +6,7 @@ import {
   chromium,
   test,
   type BrowserContext,
+  type Page,
   type Worker,
 } from "@playwright/test";
 
@@ -22,6 +23,7 @@ const landingUrl = "https://www.google.com/travel/flights?hl=en";
 const unsupportedUrl = "https://www.google.com/maps?hl=en";
 const demoTool = "mcpatch.demo.status";
 const currentSearchTool = "flights.current_search";
+const searchTool = "flights.search";
 const resultsTool = "flights.results";
 const priceInsightsTool = "flights.price_insights";
 const fingerprint = "google-flights-rendered-en-v1";
@@ -29,6 +31,7 @@ const googleTools = [
   currentSearchTool,
   priceInsightsTool,
   resultsTool,
+  searchTool,
 ] as const;
 
 test.describe.configure({ mode: "serial" });
@@ -45,7 +48,7 @@ test.skip(
   "temporary-profile Native Messaging registration is Unix-only",
 );
 
-test("routes a signed-out Google Flights search without retaining page data", async ({
+test("invokes a signed-out Google Flights search through MCP without retaining page data", async ({
   browserName,
 }, testInfo) => {
   if (browserName !== "chromium") {
@@ -75,7 +78,11 @@ test("routes a signed-out Google Flights search without retaining page data", as
 
     const page = await context.newPage();
     await page.goto(landingUrl, { waitUntil: "domcontentloaded" });
-    const client = await McpStdioClient.connect(bridgePath);
+    const searchInput = futureSearchInput();
+    const client = await McpStdioClient.connect(
+      bridgePath,
+      Object.values(searchInput),
+    );
     mcp = client;
     await waitForTools(client, [demoTool]);
 
@@ -96,7 +103,11 @@ test("routes a signed-out Google Flights search without retaining page data", as
       "Google Flights enablement did not become authoritative",
     );
     await page.reload({ waitUntil: "domcontentloaded" });
-    await waitForTools(client, [demoTool, currentSearchTool], 30_000);
+    await waitForTools(
+      client,
+      [demoTool, currentSearchTool, searchTool],
+      30_000,
+    );
 
     validateCurrentSearch(
       structuredContent(await client.callTool(currentSearchTool).response),
@@ -104,9 +115,38 @@ test("routes a signed-out Google Flights search without retaining page data", as
       false,
     );
 
+    const search = client.callTool(searchTool, searchInput, 90_000);
+    await waitFor(
+      () =>
+        context
+          ?.pages()
+          .some((candidate) =>
+            candidate
+              .url()
+              .startsWith(`chrome-extension://${extensionId}/approval.html?`),
+          ) ?? false,
+      (opened) => opened,
+      10_000,
+      "trusted MCPatch approval page did not open",
+    );
     fieldInstruction(
-      "SEARCH_REQUIRED",
-      "Create a signed-out round-trip London to Paris search using future dates at least 30 days away, then click Search. Do not select a flight.",
+      "APPROVAL_REQUIRED",
+      "Review the extension-owned MCPatch prompt and click Approve once. Do not interact with the Google Flights form; the MCP tool owns that action.",
+    );
+    const searchResponse = await search.response;
+    validateSearchAccepted(structuredContent(searchResponse));
+    await waitFor(
+      () =>
+        context
+          ?.pages()
+          .some((candidate) =>
+            candidate
+              .url()
+              .startsWith(`chrome-extension://${extensionId}/approval.html`),
+          ) ?? false,
+      (opened) => !opened,
+      10_000,
+      "trusted MCPatch approval page did not close after its one-time decision",
     );
     await waitFor(
       () => new URL(page.url()).pathname,
@@ -114,7 +154,16 @@ test("routes a signed-out Google Flights search without retaining page data", as
       120_000,
       "Google Flights did not enter the supported search path",
     );
-    await waitForTools(client, [demoTool, ...googleTools], 60_000);
+    try {
+      await waitForTools(client, [demoTool, ...googleTools], 60_000);
+    } catch (error) {
+      throw new Error(
+        `Google Flights pack did not activate after MCP navigation: ${JSON.stringify(
+          await readActivationDiagnostic(worker, page),
+        )}`,
+        { cause: error },
+      );
+    }
 
     validateCurrentSearch(
       structuredContent(await client.callTool(currentSearchTool).response),
@@ -130,7 +179,11 @@ test("routes a signed-out Google Flights search without retaining page data", as
     await waitForTools(client, [demoTool], 30_000);
 
     await page.goto(landingUrl, { waitUntil: "domcontentloaded" });
-    await waitForTools(client, [demoTool, currentSearchTool], 30_000);
+    await waitForTools(
+      client,
+      [demoTool, currentSearchTool, searchTool],
+      30_000,
+    );
 
     fieldInstruction(
       "DISABLE_REQUIRED",
@@ -178,6 +231,33 @@ async function prepareNativeHostProfile(profile: string): Promise<void> {
     )}\n`,
     { flag: "wx", mode: 0o600 },
   );
+}
+
+function futureSearchInput(): Record<string, string> {
+  return {
+    origin: "LHR",
+    destination: "CDG",
+    outboundDate: isoDateFromNow(45),
+    returnDate: isoDateFromNow(52),
+  };
+}
+
+function isoDateFromNow(days: number): string {
+  const date = new Date();
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function validateSearchAccepted(value: unknown): void {
+  const accepted = dataObject(value);
+  if (
+    accepted?.["fingerprint"] !== fingerprint ||
+    accepted["state"] !== "accepted" ||
+    Object.keys(accepted).length !== 2
+  ) {
+    throw new Error("search acknowledgement contract changed");
+  }
 }
 
 async function waitForReadyResults(client: McpStdioClient): Promise<void> {
@@ -285,14 +365,25 @@ async function waitForTools(
   timeoutMs = 10_000,
 ): Promise<void> {
   const sorted = [...expected].sort();
-  await waitFor(
-    async () => toolNames(await client.listTools()),
-    (names) =>
-      names.length === sorted.length &&
-      names.every((name, index) => name === sorted[index]),
-    timeoutMs,
-    "MCP tool discovery did not reach the expected exact set",
-  );
+  let observed: readonly string[] = [];
+  try {
+    await waitFor(
+      async () => {
+        observed = toolNames(await client.listTools());
+        return observed;
+      },
+      (names) =>
+        names.length === sorted.length &&
+        names.every((name, index) => name === sorted[index]),
+      timeoutMs,
+      "MCP tool discovery did not reach the expected exact set",
+    );
+  } catch (error) {
+    throw new Error(
+      `MCP tool discovery expected ${sorted.join(",")} but observed ${observed.join(",") || "none"}`,
+      { cause: error },
+    );
+  }
 }
 
 function toolNames(tools: readonly unknown[]): readonly string[] {
@@ -341,6 +432,58 @@ async function activeTabActionTitle(worker: Worker): Promise<string> {
     if (tab?.id === undefined) return "";
     return scope.chrome.action.getTitle({ tabId: tab.id });
   });
+}
+
+async function readActivationDiagnostic(
+  worker: Worker,
+  page: Page,
+): Promise<unknown> {
+  const browser = await worker.evaluate(async () => {
+    const scope = globalThis as typeof globalThis & {
+      chrome: {
+        permissions: {
+          contains(details: { origins: string[] }): Promise<boolean>;
+        };
+        scripting: {
+          getRegisteredContentScripts(): Promise<
+            readonly { id: string; matches?: readonly string[] }[]
+          >;
+        };
+        storage: {
+          local: { get(key: string): Promise<Record<string, unknown>> };
+        };
+      };
+    };
+    const storage = await scope.chrome.storage.local.get(
+      "mcpatch.enablement.v1",
+    );
+    return {
+      permission: await scope.chrome.permissions.contains({
+        origins: ["https://www.google.com/*"],
+      }),
+      registrations: await scope.chrome.scripting.getRegisteredContentScripts(),
+      enablementStored: Object.hasOwn(storage, "mcpatch.enablement.v1"),
+    };
+  });
+  const pageState = await page.evaluate(() => {
+    const url = new URL(location.href);
+    return {
+      origin: url.origin,
+      pathname: url.pathname,
+      searchKeys: [...url.searchParams.keys()],
+      lang: document.documentElement.lang,
+      readyState: document.readyState,
+      statusCount: document.querySelectorAll(
+        '[role="status"],[aria-live="polite"],[aria-live="assertive"]',
+      ).length,
+      headingCount: document.querySelectorAll('h1,h2,h3,h4,[role="heading"]')
+        .length,
+      resultLinkCount: document.querySelectorAll(
+        'a[aria-label^="From "],[role="link"][aria-label^="From "]',
+      ).length,
+    };
+  });
+  return { browser, document: pageState };
 }
 
 async function waitFor<T>(

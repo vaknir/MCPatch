@@ -5,6 +5,7 @@ import {
   extractPriceInsights,
   extractResults,
 } from "./extractor.js";
+import { inspectEnvelope } from "./extraction-shared.js";
 import {
   FLIGHTS_CURRENT_SEARCH,
   FLIGHTS_PRICE_INSIGHTS,
@@ -84,10 +85,14 @@ const SEARCH_ACTION_CAPABILITY = Object.freeze({
   source: "pack" as const,
   name: FLIGHTS_SEARCH,
 });
-const RESULT_CAPABILITIES = Object.freeze([
-  Object.freeze({ source: "pack" as const, name: FLIGHTS_RESULTS }),
-  Object.freeze({ source: "pack" as const, name: FLIGHTS_PRICE_INSIGHTS }),
-]);
+const RESULTS_CAPABILITY = Object.freeze({
+  source: "pack" as const,
+  name: FLIGHTS_RESULTS,
+});
+const PRICE_INSIGHTS_CAPABILITY = Object.freeze({
+  source: "pack" as const,
+  name: FLIGHTS_PRICE_INSIGHTS,
+});
 
 export function createGoogleFlightsPageAdapter(
   source: GoogleFlightsSnapshotSource,
@@ -110,15 +115,22 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
     signal: AbortSignal,
   ): Promise<readonly GoogleFlightsPageCapability[]> {
     const snapshot = await this.#read(signal);
-    const current = this.#extract(() => extractCurrentSearch(snapshot, signal));
-    const capabilities: GoogleFlightsPageCapability[] = [CURRENT_CAPABILITY];
+    const path = this.#extract(() => inspectEnvelope(snapshot, signal));
+    const capabilities: GoogleFlightsPageCapability[] = [];
+    if (this.#isCompatible(() => extractCurrentSearch(snapshot, signal))) {
+      capabilities.push(CURRENT_CAPABILITY);
+    }
     if (this.#source.search !== undefined && this.#searchState === "idle") {
       capabilities.push(SEARCH_ACTION_CAPABILITY);
     }
-    if (current.path === "landing") return Object.freeze(capabilities);
-    this.#extract(() => extractResults(snapshot, signal));
-    this.#extract(() => extractPriceInsights(snapshot, signal));
-    return Object.freeze([...capabilities, ...RESULT_CAPABILITIES]);
+    if (path === "landing") return Object.freeze(capabilities);
+    if (this.#isCompatible(() => extractResults(snapshot, signal))) {
+      capabilities.push(RESULTS_CAPABILITY);
+    }
+    if (this.#isCompatible(() => extractPriceInsights(snapshot, signal))) {
+      capabilities.push(PRICE_INSIGHTS_CAPABILITY);
+    }
+    return Object.freeze(capabilities);
   }
 
   async execute(
@@ -180,17 +192,7 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
       throw error;
     }
     const snapshot = await this.#read(signal);
-    const current = this.#extract(() => extractCurrentSearch(snapshot, signal));
-    if (
-      current.tripType !== "round_trip" ||
-      current.cabinClass !== "economy" ||
-      current.passengers !== "1 passenger"
-    ) {
-      throw new GoogleFlightsAdapterError(
-        "EXECUTION_FAILED",
-        "unsupported_search_options",
-      );
-    }
+    this.#extract(() => inspectEnvelope(snapshot, signal));
     if (this.#searchState !== "idle") {
       throw new GoogleFlightsAdapterError(
         "EXECUTION_FAILED",
@@ -265,6 +267,24 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
     try {
       return operation();
     } catch (error) {
+      if (error instanceof GoogleFlightsExtractionError) {
+        throw mapExtractionError(error);
+      }
+      throw new GoogleFlightsAdapterError("EXECUTION_FAILED", "source_failure");
+    }
+  }
+
+  #isCompatible(operation: () => unknown): boolean {
+    try {
+      operation();
+      return true;
+    } catch (error) {
+      if (
+        error instanceof GoogleFlightsExtractionError &&
+        error.code !== "CANCELLED"
+      ) {
+        return false;
+      }
       if (error instanceof GoogleFlightsExtractionError) {
         throw mapExtractionError(error);
       }

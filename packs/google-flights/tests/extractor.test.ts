@@ -94,6 +94,12 @@ describe("Google Flights semantic extraction", () => {
       state: "error",
       offers: [],
     });
+    const liveError = fixture("error");
+    if (liveError.results === undefined) throw new Error("fixture invariant");
+    liveError.results.errors = [
+      { visible: true, text: "Oops, something went wrong" },
+    ];
+    expect(extractResults(liveError, signal()).state).toBe("error");
   });
 
   it("returns only a bounded short price assessment", () => {

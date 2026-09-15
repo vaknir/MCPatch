@@ -22,9 +22,9 @@ small read-only adapter:
 - current origin, destination, departure, and return values were visible through
   labelled controls;
 - the document exposed explicit loading text followed by a bounded result count;
-- each rendered flight choice had a focusable `role="link"` element with a complete
-  accessible summary covering displayed price, trip-price scope, stops, carrier,
-  departure, arrival, and duration;
+- each rendered flight choice had a native or ARIA link with a complete accessible
+  summary covering displayed price, trip-price scope, stops, carrier, departure,
+  arrival, and duration;
 - optional rendered descendants exposed emissions and baggage caveats; and
 - a `Price insights` section exposed a short visible assessment when available.
 
@@ -60,3 +60,7 @@ covered by scrubbed fixtures. A field smoke is evidence for one date and browser
 version, not a durability guarantee. Site changes require a reviewed adapter update
 and fresh fixture and field reports; runtime code must not silently broaden its
 selectors to compensate.
+
+The later search-action network observation and credential-boundary decision are
+documented separately in
+[Google Flights browser-network reconnaissance](google-flights-network-2026-09-15.md).

@@ -2,12 +2,13 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import process from "node:process";
 
 const outputDirectory = await mkdtemp(
   join(tmpdir(), "mcpatch-google-flights-field-"),
 );
 
-let exitCode = 1;
+let exitCode;
 let activeChild;
 let resolveInterrupt;
 const interrupted = new Promise((resolve) => {

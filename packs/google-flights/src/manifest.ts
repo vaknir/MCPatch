@@ -40,7 +40,7 @@ const search = defineTool({
   name: FLIGHTS_SEARCH,
   title: "Search Google Flights",
   description:
-    "Submit one adult economy round trip between exact IATA airport codes on the current compatible Google Flights page.",
+    "Open one adult economy round-trip results for exact IATA airport codes in the current compatible Google Flights tab.",
   risk: "action",
   permissions: ["ACTION"],
   inputSchema: {
@@ -201,9 +201,9 @@ export const googleFlightsPack = definePack({
   name: "Google Flights",
   description:
     "Reviewed bounded reads and one approved round-trip search action on compatible Google Flights pages.",
-  version: "0.2.0",
+  version: "0.2.1",
   digest:
-    "sha256:2f5faa701921b9b914c706f080e62dd246ddb9b9942898eb2b08dfd06e8e5448",
+    "sha256:86d045a8ad5f247a84deb08392f44e392b59782115013c57f601fba47bd8ff02",
   compatibility: {
     runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
     bridgeProtocol: { minimum: 1, maximum: 1 },

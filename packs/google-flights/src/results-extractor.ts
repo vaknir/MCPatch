@@ -29,6 +29,7 @@ const EMPTY_STATES = new Set(["No flights found"]);
 const ERROR_STATES = new Set([
   "Unable to load flights",
   "Something went wrong",
+  "Oops, something went wrong",
 ]);
 
 export function extractResults(

@@ -29,12 +29,12 @@ export function collectControls(
   return {
     origin: collectControlsBySelector(
       document,
-      'input[aria-label="Where from?"],input[placeholder="Where from?"]',
+      'input[aria-label^="Where from?"],input[placeholder="Where from?"]',
       signal,
     ),
     destination: collectControlsBySelector(
       document,
-      'input[aria-label="Where to?"],input[placeholder="Where to?"]',
+      'input[aria-label^="Where to?"],input[placeholder="Where to?"]',
       signal,
     ),
     departure: collectControlsBySelector(
