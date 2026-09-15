@@ -1,6 +1,6 @@
-import { DEMO_CONTEXT_ID, DEMO_URL, demoPack } from "@mcpatch/example-packs";
-import { PROTOCOL_VERSION } from "@mcpatch/protocol";
+import { DEMO_CONTEXT_ID, DEMO_URL } from "@mcpatch/example-packs";
 
+import { BUNDLED_PACKS, PACK_RUNTIME_OPTIONS } from "./bundled-packs.js";
 import { CompiledPackRuntime } from "./compiled-pack-runtime.js";
 import type { ChromeRuntimeLifecycleApi } from "./lifecycle.js";
 import { registerLifecycleListeners } from "./lifecycle.js";
@@ -26,6 +26,7 @@ export interface ExtensionRuntimeOptions
   readonly pageAuthority?: PageAuthority;
   readonly pageCallTimeoutMs?: number;
   readonly pageHandshakeTimeoutMs?: number;
+  readonly onPageContextOwner?: (owner: PageContextOwner) => void;
   readonly pageRandomId?: () => string;
   readonly pageScheduler?: SessionScheduler;
 }
@@ -59,15 +60,12 @@ export function startExtensionRuntime(
       ? {}
       : { scheduler: options.pageScheduler ?? options.scheduler }),
   });
+  options.onPageContextOwner?.(pageContexts);
   const session: { supervisor?: NativeSessionSupervisor } = {};
   const packs = new CompiledPackRuntime(
     (message) => session.supervisor?.send(message) ?? false,
-    [demoPack],
-    {
-      runtimeVersion: "0.1.0",
-      bridgeProtocolVersion: PROTOCOL_VERSION,
-      allowedPermissions: ["READ"],
-    },
+    BUNDLED_PACKS,
+    PACK_RUNTIME_OPTIONS,
   );
   const supervisorOptions: NativeSessionOptions = {
     ...options,

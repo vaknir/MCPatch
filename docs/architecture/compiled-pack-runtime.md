@@ -65,15 +65,13 @@ snapshot. Reconnection reevaluates the synthetic context with a fresh revision.
 
 ## Remaining real-site work
 
-No real website should be added until these separate slices exist:
+The document owner, bounded page channel, and user-gesture enablement reconciler now
+exist. Remaining slices before a real website can complete the path are:
 
-- a tab/context owner that observes navigation without broad permanent access;
-- user-gesture optional host-permission requests scoped to an enabled exact origin;
 - a native `document.modelContext` detector and validated adapter;
-- narrowly scoped content-script channels for enabled packs;
-- persistent enable/disable state and reviewed definition replacement lifecycle;
 - approval enforcement for action or sensitive tools; and
 - installer, stable extension identity, signing, and compatibility attestation.
 
-The synthetic pack intentionally retains only `nativeMessaging` in the extension
-manifest. It is a lifecycle and routing proof, not authorization to access a site.
+The manifest now carries only the baseline APIs accepted by ADR 0008 and a dormant
+Google optional-origin declaration for the Phase 7 reference pack. The synthetic
+pack remains excluded from site authority and is only a lifecycle/routing proof.

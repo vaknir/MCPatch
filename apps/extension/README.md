@@ -14,11 +14,11 @@ pnpm --filter @mcpatch/extension build
 The build bundles the shared protocol validator, codegen-free pack runtime, reviewed
 example pack, service worker, and isolated-world content runtime, then copies the
 manifest. It fails if dynamic `eval` or `Function` code generation enters either
-executable bundle. The content artifact is intentionally inert until a later slice
-adds user-approved dynamic registration. Load `apps/extension/dist` with **Load unpacked** on
-`chrome://extensions` for local development. The native-host manifest must allow
-the resulting extension ID. There is no toolbar enablement behavior or real-site
-capability yet.
+executable bundle. The content artifact is never registered statically; the
+enablement controller registers it only for user-approved reviewed origins. Load
+`apps/extension/dist` with **Load unpacked** on `chrome://extensions` for local
+development. The native-host manifest must allow the resulting extension ID. The
+toolbar enablement flow is active, while a real-site capability arrives in Phase 7.
 
 The runtime requires Chromium 106 or newer so each accepted content port has a
 browser-attested document ID. An open Native Messaging port keeps the extension
@@ -53,10 +53,12 @@ does not yet install or authorize the native-host manifest automatically.
 
 ## Current permissions
 
-Only `nativeMessaging`. The manifest contains no `host_permissions`,
-`optional_permissions`, content scripts, or externally connectable surface. Future
-site access must be optional, requested from a user gesture, and scoped to an exact
-enabled pack origin.
+The baseline permissions are `nativeMessaging`, `storage`, `scripting`, and
+`activeTab`. `activeTab` is used only by the toolbar click that identifies the
+selected page. The manifest has no permanent `host_permissions`, static content
+scripts, or externally connectable surface. Google is listed as dormant optional
+host authority for the Phase 7 reference pack; no current reviewed site pack can
+request it yet.
 
 ADR 0008 fixes the Phase 6 direction: `storage`, `scripting`, and `activeTab` may be
 added as baseline permissions, while each site remains an optional HTTPS host grant.
@@ -73,8 +75,17 @@ frame zero, tab/document IDs, and canonical HTTPS sender origin before handshake
 and atomically replaces a tab context on navigation. Calls, discovery, and retries
 are bounded; crossed traffic or revoked pack authority closes the context. Runtime
 authority still defaults to deny, remains unavailable until bridge negotiation is
-ready, and is revoked with all page state if that bridge session is lost. No content
-script is registered in the manifest yet.
+ready, and is revoked with all page state if that bridge session is lost. Content
+scripts are never registered statically.
+
+The extension action now reconciles reviewed pack enablement. It requests only the
+matching compiled pack's exact declared origin, stores a bounded v1 identity record
+in trusted-context-only local storage, and registers one deterministic top-level
+`ISOLATED` content script for that origin. Denial leaves no state. Disable and live
+storage/permission changes revoke context authority before removing scripts and
+best-effort host access. Unknown packs, changed versions/digests, corrupt records,
+registration drift, and API failures all fail closed. See
+[Pack enablement reconciliation](../../docs/architecture/pack-enablement.md).
 
 The service worker uses package-local ES modules only. Runtime-downloaded code,
 `eval`, dynamic code generation, and remote script imports are prohibited by the
