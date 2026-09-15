@@ -47,9 +47,11 @@ All notable MCPatch changes are documented here. The format follows
   Unix and Windows relay lifecycles.
 - Process-level bridge-core race, idle-stop, crash-revocation, and reconnect coverage,
   with Unix stale-socket replacement gated by the exact held channel election.
-- Core-owned browser hello negotiation, epoch-scoped connection identities, bounded
+- Core-owned browser hello negotiation, process-scoped connection identities, bounded
   bidirectional queues, heartbeat expiry, direction enforcement, and disconnect
   revocation through the shared capability registry.
+- Downgrade-verifiable hello acknowledgements that carry the acceptor's bounded
+  supported-version set for initiator-side recomputation.
 
 ### Fixed
 

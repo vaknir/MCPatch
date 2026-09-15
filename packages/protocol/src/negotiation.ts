@@ -118,11 +118,11 @@ export function selectProtocolVersion(
 
 /** Reject unoffered acknowledgements and downgrade selections. */
 export function verifySelectedVersion(
-  localVersions: readonly number[],
-  offeredVersions: readonly number[],
+  initiatorVersions: readonly number[],
+  acceptorVersions: readonly number[],
   selectedVersion: number,
 ): void {
-  const expected = selectProtocolVersion(localVersions, offeredVersions);
+  const expected = selectProtocolVersion(initiatorVersions, acceptorVersions);
   if (selectedVersion !== expected) {
     throw new ProtocolNegotiationError("UNEXPECTED_SELECTED_VERSION");
   }

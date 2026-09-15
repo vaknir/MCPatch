@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use mcpatch_bridge::protocol::{
     AcceptorNegotiation, Cancel, Hello, Implementation, Message, NegotiationCode, NegotiationEvent,
-    NegotiationPhase, Role, select_protocol_version, verify_selected_version,
+    NegotiationPhase, Role, parse_message, select_protocol_version, verify_selected_version,
 };
 use serde::Deserialize;
 
@@ -57,6 +57,39 @@ fn rejects_downgraded_or_unoffered_acknowledgements() {
     assert_eq!(
         verify_selected_version(&[1], &[1], 2)
             .expect_err("unoffered version must fail")
+            .code,
+        NegotiationCode::UnexpectedSelectedVersion
+    );
+}
+
+#[test]
+fn verifies_the_selection_against_the_acceptor_set_carried_by_hello_ack() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/protocol/fixtures/v1/valid/hello-ack.json");
+    let bytes = fs::read(path).expect("hello acknowledgement fixture must be readable");
+    let Message::HelloAck(acknowledgement) =
+        parse_message(&bytes).expect("hello acknowledgement fixture must parse")
+    else {
+        panic!("fixture must be hello_ack");
+    };
+
+    assert_eq!(
+        verify_selected_version(
+            &[1],
+            &acknowledgement.supported_protocol_versions,
+            acknowledgement.selected_protocol_version,
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        verify_selected_version(&[1, 2], &[1, 2], 1)
+            .expect_err("lower common version is a downgrade")
+            .code,
+        NegotiationCode::UnexpectedSelectedVersion
+    );
+    assert_eq!(
+        verify_selected_version(&[1], &[1], 2)
+            .expect_err("unadvertised selection must fail")
             .code,
         NegotiationCode::UnexpectedSelectedVersion
     );

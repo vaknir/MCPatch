@@ -9,6 +9,7 @@ export interface Hello extends VersionedMessage {
 
 export interface HelloAck extends VersionedMessage {
   type: "hello_ack";
+  supportedProtocolVersions: number[];
   selectedProtocolVersion: number;
   connectionId: string;
   implementation: Implementation;

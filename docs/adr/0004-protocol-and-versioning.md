@@ -44,9 +44,10 @@ differentials at the cost of requiring a negotiated protocol change for addition
 Each new authenticated bridge connection begins when the transport initiator sends
 `hello`, containing a set of supported protocol versions and implementation
 metadata. The acceptor selects the highest mutually supported version and returns
-`hello_ack`. Selecting a lower shared version is rejected as a downgrade. Before
-the acceptor sends and the initiator verifies that acknowledgement, all other
-message types are invalid.
+`hello_ack`, including its supported set. The initiator recomputes the highest
+common version from both advertised sets, so a lower shared or unadvertised
+selection is rejected as a downgrade. Before the acceptor sends and the initiator
+verifies that acknowledgement, all other message types are invalid.
 
 Handshake messages use the stable version 1 bootstrap envelope. Their
 `supportedProtocolVersions` and `selectedProtocolVersion` fields refer to the

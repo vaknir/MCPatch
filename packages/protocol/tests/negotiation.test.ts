@@ -61,6 +61,31 @@ describe("protocol version negotiation", () => {
     );
   });
 
+  it("verifies the selection against the acceptor set carried by hello_ack", () => {
+    const acknowledgement = parseMessage(
+      readFixture(validDirectory, "hello-ack.json"),
+    );
+    if (acknowledgement.type !== "hello_ack") {
+      throw new Error("fixture must be hello_ack");
+    }
+    expect(() =>
+      verifySelectedVersion(
+        [1],
+        acknowledgement.supportedProtocolVersions,
+        acknowledgement.selectedProtocolVersion,
+      ),
+    ).not.toThrow();
+
+    expectNegotiationCode(
+      () => verifySelectedVersion([1, 2], [1, 2], 1),
+      "UNEXPECTED_SELECTED_VERSION",
+    );
+    expectNegotiationCode(
+      () => verifySelectedVersion([1], [1], 2),
+      "UNEXPECTED_SELECTED_VERSION",
+    );
+  });
+
   it("gates application messages until hello", () => {
     const negotiation = new AcceptorNegotiation([1]);
     const cancel = parseMessage(readFixture(validDirectory, "cancel.json"));

@@ -130,11 +130,11 @@ pub fn select_protocol_version(
 
 /// Verify that an acknowledgement selected the highest offered common version.
 pub fn verify_selected_version(
-    local_versions: &[u32],
-    offered_versions: &[u32],
+    initiator_versions: &[u32],
+    acceptor_versions: &[u32],
     selected_version: u32,
 ) -> Result<(), NegotiationError> {
-    let expected = select_protocol_version(local_versions, offered_versions)?;
+    let expected = select_protocol_version(initiator_versions, acceptor_versions)?;
     if selected_version != expected {
         return Err(negotiation_error(
             NegotiationCode::UnexpectedSelectedVersion,

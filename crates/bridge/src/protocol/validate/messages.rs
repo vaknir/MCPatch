@@ -10,32 +10,30 @@ use crate::protocol::{
 pub(super) fn validate_hello(message: &Hello) -> Result<(), ValidationError> {
     validate_protocol_version(message.protocol_version)?;
     validate_implementation(&message.implementation)?;
-    validate_collection_size(
-        &message.supported_protocol_versions,
-        1,
-        16,
-        "supportedProtocolVersions",
-    )?;
+    validate_supported_protocol_versions(&message.supported_protocol_versions)
+}
 
-    let mut versions = HashSet::new();
-    for version in &message.supported_protocol_versions {
+pub(super) fn validate_hello_ack(message: &HelloAck) -> Result<(), ValidationError> {
+    validate_protocol_version(message.protocol_version)?;
+    validate_supported_protocol_versions(&message.supported_protocol_versions)?;
+    validate_supported_version(message.selected_protocol_version, "selectedProtocolVersion")?;
+    validate_identifier(&message.connection_id, "connectionId")?;
+    validate_implementation(&message.implementation)
+}
+
+fn validate_supported_protocol_versions(versions: &[u32]) -> Result<(), ValidationError> {
+    validate_collection_size(versions, 1, 16, "supportedProtocolVersions")?;
+    let mut unique = HashSet::new();
+    for version in versions {
         validate_supported_version(*version, "supportedProtocolVersions")?;
-        if !versions.insert(*version) {
+        if !unique.insert(*version) {
             return Err(invalid(
                 ValidationCode::InvalidValue,
                 "supportedProtocolVersions",
             ));
         }
     }
-
     Ok(())
-}
-
-pub(super) fn validate_hello_ack(message: &HelloAck) -> Result<(), ValidationError> {
-    validate_protocol_version(message.protocol_version)?;
-    validate_supported_version(message.selected_protocol_version, "selectedProtocolVersion")?;
-    validate_identifier(&message.connection_id, "connectionId")?;
-    validate_implementation(&message.implementation)
 }
 
 pub(super) fn validate_context_closed(message: &ContextClosed) -> Result<(), ValidationError> {

@@ -192,6 +192,10 @@ async fn browser_endpoint_negotiates_before_serving_the_session() {
     let Message::HelloAck(acknowledgement) = parse_message(&payload).unwrap() else {
         panic!("browser session must return hello_ack");
     };
+    assert_eq!(
+        acknowledgement.supported_protocol_versions,
+        vec![PROTOCOL_VERSION]
+    );
     assert_eq!(acknowledgement.selected_protocol_version, PROTOCOL_VERSION);
     assert!(acknowledgement.connection_id.starts_with("browser."));
     assert!(!acknowledgement.connection_id.contains(&private_epoch));
