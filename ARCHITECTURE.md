@@ -50,6 +50,9 @@ wire-format rules, and local IPC seam are documented in
 [Native Messaging adapter](docs/architecture/native-messaging-adapter.md).
 The implemented Unix rendezvous primitive is documented in
 [Local IPC transport](docs/architecture/local-ipc-transport.md).
+Core-owned negotiation, liveness, direction checks, and disconnect revocation are
+documented in
+[Negotiated browser sessions](docs/architecture/browser-sessions.md).
 
 ### Browser extension
 

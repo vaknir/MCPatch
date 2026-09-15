@@ -66,5 +66,5 @@ failure, bidirectional relay, browser failure, and IPC loss.
 This separation keeps Native Messaging's native-endian framing out of the local IPC
 implementation, which uses its own little-endian framing and peer-identity checks as
 specified by [ADR 0007](../adr/0007-local-ipc-and-core-lifecycle.md). Bridge-protocol
-hello/version state enforcement remains in
-[#38](https://github.com/vaknir/MCPatch/issues/38).
+hello/version state is enforced only after the relay reaches the bridge core, as
+specified in [Negotiated browser sessions](browser-sessions.md).

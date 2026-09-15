@@ -197,8 +197,9 @@ primitive, authenticated adapter-side connections, deterministic bounded rendezv
 and isolated production process start. Native Messaging and MCP stdio now use their
 distinct browser and MCP endpoints. The core owns MCP initialization, handlers, and
 session limits; the stdio process only translates bounded newline frames.
-Protocol negotiation remains in
-[#38](https://github.com/vaknir/MCPatch/issues/38).
+Authenticated browser streams now enter the same core-owned negotiated session
+runtime on both platforms; see
+[Negotiated browser sessions](browser-sessions.md).
 
 No path-based design can distinguish a hostile process already running as the same
 interactive user. Private Unix directories and peer UIDs, protected Windows DACLs and

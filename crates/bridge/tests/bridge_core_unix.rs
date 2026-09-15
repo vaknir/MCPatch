@@ -14,6 +14,7 @@ use mcpatch_bridge::{
     local_ipc::{
         AuthenticatedUnixStream, EndpointRole, InstallChannel, UnixIpcErrorCode, UnixRuntime,
     },
+    protocol::{Hello, Implementation, Message, PROTOCOL_VERSION, Role, parse_message},
 };
 use serde_json::{Value, json};
 use tokio::time::timeout;
@@ -168,6 +169,46 @@ async fn initialized_mcp_disconnect_starts_idle_grace_without_stopping_the_core(
 }
 
 #[tokio::test]
+async fn browser_endpoint_negotiates_before_serving_the_session() {
+    let fixture = TestDirectory::new();
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let core = UnixBridgeCore::start(runtime.clone()).await.unwrap();
+    let private_epoch = core.epoch().as_str().to_owned();
+    let shutdown = CancellationToken::new();
+    let core_task = tokio::spawn(core.run(Duration::from_secs(60), shutdown.clone()));
+    let mut browser = runtime.connect(EndpointRole::Browser).await.unwrap();
+
+    browser
+        .write_json(&serde_json::to_vec(&browser_hello()).unwrap())
+        .await
+        .unwrap();
+    let payload = timeout(Duration::from_secs(2), browser.read_json())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let Message::HelloAck(acknowledgement) = parse_message(&payload).unwrap() else {
+        panic!("browser session must return hello_ack");
+    };
+    assert_eq!(acknowledgement.selected_protocol_version, PROTOCOL_VERSION);
+    assert!(acknowledgement.connection_id.starts_with("browser."));
+    assert!(!acknowledgement.connection_id.contains(&private_epoch));
+
+    drop(browser);
+    shutdown.cancel();
+    assert_eq!(
+        timeout(Duration::from_secs(2), core_task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        CoreStopReason::Shutdown
+    );
+}
+
+#[tokio::test]
 async fn core_bounds_sessions_per_parser_role() {
     const SESSION_LIMIT: usize = 8;
     let fixture = TestDirectory::new();
@@ -255,6 +296,18 @@ async fn initialize_and_list_tools(stream: &mut AuthenticatedUnixStream, id: u64
     .unwrap();
     assert_eq!(response["id"], list_id);
     assert_eq!(response["result"]["tools"], json!([]));
+}
+
+fn browser_hello() -> Message {
+    Message::Hello(Hello {
+        protocol_version: PROTOCOL_VERSION,
+        role: Role::Extension,
+        supported_protocol_versions: vec![PROTOCOL_VERSION],
+        implementation: Implementation {
+            name: "mcpatch-extension".to_owned(),
+            version: "0.1.0".to_owned(),
+        },
+    })
 }
 
 static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
