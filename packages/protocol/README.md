@@ -55,8 +55,9 @@ as a v1 application message. A peer must authenticate the transport before its
 1. A connection authenticates at the transport layer.
 2. The transport initiator sends `hello` using the stable bootstrap envelope.
 3. The acceptor selects the highest common application protocol version.
-4. `hello_ack` fixes the selected version and connection ID; a lower shared
-   selection is rejected as a downgrade.
+4. `hello_ack` advertises the acceptor's supported set and fixes the selected
+   version and connection ID. The initiator recomputes the highest common version;
+   a lower or unadvertised selection is rejected as a downgrade.
 5. Other messages are invalid until the acceptor sends and the initiator verifies
    the acknowledgement.
 6. A complete capability snapshot atomically replaces the prior snapshot for the

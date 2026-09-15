@@ -33,6 +33,7 @@ pub struct Hello {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct HelloAck {
     pub protocol_version: u32,
+    pub supported_protocol_versions: Vec<u32>,
     pub selected_protocol_version: u32,
     pub connection_id: String,
     pub implementation: Implementation,

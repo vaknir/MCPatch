@@ -33,31 +33,7 @@ export function validateHello(value: unknown): ValidationIssue | undefined {
     validateImplementation(message.implementation);
   if (basicIssue !== undefined) return basicIssue;
 
-  if (!Array.isArray(message.supportedProtocolVersions)) {
-    return issue("INVALID_TYPE", "supportedProtocolVersions");
-  }
-  if (
-    message.supportedProtocolVersions.length < 1 ||
-    message.supportedProtocolVersions.length > 16
-  ) {
-    return issue("LIMIT_EXCEEDED", "supportedProtocolVersions");
-  }
-  if (
-    message.supportedProtocolVersions.some(
-      (version) =>
-        validatePositiveSafeInteger(
-          version,
-          "supportedProtocolVersions",
-          2_147_483_647,
-        ) !== undefined,
-    ) ||
-    new Set(message.supportedProtocolVersions).size !==
-      message.supportedProtocolVersions.length
-  ) {
-    return issue("INVALID_VALUE", "supportedProtocolVersions");
-  }
-
-  return undefined;
+  return validateSupportedProtocolVersions(message.supportedProtocolVersions);
 }
 
 export function validateHelloAck(value: unknown): ValidationIssue | undefined {
@@ -66,6 +42,7 @@ export function validateHelloAck(value: unknown): ValidationIssue | undefined {
     [
       "protocolVersion",
       "type",
+      "supportedProtocolVersions",
       "selectedProtocolVersion",
       "connectionId",
       "implementation",
@@ -74,7 +51,7 @@ export function validateHelloAck(value: unknown): ValidationIssue | undefined {
   );
   if (checked.issue !== undefined) return checked.issue;
   const message = checked.value as JsonRecord;
-  return (
+  const basicIssue =
     validateProtocolVersion(message.protocolVersion) ??
     (message.type === "hello_ack"
       ? undefined
@@ -85,6 +62,34 @@ export function validateHelloAck(value: unknown): ValidationIssue | undefined {
       2_147_483_647,
     ) ??
     validateIdentifier(message.connectionId, "connectionId") ??
-    validateImplementation(message.implementation)
+    validateImplementation(message.implementation);
+  return (
+    basicIssue ??
+    validateSupportedProtocolVersions(message.supportedProtocolVersions)
   );
+}
+
+function validateSupportedProtocolVersions(
+  versions: unknown,
+): ValidationIssue | undefined {
+  if (!Array.isArray(versions)) {
+    return issue("INVALID_TYPE", "supportedProtocolVersions");
+  }
+  if (versions.length < 1 || versions.length > 16) {
+    return issue("LIMIT_EXCEEDED", "supportedProtocolVersions");
+  }
+  if (
+    versions.some(
+      (version) =>
+        validatePositiveSafeInteger(
+          version,
+          "supportedProtocolVersions",
+          2_147_483_647,
+        ) !== undefined,
+    ) ||
+    new Set(versions).size !== versions.length
+  ) {
+    return issue("INVALID_VALUE", "supportedProtocolVersions");
+  }
+  return undefined;
 }

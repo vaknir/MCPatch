@@ -258,6 +258,10 @@ async fn negotiate(
     let Message::HelloAck(acknowledgement) = parse_message(&payload).unwrap() else {
         panic!("bridge must acknowledge the hello");
     };
+    assert_eq!(
+        acknowledgement.supported_protocol_versions,
+        vec![PROTOCOL_VERSION]
+    );
     assert_eq!(acknowledgement.selected_protocol_version, PROTOCOL_VERSION);
     assert_eq!(acknowledgement.implementation.name, "mcpatch-bridge");
     mcpatch_bridge::browser::BrowserConnectionId::parse(acknowledgement.connection_id).unwrap()

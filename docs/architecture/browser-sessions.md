@@ -7,7 +7,8 @@ endpoint then runs this state machine:
 
 1. wait at most five seconds for the first complete local frame;
 2. require a validated version-1 bootstrap `hello` with role `extension`;
-3. select the highest locally supported version advertised by both peers;
+3. select the highest version advertised by both peers and return the bridge's set
+   so the extension can verify that choice;
 4. assign a fresh opaque connection ID scoped to the current bridge-core process;
 5. write `hello_ack` and only then register the connection; and
 6. require a valid heartbeat at least once every 45 seconds until disconnect.

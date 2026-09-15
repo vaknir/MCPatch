@@ -257,6 +257,7 @@ impl BrowserSessionManager {
         let connection_id = self.ids.next()?;
         let acknowledgement = Message::HelloAck(HelloAck {
             protocol_version: PROTOCOL_VERSION,
+            supported_protocol_versions: SUPPORTED_PROTOCOL_VERSIONS.to_vec(),
             selected_protocol_version,
             connection_id: connection_id.as_str().to_owned(),
             implementation: Implementation {

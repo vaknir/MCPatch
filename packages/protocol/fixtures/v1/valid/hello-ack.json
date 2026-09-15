@@ -1,6 +1,7 @@
 {
   "protocolVersion": 1,
   "type": "hello_ack",
+  "supportedProtocolVersions": [1],
   "selectedProtocolVersion": 1,
   "connectionId": "connection-01J8QAZ6V4F2K7M3",
   "implementation": {
