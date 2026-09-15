@@ -1,0 +1,50 @@
+{
+  "manifestVersion": 1,
+  "publisher": "mcpatch",
+  "id": "demo-pack",
+  "name": "MCPatch demo pack",
+  "description": "A deterministic bundled pack used for local contract tests.",
+  "version": "0.1.0",
+  "digest": "sha256:879486d0000d36f06d47958b5285dec823c7805112a4bd086962c20e1d54fb78",
+  "compatibility": {
+    "runtime": { "minimum": "0.1.0", "maximumExclusive": "0.2.0" },
+    "bridgeProtocol": { "minimum": 1, "maximum": 1 }
+  },
+  "execution": { "kind": "bundled" },
+  "matches": [
+    {
+      "origin": "https://demo.mcpatch.invalid",
+      "paths": [{ "kind": "exact", "path": "/" }]
+    }
+  ],
+  "networkPolicy": { "extensionRequests": "none" },
+  "tools": [
+    {
+      "name": "mcpatch.demo.status",
+      "title": "MCPatch demo status",
+      "description": "Return deterministic MCPatch demo runtime status.",
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "maxProperties": 0,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": { "status": { "const": "ready", "type": "string" } }
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "ready",
+      "tool": "mcpatch.demo.status",
+      "input": {},
+      "expect": { "kind": "result", "result": { "status": "ready" } }
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+[
+  {
+    "name": "unsupported-manifest-version",
+    "operation": { "kind": "set", "path": "/manifestVersion", "value": 2 },
+    "schemaValid": false,
+    "issue": { "code": "UNSUPPORTED_VERSION", "field": "manifestVersion" }
+  },
+  {
+    "name": "wildcard-origin",
+    "operation": {
+      "kind": "set",
+      "path": "/matches/0/origin",
+      "value": "https://*.example.com"
+    },
+    "schemaValid": false,
+    "issue": { "code": "INVALID_ORIGIN", "field": "matches[0].origin" }
+  },
+  {
+    "name": "unsafe-dot-segment-path",
+    "operation": {
+      "kind": "set",
+      "path": "/matches/0/paths/0/path",
+      "value": "/items/../admin"
+    },
+    "schemaValid": false,
+    "issue": { "code": "INVALID_PATH", "field": "matches[0].paths[0].path" }
+  },
+  {
+    "name": "risk-permission-mismatch",
+    "operations": [
+      { "kind": "set", "path": "/tools/0/risk", "value": "sensitive" },
+      { "kind": "set", "path": "/tools/0/permissions", "value": ["READ"] }
+    ],
+    "schemaValid": true,
+    "issue": { "code": "INVALID_PERMISSION", "field": "tools[0].risk" }
+  },
+  {
+    "name": "malformed-semver",
+    "operation": { "kind": "set", "path": "/version", "value": "01.0.0" },
+    "schemaValid": false,
+    "issue": { "code": "INVALID_VERSION", "field": "version" }
+  },
+  {
+    "name": "malformed-digest",
+    "operation": {
+      "kind": "set",
+      "path": "/digest",
+      "value": "sha256:NOT-A-DIGEST"
+    },
+    "schemaValid": false,
+    "issue": { "code": "INVALID_DIGEST", "field": "digest" }
+  },
+  {
+    "name": "unknown-executable-field",
+    "operation": {
+      "kind": "set",
+      "path": "/remoteScript",
+      "value": "https://example.com/pack.js"
+    },
+    "schemaValid": false,
+    "issue": { "code": "UNKNOWN_FIELD", "field": "$.remoteScript" }
+  },
+  {
+    "name": "bundled-entrypoint-field",
+    "operation": {
+      "kind": "set",
+      "path": "/execution/entrypoint",
+      "value": "https://example.com/pack.js"
+    },
+    "schemaValid": false,
+    "issue": { "code": "UNKNOWN_FIELD", "field": "execution.entrypoint" }
+  },
+  {
+    "name": "missing-network-policy",
+    "operation": { "kind": "remove", "path": "/networkPolicy" },
+    "schemaValid": false,
+    "issue": { "code": "INVALID_VALUE", "field": "$.networkPolicy" }
+  },
+  {
+    "name": "duplicate-tool",
+    "operation": { "kind": "copy", "from": "/tools/0", "path": "/tools/-" },
+    "schemaValid": false,
+    "issue": { "code": "DUPLICATE_VALUE", "field": "tools[1].name" }
+  },
+  {
+    "name": "inverted-runtime-range",
+    "operation": {
+      "kind": "set",
+      "path": "/compatibility/runtime",
+      "value": { "minimum": "0.2.0", "maximumExclusive": "0.1.0" }
+    },
+    "schemaValid": true,
+    "issue": {
+      "code": "INVALID_COMPATIBILITY",
+      "field": "compatibility.runtime"
+    }
+  },
+  {
+    "name": "undeclared-fixture-tool",
+    "operation": {
+      "kind": "set",
+      "path": "/fixtures/0/tool",
+      "value": "mcpatch.demo.missing"
+    },
+    "schemaValid": true,
+    "issue": { "code": "INVALID_REFERENCE", "field": "fixtures[0].tool" }
+  }
+]

@@ -72,6 +72,9 @@ All notable MCPatch changes are documented here. The format follows
 - Cross-platform process proof for the bundled demo across Native Messaging,
   authenticated local IPC, bridge-core discovery/routing, and MCP stdio, including
   context closure, disconnect revocation, and fresh publication after core restart.
+- Separately versioned Pack Manifest v1 types, closed JSON Schema, bounded semantic
+  validator, compatibility policy, and shared valid/invalid golden cases for both
+  declarative metadata and reviewed extension-bundled packs.
 
 ### Fixed
 

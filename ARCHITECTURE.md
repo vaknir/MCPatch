@@ -76,6 +76,9 @@ Initially, packs are local development artifacts or verified, installed bundles.
 Marketplace metadata is never executable. Remote code is not downloaded into an
 authenticated page at runtime.
 
+The closed, separately versioned contract and its activation boundaries are
+documented in [Pack Manifest version 1](docs/architecture/pack-manifest-v1.md).
+
 ### Registry
 
 The future registry distributes immutable, signed pack releases and compatibility
