@@ -56,6 +56,8 @@ The supported transport proof is described in
 documented in [docs/installation.md](docs/installation.md).
 The isolated browser suite is documented in
 [docs/testing/chromium-fixtures.md](docs/testing/chromium-fixtures.md).
+The first real-site adapter contract is documented in
+[docs/architecture/google-flights-adapter.md](docs/architecture/google-flights-adapter.md).
 
 Pack development now has a separately versioned, closed Pack Manifest v1 contract
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
