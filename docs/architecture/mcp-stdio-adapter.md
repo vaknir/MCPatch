@@ -44,7 +44,17 @@ not exposed as tool metadata. Ordering follows the registry's stable tool-name o
 The bounded version-1 registry fits in one response, so cursors are rejected and each
 new list request observes the latest snapshot, context closure, and disconnect state.
 
-Tests cover real process initialization, empty and live/revoked discovery, multiple
-core-owned sessions, per-role limits, malformed and oversized stdio, local loss,
-stdio EOF, and the authenticated Unix and Windows transport paths. No TCP, HTTP, or
-browser-facing surface is introduced.
+`tools/call` validates arguments against the selected capability before browser
+dispatch, creates a bridge-owned correlation ID, and waits on that exact registry
+reservation. The browser response must match the authenticated connection, context,
+revision, and origin, and any declared output schema. Valid results become MCP
+structured content; typed browser errors remain tool errors. Policy denial, invalid
+output, disconnect, cancellation, and the 30-second deadline fail closed without
+returning route metadata or rejected browser data. Cancellation and timeout consume
+the reservation before a best-effort `cancel` message is sent to the browser.
+
+Tests cover real process initialization, empty and live/revoked discovery, exact
+tool-call routing and completion, browser errors, invalid arguments and results,
+cancellation, timeout, disconnect, multiple core-owned sessions, per-role limits,
+malformed and oversized stdio, local loss, stdio EOF, and the authenticated Unix and
+Windows transport paths. No TCP, HTTP, or browser-facing surface is introduced.

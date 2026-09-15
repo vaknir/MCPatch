@@ -66,6 +66,9 @@ All notable MCPatch changes are documented here. The format follows
 - Live MCP `tools/list` projection of policy-visible registry capabilities with
   stable ordering, exact schemas, conservative annotations, and no internal route
   metadata.
+- MCP `tools/call` routing through bridge-owned correlation IDs, exact browser
+  completion, schema enforcement, bounded deadlines, cancellation propagation, and
+  safe errors that do not expose rejected browser data or internal route metadata.
 
 ### Fixed
 
