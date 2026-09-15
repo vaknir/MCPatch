@@ -34,12 +34,31 @@ export function validateJsonBounds(
     } else if (typeof current.value === "boolean" || current.value === null) {
       bytes += 5;
     } else if (Array.isArray(current.value)) {
-      for (const [index, child] of current.value.entries()) {
+      const array = current.value;
+      for (let index = 0; index < array.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(array, index);
+        if (descriptor === undefined || !("value" in descriptor)) {
+          return issue("INVALID_TYPE", `${current.field}[${index}]`);
+        }
         stack.push({
           depth: current.depth + 1,
           field: `${current.field}[${index}]`,
-          value: child,
+          value: descriptor.value,
         });
+      }
+      const unknown = Reflect.ownKeys(array).find((key) => {
+        if (key === "length") return false;
+        if (typeof key !== "string") return true;
+        const index = Number(key);
+        return (
+          !Number.isSafeInteger(index) ||
+          index < 0 ||
+          index >= array.length ||
+          String(index) !== key
+        );
+      });
+      if (unknown !== undefined) {
+        return issue("UNKNOWN_FIELD", `${current.field}.[array-property]`);
       }
     } else if (isRecord(current.value)) {
       for (const key of Reflect.ownKeys(current.value)) {

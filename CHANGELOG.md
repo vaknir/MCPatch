@@ -81,6 +81,9 @@ All notable MCPatch changes are documented here. The format follows
 - Pure bounded pack matching and context-bound capability resolution with canonical
   HTTPS origins, native WebMCP precedence, stable ordering, and explicit fail-closed
   collision diagnostics.
+- Deterministic compiled-pack fixture verification with whole-pack preflight,
+  runtime and bridge compatibility checks, explicit permission ceilings, typed
+  error cases, result-schema validation, deadlines, and payload-free evidence.
 
 ### Fixed
 
