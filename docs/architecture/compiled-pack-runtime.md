@@ -70,8 +70,11 @@ exist. The isolated content runtime also projects the current same-origin read-o
 subset of the draft `document.modelContext` API through a bounded adapter. Remaining
 slices before a real website can complete the path are:
 
-- approval enforcement for action or sensitive tools; and
 - installer, stable extension identity, signing, and compatibility attestation.
+
+The bridge now enforces one-time approvals for action and sensitive tools. The
+trusted approval UI is a later product slice; until it exists the extension denies
+every elevated request.
 
 The manifest now carries only the baseline APIs accepted by ADR 0008 and a dormant
 Google optional-origin declaration for the Phase 7 reference pack. The synthetic

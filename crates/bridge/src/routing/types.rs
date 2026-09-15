@@ -7,7 +7,9 @@ use crate::{
     browser::{
         BrowserConnection, BrowserConnectionError, BrowserConnectionErrorCode, BrowserConnectionId,
     },
-    protocol::{Cancel, JsonObject, Message, ToolCall, ToolError, ToolResult},
+    protocol::{
+        ApprovalRequired, Cancel, Capability, JsonObject, Message, ToolCall, ToolError, ToolResult,
+    },
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -58,6 +60,115 @@ pub struct RoutedCall {
     completion: oneshot::Receiver<Result<BrowserToolResponse, RoutedCallCompletionError>>,
     message: ToolCall,
     revocation: CancellationToken,
+}
+
+pub enum CallReservation {
+    Approval(RoutedApproval),
+    Call(RoutedCall),
+}
+
+pub struct RoutedApproval {
+    connection: Arc<dyn BrowserConnection>,
+    completion: oneshot::Receiver<Result<ApprovalGrant, ApprovalCompletionError>>,
+    message: ApprovalRequired,
+    revocation: CancellationToken,
+}
+
+impl RoutedApproval {
+    pub(crate) fn new(
+        connection: Arc<dyn BrowserConnection>,
+        completion: oneshot::Receiver<Result<ApprovalGrant, ApprovalCompletionError>>,
+        message: ApprovalRequired,
+        revocation: CancellationToken,
+    ) -> Self {
+        Self {
+            connection,
+            completion,
+            message,
+            revocation,
+        }
+    }
+
+    pub fn message(&self) -> &ApprovalRequired {
+        &self.message
+    }
+
+    pub fn revocation(&self) -> CancellationToken {
+        self.revocation.clone()
+    }
+
+    pub async fn completion(self) -> Result<ApprovalGrant, ApprovalCompletionError> {
+        self.completion
+            .await
+            .unwrap_or(Err(ApprovalCompletionError::Revoked))
+    }
+
+    pub async fn dispatch(&self) -> Result<(), BrowserConnectionError> {
+        if self.revocation.is_cancelled() {
+            return Err(BrowserConnectionError::new(
+                BrowserConnectionErrorCode::Closed,
+            ));
+        }
+        tokio::select! {
+            biased;
+            _ = self.revocation.cancelled() => {
+                Err(BrowserConnectionError::new(BrowserConnectionErrorCode::Closed))
+            }
+            result = self.connection.send(Message::ApprovalRequired(self.message.clone())) => result,
+        }
+    }
+}
+
+impl fmt::Debug for RoutedApproval {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RoutedApproval")
+            .field("connection_id", self.connection.id())
+            .field("request_id", &self.message.request_id)
+            .field("context_id", &self.message.context_id)
+            .field("context_revision", &self.message.context_revision)
+            .field("tool", &self.message.tool)
+            .field("revoked", &self.revocation.is_cancelled())
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ApprovalCompletionError {
+    Denied,
+    Expired,
+    Revoked,
+}
+
+pub struct ApprovalGrant {
+    pub(super) binding: ApprovalBinding,
+}
+
+impl fmt::Debug for ApprovalGrant {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ApprovalGrant")
+            .field("request_id", &self.binding.invocation.request_id)
+            .field("context_id", &self.binding.context_id)
+            .field("context_revision", &self.binding.context_revision)
+            .field("tool", &self.binding.invocation.tool)
+            .finish_non_exhaustive()
+    }
+}
+
+pub(super) struct ApprovalBinding {
+    pub approval_id: String,
+    pub protocol_version: u32,
+    pub policy_version: u32,
+    pub connection_id: BrowserConnectionId,
+    pub context_id: String,
+    pub context_revision: u64,
+    pub origin: String,
+    pub capability: Capability,
+    pub invocation: ToolInvocation,
+    pub args_hash: [u8; 32],
+    pub issued_at: time::OffsetDateTime,
+    pub expires_at: time::OffsetDateTime,
 }
 
 impl RoutedCall {
@@ -173,5 +284,11 @@ pub(super) struct ActiveRequest {
     pub context_revision: u64,
     pub origin: String,
     pub output_validator: Option<jsonschema::Validator>,
+    pub revocation: CancellationToken,
+}
+
+pub(super) struct PendingApproval {
+    pub binding: ApprovalBinding,
+    pub completion: oneshot::Sender<Result<ApprovalGrant, ApprovalCompletionError>>,
     pub revocation: CancellationToken,
 }

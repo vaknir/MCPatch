@@ -28,8 +28,9 @@ Native WebMCP versus pack precedence is resolved by the extension before it send
 complete snapshot. Duplicate names inside one snapshot are invalid protocol data.
 
 Capabilities with permissions that are always denied are not advertised. Action or
-sensitive capabilities may be advertised, but dispatch stops with
-`ApprovalRequired` until an argument-bound one-time approval is implemented.
+sensitive capabilities may be advertised, but dispatch requires a bridge-owned,
+argument-bound one-time approval. Without the separately trusted approval UI, the
+extension deterministically denies that request.
 
 ## Call routing
 
@@ -39,8 +40,9 @@ For each call, the registry:
 2. resolves one exact capability or fails closed;
 3. applies the fixed permission policy;
 4. validates arguments against the registered JSON Schema;
-5. creates a tool call containing the registered context, revision, and origin; and
-6. records a revocation token and one-shot completion channel before dispatch.
+5. for elevated tools, creates and atomically consumes the exact pending approval;
+6. creates a tool call containing the registered context, revision, and origin; and
+7. records a revocation token and one-shot completion channel before dispatch.
 
 JSON Schema draft 2020-12 validators are compiled when a snapshot is accepted.
 Schema depth and node counts are bounded. HTTP and file resolver features are not

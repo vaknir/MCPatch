@@ -65,6 +65,10 @@ permissions are now explicit, and the isolated content runtime adapts the strict
 read-only same-origin subset of native `document.modelContext`. A reviewed real-site
 pack remains future work.
 
+The bridge now owns argument-bound, expiring, single-use approval state for action
+and sensitive tools. No trusted approval UI ships yet, so the extension denies those
+requests by default and only read-only capabilities are usable.
+
 ## Bridge development
 
 Run the MCP server over newline-delimited stdio:

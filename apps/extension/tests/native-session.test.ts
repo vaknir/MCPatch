@@ -1,5 +1,6 @@
 import {
   PROTOCOL_VERSION,
+  type ApprovalRequired,
   type ConnectionError,
   type ContextClosed,
   type HelloAck,
@@ -196,6 +197,25 @@ describe("native session supervisor", () => {
     expect(unhandled.runtime.latestPort.disconnected).toBe(true);
   });
 
+  it("denies approvals until a trusted extension UI is installed", () => {
+    const runtime = new FakeRuntime();
+    const scheduler = new FakeScheduler();
+    startExtensionRuntime(runtime, { ...TEST_OPTIONS, scheduler });
+    const port = runtime.latestPort;
+    port.emitMessage(helloAck());
+
+    port.emitMessage(approvalRequired());
+
+    expect(parsePosted(port, 2)).toEqual({
+      protocolVersion: PROTOCOL_VERSION,
+      type: "approval_result",
+      approvalId: "approval.0123456789abcdef0123456789abcdef",
+      requestId: "request-approval",
+      decision: "denied",
+    });
+    expect(port.disconnected).toBe(false);
+  });
+
   it("stops cleanly and ignores stale port events", () => {
     const { runtime, scheduler, supervisor } = setup();
     const first = runtime.latestPort;
@@ -339,6 +359,21 @@ function toolResult(): ToolResult {
     contextRevision: 1,
     origin: "https://example.com",
     result: {},
+  };
+}
+
+function approvalRequired(): ApprovalRequired {
+  return {
+    protocolVersion: PROTOCOL_VERSION,
+    type: "approval_required",
+    approvalId: "approval.0123456789abcdef0123456789abcdef",
+    requestId: "request-approval",
+    contextId: "tab-1",
+    contextRevision: 1,
+    origin: "https://example.com",
+    tool: "demo.action",
+    argsHash: "a".repeat(64),
+    expiresAt: "2026-09-15T00:01:00Z",
   };
 }
 

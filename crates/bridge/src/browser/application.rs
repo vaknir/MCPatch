@@ -6,6 +6,7 @@ use crate::{
     protocol::Message,
     routing::{BrowserToolResponse, RegistryChange, SharedCapabilityRegistry},
 };
+use time::OffsetDateTime;
 
 pub(super) enum ReadyMessageAction {
     Continue,
@@ -53,6 +54,14 @@ pub(super) async fn apply_ready_message(
                 .lock()
                 .await
                 .accept_response(connection_id, BrowserToolResponse::Error(error))
+                .map_err(|_| registry_rejected())?;
+            Ok(ReadyMessageAction::Continue)
+        }
+        Message::ApprovalResult(result) => {
+            registry
+                .lock()
+                .await
+                .accept_approval_result(connection_id, result, OffsetDateTime::now_utc())
                 .map_err(|_| registry_rejected())?;
             Ok(ReadyMessageAction::Continue)
         }

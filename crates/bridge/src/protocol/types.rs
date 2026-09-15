@@ -205,7 +205,6 @@ pub struct ApprovalRequired {
     pub context_revision: u64,
     pub origin: String,
     pub tool: String,
-    pub arguments: JsonObject,
     pub args_hash: String,
     pub expires_at: String,
 }

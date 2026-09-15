@@ -124,7 +124,8 @@ Mitigations:
   policy version, and a random nonce;
 - consume a grant atomically before dispatch with `uses = 1`;
 - never accept approval from page content or MCP/model text;
-- present approval in extension/native trusted UI with exact human-readable fields;
+- deny elevated calls until extension/native trusted UI can present exact
+  human-readable fields through a separate bounded presentation contract;
 - recheck context and origin at dispatch; and
 - fail closed on clock uncertainty, storage error, or state mismatch.
 
@@ -176,8 +177,8 @@ Mitigations:
 - resolve policy from locally accepted metadata, not descriptions or annotations;
 - separate discovery from authorization;
 - prevent page scripts from messaging the native host directly; and
-- require deterministic approval for action, sensitive, credential, external
-  network, and arbitrary execution classes according to local policy.
+- require deterministic approval for action and sensitive classes, while credential,
+  external-network, and arbitrary-execution authority remains denied by local policy.
 
 ### Forged or stale page context
 

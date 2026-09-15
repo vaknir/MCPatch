@@ -62,8 +62,9 @@ confused with a content digest from another feature.
 
 The bridge retains the authoritative pending record. The extension displays the
 exact action in trusted UI and returns the opaque nonce and decision over the
-authenticated connection. Approval does not arrive through website content, tool
-arguments, MCP descriptions, or model text.
+authenticated connection. The browser approval message contains the route, hash,
+expiry, and opaque nonce but never raw arguments or results. Approval does not arrive
+through website content, tool arguments, MCP descriptions, or model text.
 
 Before dispatch, the bridge atomically consumes the record and rechecks every bound
 field plus current context/origin state. The call is denied if:
@@ -76,6 +77,11 @@ field plus current context/origin state. The call is denied if:
 
 Pending approvals are memory-only in version 1 and expire on bridge restart. Error
 messages reveal only an opaque request ID and stable error code.
+
+The first approval-runtime slice intentionally omits the trusted user interface. The
+extension denies every approval request until an extension-controlled frontend with
+a separate bounded presentation contract exists; packs and website DOM cannot fill
+that role.
 
 ## Consequences
 

@@ -30,11 +30,13 @@ and ambiguous messages are rejected.
 The only intentionally opaque JSON locations are:
 
 - capability `inputSchema` and `outputSchema`;
-- `tool_call.args` and `approval_required.arguments`; and
+- `tool_call.args`; and
 - `tool_result.result`.
 
 Opaque means their internal keys are defined by the selected tool, not that they
 bypass size, depth, schema, policy, or output validation.
+Approval messages contain only a canonical argument hash, never raw arguments or
+results.
 
 ## Message families
 

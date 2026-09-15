@@ -19,8 +19,10 @@ rmcp = { version = "=3.3.0", default-features = false, features = ["server", "tr
 semver = "=1.0.28"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.149"
+serde_json_canonicalizer = "=0.3.2"
+sha2 = "=0.10.9"
 thiserror = "=2.0.18"
-time = { version = "=0.3.47", features = ["parsing"] }
+time = { version = "=0.3.47", features = ["formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = { version = "=0.7.19", features = ["codec", "rt"] }
 tracing = "=0.1.44"

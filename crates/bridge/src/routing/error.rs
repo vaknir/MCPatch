@@ -3,6 +3,9 @@ use thiserror::Error;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RegistryErrorCode {
     AmbiguousTool,
+    ApprovalExpired,
+    ApprovalMismatch,
+    ApprovalNotFound,
     ApprovalRequired,
     CapabilityDenied,
     ConnectionAlreadyExists,
@@ -11,6 +14,7 @@ pub enum RegistryErrorCode {
     InvalidArguments,
     InvalidMessage,
     InvalidSchema,
+    InternalError,
     LimitExceeded,
     OriginMismatch,
     RequestNotFound,

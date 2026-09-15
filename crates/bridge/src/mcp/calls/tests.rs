@@ -5,10 +5,13 @@ use serde_json::{Map, Value, json};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
-use super::McpCallRuntime;
+use super::{DEFAULT_APPROVAL_TIMEOUT, McpCallRuntime};
 use crate::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
-    protocol::{ErrorCode, Message, Permission, Risk, ToolError, ToolResult, parse_message},
+    protocol::{
+        ApprovalDecision, ApprovalResult, ErrorCode, Message, PROTOCOL_VERSION, Permission, Risk,
+        ToolError, ToolResult, parse_message,
+    },
     routing::{BrowserToolResponse, SharedCapabilityRegistry, shared_capability_registry},
 };
 
@@ -133,6 +136,105 @@ async fn rejects_missing_and_denied_tools_before_browser_dispatch() {
 }
 
 #[tokio::test]
+async fn elevated_call_dispatches_only_after_the_exact_approval() {
+    let fixture = elevated_fixture(Duration::from_millis(100), Duration::from_millis(100)).await;
+    let task = spawn_call(&fixture.runtime, CancellationToken::new(), Map::new());
+    let Message::ApprovalRequired(approval) = receive_message(&fixture.browser).await else {
+        panic!("elevated call must request approval first");
+    };
+    assert_eq!(approval.tool, "mcpatch.demo.status");
+    assert_eq!(approval.origin, "https://demo.mcpatch.invalid");
+    assert!(
+        !serde_json::to_value(&approval)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("arguments")
+    );
+    assert_no_browser_dispatch(&fixture.browser).await;
+
+    fixture
+        .registry
+        .lock()
+        .await
+        .accept_approval_result(
+            &fixture.connection_id,
+            ApprovalResult {
+                protocol_version: PROTOCOL_VERSION,
+                approval_id: approval.approval_id,
+                request_id: approval.request_id,
+                decision: ApprovalDecision::Approved,
+            },
+            time::OffsetDateTime::now_utc(),
+        )
+        .unwrap();
+    let call = receive_call(&fixture.browser).await;
+    fixture
+        .registry
+        .lock()
+        .await
+        .accept_response(
+            &fixture.connection_id,
+            BrowserToolResponse::Result(ToolResult {
+                protocol_version: call.protocol_version,
+                request_id: call.request_id,
+                context_id: call.context_id,
+                context_revision: call.context_revision,
+                origin: call.origin,
+                result: json!({"status": "ready"}),
+            }),
+        )
+        .unwrap();
+    assert_eq!(complete(task).await.is_error, Some(false));
+}
+
+#[tokio::test]
+async fn denial_cancellation_and_timeout_never_dispatch_an_elevated_call() {
+    let denied = elevated_fixture(Duration::from_millis(100), Duration::from_millis(100)).await;
+    let denied_task = spawn_call(&denied.runtime, CancellationToken::new(), Map::new());
+    let Message::ApprovalRequired(approval) = receive_message(&denied.browser).await else {
+        panic!("elevated call must request approval");
+    };
+    denied
+        .registry
+        .lock()
+        .await
+        .accept_approval_result(
+            &denied.connection_id,
+            ApprovalResult {
+                protocol_version: PROTOCOL_VERSION,
+                approval_id: approval.approval_id,
+                request_id: approval.request_id,
+                decision: ApprovalDecision::Denied,
+            },
+            time::OffsetDateTime::now_utc(),
+        )
+        .unwrap();
+    assert_eq!(complete(denied_task).await.is_error, Some(true));
+    assert_no_browser_dispatch(&denied.browser).await;
+
+    let cancelled = elevated_fixture(Duration::from_millis(100), Duration::from_millis(100)).await;
+    let cancellation = CancellationToken::new();
+    let cancelled_task = spawn_call(&cancelled.runtime, cancellation.clone(), Map::new());
+    receive_message(&cancelled.browser).await;
+    cancellation.cancel();
+    assert!(matches!(
+        receive_message(&cancelled.browser).await,
+        Message::Cancel(_)
+    ));
+    assert_eq!(complete(cancelled_task).await.is_error, Some(true));
+
+    let expired = elevated_fixture(Duration::from_millis(100), Duration::from_millis(20)).await;
+    let expired_task = spawn_call(&expired.runtime, CancellationToken::new(), Map::new());
+    receive_message(&expired.browser).await;
+    assert!(matches!(
+        receive_message(&expired.browser).await,
+        Message::Cancel(_)
+    ));
+    assert_eq!(complete(expired_task).await.is_error, Some(true));
+}
+
+#[tokio::test]
 async fn send_failure_consumes_the_pending_request() {
     let fixture = fixture(Duration::from_millis(100)).await;
     drop(fixture.browser);
@@ -245,6 +347,22 @@ async fn fixture_with_capability(
     call_timeout: Duration,
     update: impl FnOnce(&mut crate::protocol::Capability),
 ) -> Fixture {
+    fixture_with_timeouts(call_timeout, DEFAULT_APPROVAL_TIMEOUT, update).await
+}
+
+async fn elevated_fixture(call_timeout: Duration, approval_timeout: Duration) -> Fixture {
+    fixture_with_timeouts(call_timeout, approval_timeout, |capability| {
+        capability.risk = Risk::Action;
+        capability.permissions = vec![Permission::Action];
+    })
+    .await
+}
+
+async fn fixture_with_timeouts(
+    call_timeout: Duration,
+    approval_timeout: Duration,
+    update: impl FnOnce(&mut crate::protocol::Capability),
+) -> Fixture {
     let registry = shared_capability_registry();
     let (connection, browser) = fake_browser_connection(
         BrowserConnectionId::parse("connection-a").unwrap(),
@@ -263,7 +381,7 @@ async fn fixture_with_capability(
         registry.add_connection(connection).unwrap();
         registry.replace_snapshot(&connection_id, snapshot).unwrap();
     }
-    let runtime = McpCallRuntime::with_timeout(registry.clone(), call_timeout);
+    let runtime = McpCallRuntime::with_timeouts(registry.clone(), call_timeout, approval_timeout);
     Fixture {
         browser,
         connection_id,
