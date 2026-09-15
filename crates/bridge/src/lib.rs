@@ -4,6 +4,7 @@
 pub mod bridge_core;
 pub mod browser;
 pub mod cli;
+pub mod installation;
 pub mod local_ipc;
 pub mod logging;
 pub mod mcp;

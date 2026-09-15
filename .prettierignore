@@ -1,5 +1,6 @@
 coverage/
 dist/
 node_modules/
+.artifacts/
 pnpm-lock.yaml
 target/

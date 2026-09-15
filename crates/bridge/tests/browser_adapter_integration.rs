@@ -13,8 +13,9 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
 use mcpatch_bridge::{
     bridge_core::{BridgeCoreError, CoreStopReason},
+    installation::STABLE_EXTENSION_ORIGIN,
     local_ipc::InstallChannel,
-    native_host::{ALLOWED_EXTENSION_ORIGIN_ENV, read_message, write_message},
+    native_host::{read_message, write_message},
     protocol::{
         Heartbeat, Hello, HelloAck, Implementation, Message, PROTOCOL_VERSION, Role, ToolCall,
     },
@@ -33,7 +34,7 @@ use mcpatch_bridge::{bridge_core::UnixBridgeCore, local_ipc::UnixRuntime};
 #[cfg(windows)]
 use mcpatch_bridge::{bridge_core::WindowsBridgeCore, local_ipc::WindowsRuntime};
 
-const ALLOWED_ORIGIN: &str = "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
+const ALLOWED_ORIGIN: &str = STABLE_EXTENSION_ORIGIN;
 const TEST_TIMEOUT: Duration = Duration::from_secs(5);
 const QUIET_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -191,9 +192,7 @@ async fn assert_no_replayed_output(host: &mut Child) {
 fn spawn_native_host(fixture: &TestDirectory) -> Child {
     let mut command = Command::new(env!("CARGO_BIN_EXE_mcpatch"));
     command
-        .arg("native-host")
         .arg(ALLOWED_ORIGIN)
-        .env(ALLOWED_EXTENSION_ORIGIN_ENV, ALLOWED_ORIGIN)
         .env("MCPATCH_LOG", "trace")
         .env("RUST_LOG", "trace")
         .stdin(Stdio::piped())

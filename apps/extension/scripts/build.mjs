@@ -1,4 +1,5 @@
-import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
 
 import { build } from "esbuild";
@@ -14,12 +15,32 @@ const sdkRuntimeEntry = fileURLToPath(
 const examplePacksEntry = fileURLToPath(
   new URL("../../../packs/examples/src/index.ts", import.meta.url),
 );
+const manifest = JSON.parse(
+  await readFile(new URL("manifest.json", extensionDirectory), "utf8"),
+);
+const sourceCommit = process.env["MCPATCH_SOURCE_COMMIT"] ?? "development";
+if (sourceCommit !== "development" && !/^[0-9a-f]{40}$/u.test(sourceCommit)) {
+  throw new Error("MCPATCH_SOURCE_COMMIT must be a full lowercase Git commit");
+}
 
 await rm(distributionDirectory, { recursive: true, force: true });
 await mkdir(distributionDirectory, { recursive: true });
 await copyFile(
   new URL("manifest.json", extensionDirectory),
   new URL("manifest.json", distributionDirectory),
+);
+await writeFile(
+  new URL("build-metadata.json", distributionDirectory),
+  `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      productVersion: manifest.version,
+      sourceCommit,
+    },
+    null,
+    2,
+  )}\n`,
+  { flag: "wx", mode: 0o600 },
 );
 
 await build({

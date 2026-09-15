@@ -3,6 +3,7 @@
   "name": "MCPatch",
   "version": "0.1.0",
   "description": "Safe, typed website capabilities for MCP clients.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy3kM1yKMn2NDEbNNIjIRPYRfdJQhEMZGTudRBQIyGkk72/R0BL+gGqR8K84CNAcGrZ0WBZFwQCsL2oZX72g7yMkH5TJ0rLofB/UKwmc7msKx7Ta/MVGYq8zZCXUZ9KTSyuhMWfixZrUd1ma2DTErC61AAkXcBpTWcTMXwCMPM8bKK+efjlmHOj2NUNjbQxAbLXRJKgyl1MS5rbs2QO6+r5A9qzqO2AAhFDQPImFJj3WT+8Si3ZYeSnMG1rU9Y9kJ50ATfDbOHGp39ImA3RN5s+cPHmPQTbKOW3VfXAudqXbyNoKSgWTKlLCA+NifNtO3wFvZbKmgFLOo9jdeeACllwIDAQAB",
   "minimum_chrome_version": "106",
   "permissions": ["activeTab", "nativeMessaging", "scripting", "storage"],
   "optional_host_permissions": ["https://www.google.com/*"],

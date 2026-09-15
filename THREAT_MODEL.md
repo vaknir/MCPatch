@@ -209,6 +209,10 @@ or injects frames.
 Mitigations:
 
 - exact Native Messaging `allowed_origins` and caller-origin verification;
+- deterministic derivation of that origin from committed public identity only,
+  with no environment override or repository signing secret;
+- canonical direct binary invocation with no generated shell launcher, plus an
+  integrity-bound ownership receipt for installation and removal;
 - user-owned runtime directory and Unix socket mode, or Windows named-pipe ACL;
 - per-install peer authentication if platform ownership is insufficient;
 - bounded length-prefixed frames and mandatory protocol negotiation; and

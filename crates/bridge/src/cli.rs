@@ -1,13 +1,27 @@
 use std::ffi::OsString;
 
-use crate::local_ipc::InstallChannel;
+use crate::{
+    installation::ChromiumBrowser, local_ipc::InstallChannel, native_host::ExtensionOrigin,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
-    BridgeCore { channel: InstallChannel },
+    BridgeCore {
+        channel: InstallChannel,
+    },
     Help,
+    Install {
+        browser: ChromiumBrowser,
+        dry_run: bool,
+    },
     McpStdio,
-    NativeHost { caller_origin: OsString },
+    NativeHost {
+        caller_origin: OsString,
+    },
+    Uninstall {
+        browser: ChromiumBrowser,
+        dry_run: bool,
+    },
     Version,
 }
 
@@ -16,6 +30,12 @@ pub struct CliError;
 
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {
     let args = args.into_iter().collect::<Vec<_>>();
+    if args.first().is_some_and(|value| value == "install") {
+        return parse_registration_options(&args[1..], true);
+    }
+    if args.first().is_some_and(|value| value == "uninstall") {
+        return parse_registration_options(&args[1..], false);
+    }
     match args.as_slice() {
         [] => Ok(Command::McpStdio),
         [value] if value == "bridge-core" => Ok(Command::BridgeCore {
@@ -42,12 +62,53 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliErr
                 caller_origin: caller_origin.clone(),
             })
         }
+        [caller_origin] if valid_caller_origin(caller_origin) => Ok(Command::NativeHost {
+            caller_origin: caller_origin.clone(),
+        }),
+        [caller_origin, parent_window]
+            if valid_caller_origin(caller_origin) && valid_parent_window(parent_window) =>
+        {
+            Ok(Command::NativeHost {
+                caller_origin: caller_origin.clone(),
+            })
+        }
         [value] if value == "--help" || value == "-h" || value == "help" => Ok(Command::Help),
         [value] if value == "--version" || value == "-V" || value == "version" => {
             Ok(Command::Version)
         }
         _ => Err(CliError),
     }
+}
+
+fn parse_registration_options(args: &[OsString], install: bool) -> Result<Command, CliError> {
+    let mut browser = ChromiumBrowser::GoogleChrome;
+    let mut browser_seen = false;
+    let mut dry_run = false;
+    for argument in args {
+        let value = argument.to_str().ok_or(CliError)?;
+        if value == "--dry-run" && !dry_run {
+            dry_run = true;
+        } else if let Some(value) = value.strip_prefix("--browser=")
+            && !browser_seen
+            && let Some(parsed) = ChromiumBrowser::parse(value)
+        {
+            browser = parsed;
+            browser_seen = true;
+        } else {
+            return Err(CliError);
+        }
+    }
+    if install {
+        Ok(Command::Install { browser, dry_run })
+    } else {
+        Ok(Command::Uninstall { browser, dry_run })
+    }
+}
+
+fn valid_caller_origin(value: &OsString) -> bool {
+    value
+        .to_str()
+        .is_some_and(|value| ExtensionOrigin::parse(value).is_ok())
 }
 
 fn valid_parent_window(value: &OsString) -> bool {
@@ -61,7 +122,7 @@ fn valid_parent_window(value: &OsString) -> bool {
 mod tests {
     use std::ffi::OsString;
 
-    use super::{Command, InstallChannel, parse};
+    use super::{ChromiumBrowser, Command, InstallChannel, parse};
 
     #[test]
     fn defaults_to_mcp_stdio() {
@@ -105,10 +166,63 @@ mod tests {
     }
 
     #[test]
+    fn parses_closed_install_and_uninstall_options() {
+        assert_eq!(
+            parse(vec![OsString::from("install")]),
+            Ok(Command::Install {
+                browser: ChromiumBrowser::GoogleChrome,
+                dry_run: false,
+            })
+        );
+        assert_eq!(
+            parse(vec![
+                OsString::from("install"),
+                OsString::from("--browser=chromium"),
+                OsString::from("--dry-run"),
+            ]),
+            Ok(Command::Install {
+                browser: ChromiumBrowser::Chromium,
+                dry_run: true,
+            })
+        );
+        assert_eq!(
+            parse(vec![
+                OsString::from("uninstall"),
+                OsString::from("--dry-run"),
+                OsString::from("--browser=chrome-for-testing"),
+            ]),
+            Ok(Command::Uninstall {
+                browser: ChromiumBrowser::ChromeForTesting,
+                dry_run: true,
+            })
+        );
+        for invalid in [
+            vec!["install", "--browser=edge"],
+            vec!["install", "--dry-run", "--dry-run"],
+            vec!["uninstall", "--browser=chromium", "--browser=google-chrome"],
+            vec!["uninstall", "--bridge=/tmp/other"],
+        ] {
+            assert!(parse(invalid.into_iter().map(OsString::from)).is_err());
+        }
+    }
+
+    #[test]
     fn parses_native_host_arguments_from_chromium() {
         let origin = OsString::from("chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/");
         assert_eq!(
             parse(vec![OsString::from("native-host"), origin.clone()]),
+            Ok(Command::NativeHost {
+                caller_origin: origin.clone(),
+            })
+        );
+        assert_eq!(
+            parse(vec![origin.clone()]),
+            Ok(Command::NativeHost {
+                caller_origin: origin.clone(),
+            })
+        );
+        assert_eq!(
+            parse(vec![origin.clone(), OsString::from("--parent-window=0")]),
             Ok(Command::NativeHost {
                 caller_origin: origin.clone(),
             })
@@ -120,7 +234,7 @@ mod tests {
                 OsString::from("--parent-window=42"),
             ]),
             Ok(Command::NativeHost {
-                caller_origin: origin,
+                caller_origin: origin.clone(),
             })
         );
     }
@@ -128,6 +242,12 @@ mod tests {
     #[test]
     fn rejects_malformed_native_host_arguments() {
         assert!(parse(vec![OsString::from("native-host")]).is_err());
+        assert!(
+            parse(vec![OsString::from(
+                "chrome-extension://not-a-valid-extension-id/"
+            )])
+            .is_err()
+        );
         assert!(
             parse(vec![
                 OsString::from("native-host"),

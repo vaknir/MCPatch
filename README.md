@@ -44,13 +44,16 @@ along with bounded connect-first rendezvous and isolated bridge-core process sta
 Both public adapters now use their distinct authenticated bridge-core endpoints;
 browser negotiation and lifecycle ingestion are live, with one synthetic read-only
 demo capability proving extension-to-registry publication, MCP discovery, and exact
-validated tool-call completion. User-facing pairing and real-site packs remain
-upcoming slices.
+validated tool-call completion. Local packages now bind a deterministic public
+extension identity to platform-correct user-level Native Messaging registration and
+source-commit digests. Deterministic real-Chromium fixtures and real-site packs
+remain upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
-The supported transport proof and the remaining packaged-browser gap are described
-in [docs/local-demo.md](docs/local-demo.md).
+The supported transport proof is described in
+[docs/local-demo.md](docs/local-demo.md). Local packaging and registration are
+documented in [docs/installation.md](docs/installation.md).
 
 Pack development now has a separately versioned, closed Pack Manifest v1 contract
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.

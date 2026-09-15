@@ -42,6 +42,10 @@ after routing and policy behavior are deterministic under tests.
 The production channel must enforce these controls:
 
 - the native-host manifest allowlists exactly one production extension origin;
+- the committed extension manifest carries only the public identity key that
+  deterministically derives that origin;
+- the host compiles the exact origin as defense in depth and does not accept an
+  environment override;
 - development builds use a separate host name and extension identity;
 - the host verifies Chrome's caller-origin process argument as defense in depth;
 - the service worker uses one long-lived `runtime.connectNative` port;
@@ -68,6 +72,8 @@ The endpoint, peer-identity, process, and stale-state rules are specified in
 
 - Ordinary websites cannot connect to the native host API.
 - Chrome installation must register a platform-specific native-host manifest.
+- The user-level installer uses ownership receipts, canonical executable paths,
+  idempotent writes, dry-run, and recoverable uninstall backups.
 - The exact extension ID becomes part of packaging and release integrity.
 - The bridge needs a small local service lifecycle and two adapter modes.
 - The same connection and policy core can later support Firefox Native Messaging.

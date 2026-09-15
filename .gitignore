@@ -1,5 +1,6 @@
 # JavaScript and TypeScript
 node_modules/
+.artifacts/
 dist/
 coverage/
 *.tsbuildinfo

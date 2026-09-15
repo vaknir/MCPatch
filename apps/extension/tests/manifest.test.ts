@@ -1,3 +1,4 @@
+import { createHash, createPublicKey } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
@@ -7,6 +8,20 @@ import { DECLARED_SITE_ORIGINS } from "../src/bundled-packs.js";
 const manifest = JSON.parse(
   readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
 ) as Record<string, unknown>;
+
+const EXPECTED_EXTENSION_ID = "imbnpameklobbabbkfkalcfcggpjacdi";
+
+function deriveChromiumExtensionId(publicKeyDer: Uint8Array): string {
+  const hexadecimal = createHash("sha256")
+    .update(publicKeyDer)
+    .digest("hex")
+    .slice(0, 32);
+  return [...hexadecimal]
+    .map((digit) =>
+      String.fromCharCode("a".charCodeAt(0) + Number.parseInt(digit, 16)),
+    )
+    .join("");
+}
 
 describe("extension manifest", () => {
   it("is an ES-module Manifest V3 service worker", () => {
@@ -22,6 +37,7 @@ describe("extension manifest", () => {
       "action",
       "background",
       "description",
+      "key",
       "manifest_version",
       "minimum_chrome_version",
       "name",
@@ -49,5 +65,20 @@ describe("extension manifest", () => {
     expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
     expect(manifest).not.toHaveProperty("externally_connectable");
+  });
+
+  it("derives one stable ID from a committed public identity", () => {
+    const encodedKey = manifest["key"];
+    expect(typeof encodedKey).toBe("string");
+    const publicKeyDer = Buffer.from(encodedKey as string, "base64");
+    const publicKey = createPublicKey({
+      key: publicKeyDer,
+      format: "der",
+      type: "spki",
+    });
+
+    expect(publicKey.asymmetricKeyType).toBe("rsa");
+    expect(deriveChromiumExtensionId(publicKeyDer)).toBe(EXPECTED_EXTENSION_ID);
+    expect(encodedKey).not.toContain("PRIVATE");
   });
 });

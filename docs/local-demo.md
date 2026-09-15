@@ -46,9 +46,8 @@ The output is `apps/extension/dist`. Its service worker admits the reviewed pack
 applies exact matching and native-first resolution, and implements the same demo
 contract used by the process test. The build rejects dynamic code generation.
 
-This is not yet a complete Chrome installation flow. MCPatch does not currently
-install a Native Messaging manifest, provision a stable extension ID, bind the
-manifest allowlist to that ID, or provide packaged bridge/extension artifacts. Until
-that installer and pairing work exists, loading `dist` manually is useful for
-extension inspection but is not the supported end-to-end demo path. Do not use this
-pre-alpha build with sensitive browser accounts.
+For a real Native Messaging registration, build an attributable local package and
+run its dry-run/install command as documented in [Local packaging and Chromium
+registration](installation.md). The stable unpacked-extension identity and native
+host allowlist are bound, but MCPatch remains pre-alpha and must not be used with
+sensitive browser accounts.
