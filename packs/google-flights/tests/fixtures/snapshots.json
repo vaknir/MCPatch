@@ -1,0 +1,158 @@
+{
+  "landing": {
+    "origin": "https://www.google.com",
+    "pathname": "/travel/flights",
+    "language": "en-US",
+    "controls": {
+      "origin": [{ "visible": true, "text": "" }],
+      "destination": [{ "visible": true, "text": "" }],
+      "departure": [{ "visible": true, "text": "" }],
+      "returnDate": [{ "visible": true, "text": "" }],
+      "tripType": [{ "visible": true, "text": "Round trip" }],
+      "cabinClass": [{ "visible": true, "text": "Economy" }],
+      "passengers": [{ "visible": true, "text": "1 passenger" }]
+    }
+  },
+  "ready": {
+    "origin": "https://www.google.com",
+    "pathname": "/travel/flights/search",
+    "language": "en-US",
+    "controls": {
+      "origin": [{ "visible": true, "text": "Alder Bay" }],
+      "destination": [{ "visible": true, "text": "Cedar Point" }],
+      "departure": [{ "visible": true, "text": "Tue, Oct 20" }],
+      "returnDate": [{ "visible": true, "text": "Tue, Oct 27" }],
+      "tripType": [{ "visible": true, "text": "Round trip" }],
+      "cabinClass": [{ "visible": true, "text": "Economy" }],
+      "passengers": [{ "visible": true, "text": "1 passenger" }]
+    },
+    "results": {
+      "regions": [{ "visible": true, "text": "Search results" }],
+      "loading": [],
+      "counts": [{ "visible": true, "text": "24 results returned" }],
+      "empty": [],
+      "errors": [],
+      "cards": [
+        {
+          "visible": true,
+          "label": "From 321 US dollars round trip total. Nonstop flight with Northwind Air. Leaves Alder Bay Airport at 8:10 AM on Tue, Oct 20 and arrives at Cedar Point Airport at 10:40 AM on Tue, Oct 20. Total duration 2 hr 30 min. Select flight",
+          "emissions": [
+            {
+              "visible": true,
+              "text": "Estimated emissions: 120 kilograms CO2e"
+            }
+          ],
+          "caveats": []
+        },
+        {
+          "visible": true,
+          "label": "From 410 US dollars round trip total.This fare does not include overhead bin access. 1 stop flight with Contoso Wings. Leaves Alder Bay Airport at 9:05 AM on Tue, Oct 20 and arrives at Cedar Point Airport at 1:20 PM on Tue, Oct 20. Total duration 4 hr 15 min. Select flight",
+          "emissions": [],
+          "caveats": [
+            {
+              "visible": true,
+              "text": "This fare does not include overhead bin access"
+            }
+          ]
+        },
+        {
+          "visible": false,
+          "label": "From 999 US dollars round trip total. Nonstop flight with Hidden Air. Leaves Nowhere at 1:00 AM on Tue, Oct 20 and arrives at Nowhere at 2:00 AM on Tue, Oct 20. Total duration 1 hr. Select flight",
+          "emissions": [],
+          "caveats": []
+        }
+      ]
+    },
+    "priceInsights": {
+      "headings": [{ "visible": true, "text": "Price insights" }],
+      "loading": [],
+      "assessments": [
+        {
+          "visible": true,
+          "text": "Prices are currently typical for this invented route"
+        }
+      ]
+    }
+  },
+  "loading": {
+    "origin": "https://www.google.com",
+    "pathname": "/travel/flights/search",
+    "language": "en-GB",
+    "controls": {
+      "origin": [{ "visible": true, "text": "Alder Bay" }],
+      "destination": [{ "visible": true, "text": "Cedar Point" }],
+      "departure": [{ "visible": true, "text": "Tue, 20 Oct" }],
+      "returnDate": [{ "visible": true, "text": "Tue, 27 Oct" }],
+      "tripType": [{ "visible": true, "text": "Round trip" }],
+      "cabinClass": [{ "visible": true, "text": "Business" }],
+      "passengers": [{ "visible": true, "text": "2 passengers" }]
+    },
+    "results": {
+      "regions": [{ "visible": true, "text": "Search results" }],
+      "loading": [{ "visible": true, "text": "Searching for flights" }],
+      "counts": [],
+      "empty": [],
+      "errors": [],
+      "cards": []
+    },
+    "priceInsights": {
+      "headings": [],
+      "loading": [{ "visible": true, "text": "Loading price insights" }],
+      "assessments": []
+    }
+  },
+  "empty": {
+    "origin": "https://www.google.com",
+    "pathname": "/travel/flights/search",
+    "language": "en",
+    "controls": {
+      "origin": [{ "visible": true, "text": "Alder Bay" }],
+      "destination": [{ "visible": true, "text": "Cedar Point" }],
+      "departure": [{ "visible": true, "text": "Tue, Oct 20" }],
+      "returnDate": [],
+      "tripType": [{ "visible": true, "text": "One way" }],
+      "cabinClass": [{ "visible": true, "text": "Premium economy" }],
+      "passengers": [{ "visible": true, "text": "1 passenger" }]
+    },
+    "results": {
+      "regions": [{ "visible": true, "text": "Search results" }],
+      "loading": [],
+      "counts": [],
+      "empty": [{ "visible": true, "text": "No flights found" }],
+      "errors": [],
+      "cards": []
+    },
+    "priceInsights": {
+      "headings": [],
+      "loading": [],
+      "assessments": []
+    }
+  },
+  "error": {
+    "origin": "https://www.google.com",
+    "pathname": "/travel/flights/search",
+    "language": "en-US",
+    "controls": {
+      "origin": [{ "visible": true, "text": "Alder Bay" }],
+      "destination": [{ "visible": true, "text": "Cedar Point" }],
+      "departure": [{ "visible": true, "text": "Tue, Oct 20" }],
+      "returnDate": [{ "visible": true, "text": "Tue, Oct 27" }],
+      "tripType": [{ "visible": true, "text": "Round trip" }],
+      "cabinClass": [{ "visible": true, "text": "First" }],
+      "passengers": [{ "visible": true, "text": "1 passenger" }]
+    },
+    "results": {
+      "regions": [{ "visible": true, "text": "Search results" }],
+      "loading": [],
+      "counts": [],
+      "empty": [],
+      "errors": [{ "visible": true, "text": "Unable to load flights" }],
+      "cards": []
+    },
+    "priceInsights": {
+      "headings": [],
+      "loading": [],
+      "assessments": []
+    }
+  }
+}
