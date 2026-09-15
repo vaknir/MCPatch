@@ -6,8 +6,14 @@ import {
 } from "@mcpatch/sdk/runtime";
 import type { JsonObject as ProtocolJsonObject } from "@mcpatch/protocol";
 
-import type { NativeRuntimeTool } from "./compiled-pack-model.js";
-import type { PageNativeCapability } from "./page-channel.js";
+import type {
+  NativeRuntimeTool,
+  PageRuntimeTool,
+} from "./compiled-pack-model.js";
+import type {
+  PageNativeCapability,
+  PagePackCapability,
+} from "./page-channel.js";
 import {
   PageInvocationError,
   type PageContextSnapshot,
@@ -42,24 +48,51 @@ export function projectPageNativeTools(
             // still bounds and validates every returned JSON value.
             outputSchema: UNCONSTRAINED_JSON_SCHEMA,
           }),
-          async execute(context: PackExecutionContext, input: JsonObject) {
-            try {
-              return await invoker.invoke(
-                snapshot.binding.contextId,
-                capability.name,
-                input as unknown as ProtocolJsonObject,
-                context.signal,
-              );
-            } catch (error) {
-              if (error instanceof PageInvocationError) {
-                throw new PackToolExecutionError(toPackErrorCode(error.code));
-              }
-              throw error;
-            }
-          },
+          execute: pageExecution(snapshot, capability.name, invoker),
         }),
       ),
   );
+}
+
+export function projectPagePackTools(
+  snapshot: PageContextSnapshot,
+  invoker: PageInvoker,
+): readonly PageRuntimeTool[] {
+  return Object.freeze(
+    snapshot.capabilities
+      .filter(
+        (capability): capability is PagePackCapability =>
+          capability.source === "pack",
+      )
+      .map((capability) =>
+        Object.freeze({
+          name: capability.name,
+          execute: pageExecution(snapshot, capability.name, invoker),
+        }),
+      ),
+  );
+}
+
+function pageExecution(
+  snapshot: PageContextSnapshot,
+  tool: string,
+  invoker: PageInvoker,
+) {
+  return async (context: PackExecutionContext, input: JsonObject) => {
+    try {
+      return await invoker.invoke(
+        snapshot.binding.contextId,
+        tool,
+        input as unknown as ProtocolJsonObject,
+        context.signal,
+      );
+    } catch (error) {
+      if (error instanceof PageInvocationError) {
+        throw new PackToolExecutionError(toPackErrorCode(error.code));
+      }
+      throw error;
+    }
+  };
 }
 
 function toPackErrorCode(code: PageInvocationErrorCode): PackFixtureErrorCode {

@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Reviewed Google Flights pack bundling with exact optional-origin enablement,
+  document-local execution, page-reported capability projection, fail-closed
+  service-worker fallbacks, and native WebMCP precedence.
+- Bounded Google Flights semantic extraction for current search state, visible
+  results, and price insights, with invented fixtures, strict English fingerprint
+  checks, cancellation, and coalesced mutation refresh.
 - A fail-closed `google-flights-rendered-en-v1` contract and scrubbed public-page
   reconnaissance for the first real read-only pack.
 - Deterministic real-Chromium fixture coverage for profile-scoped Native Messaging,

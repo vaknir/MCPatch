@@ -202,6 +202,9 @@ importers:
       '@mcpatch/example-packs':
         specifier: workspace:*
         version: link:../../packs/examples
+      '@mcpatch/google-flights-pack':
+        specifier: workspace:*
+        version: link:../../packs/google-flights
       '@mcpatch/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

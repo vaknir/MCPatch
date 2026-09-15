@@ -63,6 +63,22 @@ the public-key bytes needed to preserve this ID. The repository and package cont
 no private signing key; the private half of this pre-alpha local identity was
 discarded after the public key was generated.
 
+## Enable the Google Flights pack
+
+Use only a disposable or signed-out profile during pre-alpha testing. Open either
+`https://www.google.com/travel/flights` or an existing Google Flights search, then
+click the MCPatch toolbar action. Chromium should request only
+`https://www.google.com/*`. Granting that optional origin stores the exact reviewed
+pack identity and registers the packaged isolated-world content script. Reload the
+page once after first enablement so the newly registered script owns that document.
+
+The pack then exposes only `flights.current_search`, `flights.results`, and
+`flights.price_insights` when the English rendered-page fingerprint is compatible.
+It does not search, select, book, sign in, inspect credentials, or make extension
+network requests. Click the toolbar action again on a supported page to disable the
+pack; MCPatch revokes live tool contexts before unregistering the script and removing
+the now-unused optional host permission.
+
 ## Uninstall and recovery
 
 Preview or remove a registration with the same browser selection:

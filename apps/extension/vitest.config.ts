@@ -11,6 +11,9 @@ export default defineConfig({
       "@mcpatch/example-packs": fileURLToPath(
         new URL("../../packs/examples/src/index.ts", import.meta.url),
       ),
+      "@mcpatch/google-flights-pack": fileURLToPath(
+        new URL("../../packs/google-flights/src/index.ts", import.meta.url),
+      ),
       "@mcpatch/protocol": fileURLToPath(
         new URL("../../packages/protocol/src/index.ts", import.meta.url),
       ),

@@ -16,7 +16,10 @@ import {
   type SessionScheduler,
 } from "./native-session.js";
 import { denyPageAuthority, PageContextOwner } from "./page-context-owner.js";
-import { projectPageNativeTools } from "./page-capability-projection.js";
+import {
+  projectPageNativeTools,
+  projectPagePackTools,
+} from "./page-capability-projection.js";
 import type {
   ChromePageServiceRuntimeApi,
   PageAuthority,
@@ -67,6 +70,7 @@ export function startExtensionRuntime(
         contextId: snapshot.binding.contextId,
         url: snapshot.url,
         native: projectPageNativeTools(snapshot, pageContexts),
+        page: projectPagePackTools(snapshot, pageContexts),
       });
       if (activation === undefined || !activation.ok) {
         throw new Error("page capability projection failed");

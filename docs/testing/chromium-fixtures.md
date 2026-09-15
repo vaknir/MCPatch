@@ -28,7 +28,9 @@ default-browser registration is required.
 The scenario proves:
 
 - stable extension identity and real Native Messaging hello negotiation;
-- MCP discovery and exact invocation of current visible page state;
+- MCP discovery and exact invocation of a page-reported pack capability, with
+  service-worker fallback handlers set to fail closed;
+- output-schema validation of current visible page state after page execution;
 - DOM mutation refresh and replacement of the capability snapshot;
 - cancellation from MCP through the bridge and extension into the page adapter;
 - same-origin document reload and fresh context revision;

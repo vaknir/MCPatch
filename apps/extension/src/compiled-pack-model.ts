@@ -12,10 +12,17 @@ export interface NativeRuntimeTool {
   readonly execute: PackToolHandler;
 }
 
+export interface PageRuntimeTool {
+  readonly name: string;
+  readonly execute: PackToolHandler;
+}
+
 export interface PackRuntimeContext {
   readonly contextId: string;
   readonly url: string;
   readonly native: readonly NativeRuntimeTool[];
+  /** Present for a browser page; omitted for extension-local compiled contexts. */
+  readonly page?: readonly PageRuntimeTool[];
 }
 
 export type ContextActivationResult =
