@@ -27,10 +27,14 @@ wrong-version traffic, reversed call/result direction, malformed input, queue
 saturation, or a partial-frame failure terminates that browser session. A failed
 session does not terminate the shared core or unrelated MCP sessions.
 
-This first session slice consumes heartbeats and peer lifecycle errors. Other valid
-extension-to-bridge application messages currently fail closed instead of being
-dropped; capability snapshot and response handling is added with the demo capability
-runtime in issue #39.
+Ready sessions consume heartbeats and peer lifecycle errors, apply complete
+capability snapshots atomically, close exact context revisions, and accept tool
+results or errors only when the registry binds them to the originating connection,
+context revision, origin, and request. Snapshot replacement and context closure
+dispatch cancellation for affected calls after releasing the registry lock. Stale,
+conflicting, mismatched, or otherwise invalid lifecycle traffic terminates that
+browser session through the same disconnect cleanup path. Approval results remain
+unsupported until the approval runtime exists and therefore fail closed.
 
 ## Revocation
 

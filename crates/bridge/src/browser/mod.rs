@@ -1,3 +1,4 @@
+mod application;
 mod connection;
 mod fake;
 mod session;

@@ -17,6 +17,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     BrowserConnection, BrowserConnectionErrorCode, BrowserConnectionId,
+    application::{ReadyMessageAction, apply_ready_message},
     stream::stream_browser_connection,
 };
 use crate::{
@@ -183,16 +184,20 @@ impl BrowserSessionManager {
                     break Ok(());
                 }
                 message = connection.receive() => {
-                    match message.map_err(map_connection_error)? {
-                        Some(Message::Heartbeat(_)) => {
+                    let message = match message {
+                        Ok(message) => message,
+                        Err(error) => break Err(map_connection_error(error)),
+                    };
+                    let Some(message) = message else {
+                        break Ok(());
+                    };
+                    match apply_ready_message(&self.registry, &connection_id, message).await {
+                        Ok(ReadyMessageAction::Heartbeat) => {
                             heartbeat_deadline = Instant::now() + self.config.heartbeat_timeout;
                         }
-                        Some(Message::ConnectionError(message)) if message.fatal => break Ok(()),
-                        Some(Message::ConnectionError(_)) => {}
-                        Some(_) => break Err(session_error(
-                            BrowserSessionErrorCode::ProtocolViolation,
-                        )),
-                        None => break Ok(()),
+                        Ok(ReadyMessageAction::Continue) => {}
+                        Ok(ReadyMessageAction::Close) => break Ok(()),
+                        Err(error) => break Err(error),
                     }
                 }
                 () = tokio::time::sleep_until(heartbeat_deadline) => {
@@ -309,7 +314,7 @@ fn selected_version(negotiation: &AcceptorNegotiation) -> Result<u32, BrowserSes
     }
 }
 
-fn map_connection_error(error: super::BrowserConnectionError) -> BrowserSessionError {
+pub(super) fn map_connection_error(error: super::BrowserConnectionError) -> BrowserSessionError {
     let code = match error.code() {
         BrowserConnectionErrorCode::Backpressure => BrowserSessionErrorCode::Backpressure,
         BrowserConnectionErrorCode::Closed => BrowserSessionErrorCode::Transport,
@@ -333,6 +338,6 @@ fn map_frame_error(error: LocalFrameError) -> BrowserSessionError {
     session_error(code)
 }
 
-const fn session_error(code: BrowserSessionErrorCode) -> BrowserSessionError {
+pub(super) const fn session_error(code: BrowserSessionErrorCode) -> BrowserSessionError {
     BrowserSessionError { code }
 }

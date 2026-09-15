@@ -58,6 +58,8 @@ All notable MCPatch changes are documented here. The format follows
 - Cross-platform process coverage for browser negotiation, heartbeat, violation
   isolation, disconnect revocation, fresh reconnect identities, and core restart
   through Native Messaging plus authenticated local IPC.
+- Negotiated browser-session ingestion for atomic capability snapshots, context
+  closure, bound tool responses, and cancellation dispatch.
 
 ### Fixed
 
@@ -66,5 +68,8 @@ All notable MCPatch changes are documented here. The format follows
   shared core.
 - Native-host peer-driven shutdown no longer waits indefinitely for Tokio's
   uncancellable blocking standard-input read.
+- Registry-rejected browser traffic now passes through common connection cleanup,
+  preventing leaked capabilities or pending calls after a stale or mismatched
+  lifecycle message.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
