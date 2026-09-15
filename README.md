@@ -52,6 +52,11 @@ have independent compatibility versions.
 The supported transport proof and the remaining packaged-browser gap are described
 in [docs/local-demo.md](docs/local-demo.md).
 
+Pack development now has a separately versioned, closed Pack Manifest v1 contract
+with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
+The authoring helpers, matcher, fixture runner, and real-site adapters remain Phase 5
+work.
+
 ## Bridge development
 
 Run the MCP server over newline-delimited stdio:

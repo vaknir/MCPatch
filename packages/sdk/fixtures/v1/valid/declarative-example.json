@@ -1,0 +1,43 @@
+{
+  "manifestVersion": 1,
+  "publisher": "example",
+  "id": "read-page",
+  "name": "Declarative read example",
+  "description": "Manifest-only example for the reviewed declarative execution tier.",
+  "version": "1.2.3",
+  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "compatibility": {
+    "runtime": { "minimum": "0.1.0", "maximumExclusive": "1.0.0" },
+    "bridgeProtocol": { "minimum": 1, "maximum": 1 }
+  },
+  "execution": { "kind": "declarative", "operationsVersion": 1 },
+  "matches": [
+    {
+      "origin": "https://example.com",
+      "paths": [{ "kind": "prefix", "path": "/items/" }]
+    }
+  ],
+  "networkPolicy": { "extensionRequests": "none" },
+  "tools": [
+    {
+      "name": "example.items.current",
+      "description": "Return the current visible item.",
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": { "type": "object" }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "current-item",
+      "tool": "example.items.current",
+      "input": {},
+      "expect": { "kind": "result", "result": { "id": "fixture-item" } }
+    }
+  ]
+}
