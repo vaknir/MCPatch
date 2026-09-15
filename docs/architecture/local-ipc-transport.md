@@ -54,15 +54,39 @@ The listener records the device/inode it created. On drop it removes only a sock
 with that same identity and owner, so it cannot delete a replacement path. The
 private runtime directory is never recursively removed by production code.
 
+## Windows implementation
+
+Windows uses fixed, channel- and role-separated byte-mode named pipes:
+
+```text
+\\.\pipe\MCPatch-development-browser-v1
+\\.\pipe\MCPatch-development-mcp-v1
+\\.\pipe\MCPatch-production-browser-v1
+\\.\pipe\MCPatch-production-mcp-v1
+```
+
+The bridge reads its process-token logon SID and creates an explicit protected DACL
+with one allow ACE granting only generic read and write to that SID. It does not add
+Everyone, anonymous, administrator, or broad system ACEs. Handles are non-inheritable,
+remote clients are rejected, and the first server instance uses Windows
+first-pipe-instance semantics so a pre-existing server makes binding fail closed.
+
+After accepting a client, the listener impersonates it only long enough to query the
+effective thread token's logon SID. The token must match the expected logon SID before
+the stream is returned or any frame is parsed. Reversion is checked immediately; an
+RAII guard remains in scope as a fallback during every error path. The authenticated
+blocking stream uses the same bounded little-endian JSON framing validators as Unix.
+Issue #45 will isolate blocking Windows accepts and streams on bounded bridge-core
+worker threads rather than blocking Tokio executor threads.
+
 ## Current scope and residual risk
 
-This slice provides the Unix transport primitive only. It does not start a bridge
-core or connect either adapter; process election and lifecycle are tracked in
-[#45](https://github.com/vaknir/MCPatch/issues/45). Windows requires its separate
-protected-DACL and client-token implementation in
-[#44](https://github.com/vaknir/MCPatch/issues/44).
+These slices provide platform transport primitives only. They do not start a bridge
+core or connect either adapter; protected process election, bounded startup, adapter
+rendezvous, and lifecycle are tracked in
+[#45](https://github.com/vaknir/MCPatch/issues/45).
 
 No path-based design can distinguish a hostile process already running as the same
-interactive user. The private directory, no-follow checks, inode-bound cleanup, and
-peer UID checks prevent cross-user access and accidental replacement; the threat
-model's same-user residual remains explicit.
+interactive user. Private Unix directories and peer UIDs, protected Windows DACLs and
+logon-SID verification, and first-instance checks prevent cross-user access and
+accidental replacement; the threat model's same-user residual remains explicit.

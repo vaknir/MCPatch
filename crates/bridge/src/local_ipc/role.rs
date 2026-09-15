@@ -6,6 +6,7 @@ pub enum InstallChannel {
 }
 
 impl InstallChannel {
+    #[cfg(unix)]
     pub(crate) const fn directory_name(self) -> &'static str {
         match self {
             Self::Development => "development",
@@ -22,6 +23,7 @@ pub enum EndpointRole {
 }
 
 impl EndpointRole {
+    #[cfg(unix)]
     pub(crate) const fn socket_file_name(self) -> &'static str {
         match self {
             Self::Browser => "browser-v1.sock",

@@ -1,0 +1,49 @@
+use interprocess::os::windows::security_descriptor::SecurityDescriptor;
+use widestring::U16CString;
+
+use crate::local_ipc::{WindowsIpcError, WindowsIpcErrorCode};
+
+pub(super) fn security_descriptor_for(
+    logon_sid: &str,
+) -> Result<SecurityDescriptor, WindowsIpcError> {
+    let sddl = security_descriptor_sddl(logon_sid);
+    let wide = U16CString::from_str(&sddl).map_err(|_| descriptor_unavailable())?;
+    SecurityDescriptor::deserialize(&wide).map_err(|error| {
+        WindowsIpcError::with_source(WindowsIpcErrorCode::SecurityDescriptorUnavailable, error)
+    })
+}
+
+fn security_descriptor_sddl(logon_sid: &str) -> String {
+    // Protected DACL: exactly one allow ACE for duplex read/write by this logon.
+    format!("D:P(A;;GRGW;;;{logon_sid})")
+}
+
+const fn descriptor_unavailable() -> WindowsIpcError {
+    WindowsIpcError::without_source(WindowsIpcErrorCode::SecurityDescriptorUnavailable)
+}
+
+#[cfg(test)]
+mod tests {
+    use firehazard::winapi::um::winnt::DACL_SECURITY_INFORMATION;
+    use interprocess::os::windows::security_descriptor::AsSecurityDescriptorExt;
+
+    use super::*;
+    use crate::local_ipc::windows::identity::current_process_logon_sid;
+
+    #[test]
+    fn dacl_contains_only_the_expected_logon_sid() {
+        let sid = current_process_logon_sid().unwrap();
+        let expected = security_descriptor_sddl(&sid);
+        assert_eq!(expected, format!("D:P(A;;GRGW;;;{sid})"));
+
+        let descriptor = security_descriptor_for(&sid).unwrap();
+        let serialized = descriptor
+            .serialize(DACL_SECURITY_INFORMATION, |value| value.to_string_lossy())
+            .unwrap();
+
+        assert_eq!(serialized.matches("(A;").count(), 1);
+        assert_eq!(serialized.matches(&sid).count(), 1);
+        assert!(!serialized.contains(";;;WD)"));
+        assert!(!serialized.contains(";;;AN)"));
+    }
+}

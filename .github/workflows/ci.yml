@@ -71,6 +71,30 @@ jobs:
       - name: Test platform-specific transport
         run: cargo test --workspace --all-features --locked
 
+  rust-windows:
+    name: Rust (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal --component clippy
+      - name: Lint platform-specific transport
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Test shared blocking frames
+        run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::framing::tests
+      - name: Test Windows endpoint names
+        run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::windows::endpoint::tests
+      - name: Test Windows identity rejection
+        run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::windows::stream::tests
+      - name: Test Windows protected DACL
+        run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::windows::security::tests
+      - name: Test Windows first-instance exclusion
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked first_pipe_instance_prevents_a_second_listener -- --exact --nocapture
+      - name: Test Windows client authentication
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked authenticates_the_client_before_reading_a_bounded_frame -- --exact --nocapture
+
   typescript:
     name: TypeScript
     runs-on: ubuntu-latest
