@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "type": "approval_result",
+  "approvalId": "approval id with spaces",
+  "requestId": "request-01J8QAZ6V4F2K7M3",
+  "decision": "approved"
+}

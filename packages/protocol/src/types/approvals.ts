@@ -1,10 +1,9 @@
-import type { JsonObject, RoutedMessage, VersionedMessage } from "./common.js";
+import type { RoutedMessage, VersionedMessage } from "./common.js";
 
 export interface ApprovalRequired extends RoutedMessage {
   type: "approval_required";
   approvalId: string;
   tool: string;
-  arguments: JsonObject;
   argsHash: string;
   expiresAt: string;
 }

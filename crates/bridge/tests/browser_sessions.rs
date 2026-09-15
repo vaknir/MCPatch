@@ -79,7 +79,7 @@ async fn rejects_no_common_version_wrong_first_message_and_wrong_role() {
 }
 
 #[tokio::test]
-async fn rejects_wrong_version_direction_and_unhandled_application_messages() {
+async fn rejects_wrong_version_direction_and_unknown_approval_results() {
     let wrong_version = json!({
         "protocolVersion": 2,
         "type": "heartbeat",
@@ -115,7 +115,7 @@ async fn rejects_wrong_version_direction_and_unhandled_application_messages() {
     });
     assert_ready_violation(
         serde_json::to_vec(&approval).unwrap(),
-        BrowserSessionErrorCode::ProtocolViolation,
+        BrowserSessionErrorCode::RegistryRejected,
     )
     .await;
 }

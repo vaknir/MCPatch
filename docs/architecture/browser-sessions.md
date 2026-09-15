@@ -33,8 +33,9 @@ results or errors only when the registry binds them to the originating connectio
 context revision, origin, and request. Snapshot replacement and context closure
 dispatch cancellation for affected calls after releasing the registry lock. Stale,
 conflicting, mismatched, or otherwise invalid lifecycle traffic terminates that
-browser session through the same disconnect cleanup path. Approval results remain
-unsupported until the approval runtime exists and therefore fail closed.
+browser session through the same disconnect cleanup path. Approval results are
+accepted only when they consume an exact live bridge-owned approval record; unknown,
+expired, mismatched, and replayed results fail the sending browser session closed.
 
 ## Revocation
 
@@ -85,6 +86,7 @@ The general lifecycle and native-first resolution behavior is specified in
 [Compiled pack extension runtime](compiled-pack-runtime.md).
 
 The extension targets Chromium 105 or newer because an open Native Messaging port
-has kept extension service workers alive since that release. Its manifest grants
-only `nativeMessaging`; this session layer has no website authority, content script,
-external messaging surface, dynamic code generation, or remote code.
+has kept extension service workers alive since that release. This session layer uses
+only `nativeMessaging`; separately reviewed origin enablement owns the manifest's
+optional website authority. There is no external messaging surface, dynamic code
+generation, or remote code.

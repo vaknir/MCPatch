@@ -19,6 +19,13 @@ All notable MCPatch changes are documented here. The format follows
 - Isolated native WebMCP draft adapter with same-origin no-option discovery,
   explicit read-only metadata admission, opaque handle retention, bounded calls and
   results, deterministic duplicate rejection, cancellation, and lifecycle refresh.
+- Bridge-owned one-time approvals bound to canonical argument hashes, exact active
+  routes and pack identities, with random nonces, bounded expiry, atomic consumption,
+  replay denial, lifecycle revocation, and a deny-only extension fallback until a
+  trusted approval UI exists.
+- Pre-release protocol-v1 approval correction removing raw arguments from approval
+  messages before the first distributed build; hash-only approval messages are now
+  the frozen version-1 shape.
 - Initial architecture, trust boundaries, and roadmap.
 - Security policy and threat model.
 - ADRs for the monorepo, Rust bridge, Native Messaging transport, bridge protocol,

@@ -4,7 +4,7 @@ use super::{
     PermissionDecision, RegistryError, RegistryErrorCode, RoutedCancellation,
     policy::permission_decision,
     state::{ConnectionState, RegisteredCapability, ResolvedCapability},
-    types::ActiveRequest,
+    types::{ActiveRequest, PendingApproval},
 };
 use crate::{
     browser::{BrowserConnection, BrowserConnectionId},
@@ -16,6 +16,7 @@ const MAX_CONNECTIONS: usize = 8;
 pub struct CapabilityRegistry {
     pub(super) connections: BTreeMap<BrowserConnectionId, ConnectionState>,
     pub(super) active_requests: BTreeMap<String, ActiveRequest>,
+    pub(super) pending_approvals: BTreeMap<String, PendingApproval>,
 }
 
 impl CapabilityRegistry {
@@ -23,6 +24,7 @@ impl CapabilityRegistry {
         Self {
             connections: BTreeMap::new(),
             active_requests: BTreeMap::new(),
+            pending_approvals: BTreeMap::new(),
         }
     }
 
@@ -64,6 +66,17 @@ impl CapabilityRegistry {
         for request_id in request_ids {
             if let Some(request) = self.active_requests.remove(&request_id) {
                 request.revocation.cancel();
+            }
+        }
+        let approval_ids = self
+            .pending_approvals
+            .iter()
+            .filter(|(_, approval)| &approval.binding.connection_id == connection_id)
+            .map(|(approval_id, _)| approval_id.clone())
+            .collect::<Vec<_>>();
+        for approval_id in approval_ids {
+            if let Some(approval) = self.pending_approvals.remove(&approval_id) {
+                approval.revocation.cancel();
             }
         }
         true
@@ -146,7 +159,7 @@ impl CapabilityRegistry {
             .map(|(request_id, _)| request_id.clone())
             .collect::<Vec<_>>();
 
-        request_ids
+        let mut cancellations = request_ids
             .into_iter()
             .filter_map(|request_id| {
                 let request = self.active_requests.remove(&request_id)?;
@@ -159,7 +172,28 @@ impl CapabilityRegistry {
                     },
                 ))
             })
-            .collect()
+            .collect::<Vec<_>>();
+        let approval_ids = self
+            .pending_approvals
+            .iter()
+            .filter(|(_, approval)| {
+                &approval.binding.connection_id == connection_id
+                    && approval.binding.context_id == context_id
+            })
+            .map(|(approval_id, _)| approval_id.clone())
+            .collect::<Vec<_>>();
+        cancellations.extend(approval_ids.into_iter().filter_map(|approval_id| {
+            let approval = self.pending_approvals.remove(&approval_id)?;
+            approval.revocation.cancel();
+            Some(RoutedCancellation::new(
+                connection.clone(),
+                Cancel {
+                    protocol_version: PROTOCOL_VERSION,
+                    request_id: approval.binding.invocation.request_id,
+                },
+            ))
+        }));
+        cancellations
     }
 }
 

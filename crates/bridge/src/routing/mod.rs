@@ -1,3 +1,4 @@
+mod approvals;
 mod calls;
 mod error;
 mod policy;
@@ -15,9 +16,11 @@ pub use error::{RegistryError, RegistryErrorCode};
 pub use policy::{PermissionDecision, permission_decision};
 pub use registry::CapabilityRegistry;
 pub use types::{
-    BrowserToolResponse, RegistryChange, RoutedCall, RoutedCallCompletionError, RoutedCancellation,
-    ToolInvocation,
+    ApprovalCompletionError, ApprovalGrant, BrowserToolResponse, CallReservation, RegistryChange,
+    RoutedApproval, RoutedCall, RoutedCallCompletionError, RoutedCancellation, ToolInvocation,
 };
+
+const MAX_RESERVED_REQUESTS: usize = 128;
 
 pub type SharedCapabilityRegistry = Arc<Mutex<CapabilityRegistry>>;
 

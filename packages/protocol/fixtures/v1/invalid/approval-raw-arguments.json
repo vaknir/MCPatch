@@ -1,0 +1,15 @@
+{
+  "protocolVersion": 1,
+  "type": "approval_required",
+  "approvalId": "approval-01J8QAZ6V4F2K7M3",
+  "requestId": "request-01J8QAZ6V4F2K7M3",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://jira.example.com",
+  "tool": "jira.add_comment",
+  "arguments": {
+    "body": "must-not-cross-the-approval-boundary"
+  },
+  "argsHash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  "expiresAt": "2026-09-15T12:05:00Z"
+}

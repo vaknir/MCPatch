@@ -11,17 +11,21 @@ use rmcp::{
     model::{CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock},
 };
 use serde_json::json;
+use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
 use crate::routing::{
-    BrowserToolResponse, RegistryError, RegistryErrorCode, RoutedCallCompletionError,
-    SharedCapabilityRegistry, ToolInvocation,
+    ApprovalCompletionError, ApprovalGrant, BrowserToolResponse, CallReservation, RegistryError,
+    RegistryErrorCode, RoutedCall, RoutedCallCompletionError, SharedCapabilityRegistry,
+    ToolInvocation,
 };
 
 const DEFAULT_CALL_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_APPROVAL_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Clone)]
 pub(super) struct McpCallRuntime {
+    approval_timeout: Duration,
     call_timeout: Duration,
     registry: SharedCapabilityRegistry,
     sequence: Arc<AtomicU64>,
@@ -33,7 +37,16 @@ impl McpCallRuntime {
     }
 
     fn with_timeout(registry: SharedCapabilityRegistry, call_timeout: Duration) -> Self {
+        Self::with_timeouts(registry, call_timeout, DEFAULT_APPROVAL_TIMEOUT)
+    }
+
+    fn with_timeouts(
+        registry: SharedCapabilityRegistry,
+        call_timeout: Duration,
+        approval_timeout: Duration,
+    ) -> Self {
         Self {
+            approval_timeout,
             call_timeout,
             registry,
             sequence: Arc::new(AtomicU64::new(0)),
@@ -61,21 +74,97 @@ impl McpCallRuntime {
             tool: request.name.into_owned(),
             arguments: request.arguments.unwrap_or_default(),
         };
-        let routed = match self.registry.lock().await.route_call(invocation) {
-            Ok(routed) => routed,
+        let reservation = match self.registry.lock().await.prepare_call(
+            invocation,
+            OffsetDateTime::now_utc(),
+            self.approval_timeout,
+        ) {
+            Ok(reservation) => reservation,
             Err(error) => return map_route_error(error),
         };
+        let routed = match reservation {
+            CallReservation::Call(routed) => routed,
+            CallReservation::Approval(approval) => {
+                let grant = match self
+                    .await_approval(approval, &request_id, &cancellation)
+                    .await
+                {
+                    Ok(grant) => grant,
+                    Err(error) => return Ok(tool_failure(error.message())),
+                };
+                match self
+                    .registry
+                    .lock()
+                    .await
+                    .route_approved(grant, OffsetDateTime::now_utc())
+                {
+                    Ok(routed) => routed,
+                    Err(_) => return Ok(tool_failure("The approval is no longer valid.")),
+                }
+            }
+        };
 
+        self.execute_routed(routed, &request_id, cancellation).await
+    }
+
+    async fn await_approval(
+        &self,
+        approval: crate::routing::RoutedApproval,
+        request_id: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<ApprovalGrant, ApprovalWaitError> {
         let dispatch_result = tokio::select! {
             biased;
             _ = cancellation.cancelled() => {
-                self.cancel_pending(&request_id).await;
+                self.cancel_pending(request_id).await;
+                return Err(ApprovalWaitError::Cancelled);
+            }
+            result = approval.dispatch() => result,
+        };
+        if dispatch_result.is_err() {
+            self.cancel_pending(request_id).await;
+            return Err(ApprovalWaitError::Unavailable);
+        }
+
+        let completion = approval.completion();
+        tokio::pin!(completion);
+        let timeout = tokio::time::sleep(self.approval_timeout);
+        tokio::pin!(timeout);
+        tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => {
+                self.cancel_pending(request_id).await;
+                Err(ApprovalWaitError::Cancelled)
+            }
+            _ = &mut timeout => {
+                self.cancel_pending(request_id).await;
+                Err(ApprovalWaitError::Expired)
+            }
+            result = &mut completion => match result {
+                Ok(grant) => Ok(grant),
+                Err(ApprovalCompletionError::Denied) => Err(ApprovalWaitError::Denied),
+                Err(ApprovalCompletionError::Expired) => Err(ApprovalWaitError::Expired),
+                Err(ApprovalCompletionError::Revoked) => Err(ApprovalWaitError::Revoked),
+            },
+        }
+    }
+
+    async fn execute_routed(
+        &self,
+        routed: RoutedCall,
+        request_id: &str,
+        cancellation: CancellationToken,
+    ) -> Result<CallToolResponse, McpError> {
+        let dispatch_result = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => {
+                self.cancel_pending(request_id).await;
                 return Ok(tool_failure("The MCPatch tool call was cancelled."));
             }
             result = routed.dispatch() => result,
         };
         if dispatch_result.is_err() {
-            self.cancel_pending(&request_id).await;
+            self.cancel_pending(request_id).await;
             return Ok(tool_failure("The browser capability is unavailable."));
         }
 
@@ -86,11 +175,11 @@ impl McpCallRuntime {
         tokio::select! {
             biased;
             _ = cancellation.cancelled() => {
-                self.cancel_pending(&request_id).await;
+                self.cancel_pending(request_id).await;
                 Ok(tool_failure("The MCPatch tool call was cancelled."))
             }
             _ = &mut timeout => {
-                self.cancel_pending(&request_id).await;
+                self.cancel_pending(request_id).await;
                 Ok(tool_failure("The browser capability timed out."))
             }
             result = &mut completion => Ok(map_completion(result)),
@@ -109,6 +198,27 @@ impl McpCallRuntime {
         let cancellation = self.registry.lock().await.cancel_request(request_id);
         if let Some(cancellation) = cancellation {
             let _ = cancellation.dispatch().await;
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ApprovalWaitError {
+    Cancelled,
+    Denied,
+    Expired,
+    Revoked,
+    Unavailable,
+}
+
+impl ApprovalWaitError {
+    const fn message(self) -> &'static str {
+        match self {
+            Self::Cancelled => "The MCPatch tool call was cancelled.",
+            Self::Denied => "The user denied this tool call.",
+            Self::Expired => "The approval request expired.",
+            Self::Revoked => "The approval request was revoked.",
+            Self::Unavailable => "The approval surface is unavailable.",
         }
     }
 }

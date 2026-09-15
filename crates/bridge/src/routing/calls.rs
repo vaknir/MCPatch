@@ -1,30 +1,24 @@
 use serde_json::Value;
+use std::time::Duration;
+use time::OffsetDateTime;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    BrowserToolResponse, PermissionDecision, RegistryError, RegistryErrorCode, RoutedCall,
-    RoutedCancellation, ToolInvocation, permission_decision,
+    BrowserToolResponse, CallReservation, MAX_RESERVED_REQUESTS, PermissionDecision, RegistryError,
+    RegistryErrorCode, RoutedCall, RoutedCancellation, ToolInvocation, permission_decision,
     registry::CapabilityRegistry,
-    types::{ActiveRequest, RoutedCallCompletionError},
+    state::ResolvedCapability,
+    types::{ActiveRequest, ApprovalGrant, RoutedCallCompletionError},
 };
 use crate::{
     browser::BrowserConnectionId,
     protocol::{Cancel, Message, PROTOCOL_VERSION, ToolCall},
 };
 
-const MAX_IN_FLIGHT_REQUESTS: usize = 128;
-
 impl CapabilityRegistry {
     pub fn route_call(&mut self, invocation: ToolInvocation) -> Result<RoutedCall, RegistryError> {
-        validate_request_id(&invocation.request_id)?;
-        if self.active_requests.contains_key(&invocation.request_id) {
-            return Err(RegistryError::new(RegistryErrorCode::DuplicateRequest));
-        }
-        if self.active_requests.len() >= MAX_IN_FLIGHT_REQUESTS {
-            return Err(RegistryError::new(RegistryErrorCode::LimitExceeded));
-        }
-
+        self.validate_reservation(&invocation)?;
         let resolved = self.resolve_capability(&invocation.tool)?;
         match permission_decision(&resolved.capability) {
             PermissionDecision::Allow => {}
@@ -43,6 +37,106 @@ impl CapabilityRegistry {
             return Err(RegistryError::new(RegistryErrorCode::InvalidArguments));
         }
 
+        self.reserve_call(invocation, resolved)
+    }
+
+    pub fn prepare_call(
+        &mut self,
+        invocation: ToolInvocation,
+        now: OffsetDateTime,
+        approval_ttl: Duration,
+    ) -> Result<CallReservation, RegistryError> {
+        self.purge_expired_approvals(now);
+        self.validate_reservation(&invocation)?;
+        let resolved = self.resolve_capability(&invocation.tool)?;
+        match permission_decision(&resolved.capability) {
+            PermissionDecision::Deny => {
+                return Err(RegistryError::new(RegistryErrorCode::CapabilityDenied));
+            }
+            PermissionDecision::Allow | PermissionDecision::ApprovalRequired => {}
+        }
+        self.validate_arguments(&invocation, &resolved)?;
+
+        if permission_decision(&resolved.capability) == PermissionDecision::ApprovalRequired {
+            self.reserve_approval(invocation, resolved, now, approval_ttl)
+                .map(CallReservation::Approval)
+        } else {
+            self.reserve_call(invocation, resolved)
+                .map(CallReservation::Call)
+        }
+    }
+
+    pub fn route_approved(
+        &mut self,
+        grant: ApprovalGrant,
+        now: OffsetDateTime,
+    ) -> Result<RoutedCall, RegistryError> {
+        let binding = grant.binding;
+        if binding.protocol_version != PROTOCOL_VERSION
+            || binding.policy_version != super::approvals::APPROVAL_POLICY_VERSION
+        {
+            return Err(RegistryError::new(RegistryErrorCode::ApprovalMismatch));
+        }
+        if now < binding.issued_at || now >= binding.expires_at {
+            return Err(RegistryError::new(RegistryErrorCode::ApprovalExpired));
+        }
+        self.validate_reservation(&binding.invocation)?;
+        let resolved = self.resolve_capability(&binding.invocation.tool)?;
+        self.validate_arguments(&binding.invocation, &resolved)?;
+        let current_hash =
+            super::approvals::canonical_arguments_hash(&binding.invocation.arguments)?;
+        if permission_decision(&resolved.capability) != PermissionDecision::ApprovalRequired
+            || resolved.connection.id() != &binding.connection_id
+            || resolved.context_id != binding.context_id
+            || resolved.context_revision != binding.context_revision
+            || resolved.origin != binding.origin
+            || resolved.capability != binding.capability
+            || current_hash != binding.args_hash
+        {
+            return Err(RegistryError::new(RegistryErrorCode::ApprovalMismatch));
+        }
+        self.reserve_call(binding.invocation, resolved)
+    }
+
+    pub(super) fn validate_reservation(
+        &self,
+        invocation: &ToolInvocation,
+    ) -> Result<(), RegistryError> {
+        validate_request_id(&invocation.request_id)?;
+        if self.active_requests.contains_key(&invocation.request_id)
+            || self
+                .pending_approvals
+                .values()
+                .any(|approval| approval.binding.invocation.request_id == invocation.request_id)
+        {
+            return Err(RegistryError::new(RegistryErrorCode::DuplicateRequest));
+        }
+        if self.active_requests.len() + self.pending_approvals.len() >= MAX_RESERVED_REQUESTS {
+            return Err(RegistryError::new(RegistryErrorCode::LimitExceeded));
+        }
+        Ok(())
+    }
+
+    pub(super) fn validate_arguments(
+        &self,
+        invocation: &ToolInvocation,
+        resolved: &ResolvedCapability,
+    ) -> Result<(), RegistryError> {
+        if resolved
+            .input_validator
+            .is_valid(&Value::Object(invocation.arguments.clone()))
+        {
+            Ok(())
+        } else {
+            Err(RegistryError::new(RegistryErrorCode::InvalidArguments))
+        }
+    }
+
+    pub(super) fn reserve_call(
+        &mut self,
+        invocation: ToolInvocation,
+        resolved: ResolvedCapability,
+    ) -> Result<RoutedCall, RegistryError> {
         let message = ToolCall {
             protocol_version: PROTOCOL_VERSION,
             request_id: invocation.request_id.clone(),
@@ -80,11 +174,31 @@ impl CapabilityRegistry {
     }
 
     pub fn cancel_request(&mut self, request_id: &str) -> Option<RoutedCancellation> {
-        let request = self.active_requests.remove(request_id)?;
-        request.revocation.cancel();
+        if let Some(request) = self.active_requests.remove(request_id) {
+            request.revocation.cancel();
+            let connection = self
+                .connections
+                .get(&request.connection_id)?
+                .connection
+                .clone();
+            return Some(RoutedCancellation::new(
+                connection,
+                Cancel {
+                    protocol_version: PROTOCOL_VERSION,
+                    request_id: request_id.to_owned(),
+                },
+            ));
+        }
+        let approval_id = self
+            .pending_approvals
+            .iter()
+            .find(|(_, approval)| approval.binding.invocation.request_id == request_id)
+            .map(|(approval_id, _)| approval_id.clone())?;
+        let approval = self.pending_approvals.remove(&approval_id)?;
+        approval.revocation.cancel();
         let connection = self
             .connections
-            .get(&request.connection_id)?
+            .get(&approval.binding.connection_id)?
             .connection
             .clone();
         Some(RoutedCancellation::new(

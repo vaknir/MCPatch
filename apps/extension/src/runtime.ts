@@ -71,6 +71,20 @@ export function startExtensionRuntime(
     ...options,
     onMessage(message) {
       if (packs.handle(message)) return;
+      if (message.type === "approval_required") {
+        if (!(
+          session.supervisor?.send({
+            protocolVersion: message.protocolVersion,
+            type: "approval_result",
+            approvalId: message.approvalId,
+            requestId: message.requestId,
+            decision: "denied",
+          }) ?? false
+        )) {
+          throw new Error("approval denial could not be delivered");
+        }
+        return;
+      }
       if (options.onMessage === undefined) {
         throw new Error("unsupported bridge application message");
       }

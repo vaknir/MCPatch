@@ -92,7 +92,6 @@ pub(super) fn validate_approval_required(
     )?;
     validate_identifier(&message.approval_id, "approvalId")?;
     validate_tool_name(&message.tool, "tool")?;
-    validate_object_limit(message.arguments.len(), "arguments")?;
     if !valid_lower_hex(&message.args_hash, 64) {
         return Err(invalid(ValidationCode::InvalidValue, "argsHash"));
     }

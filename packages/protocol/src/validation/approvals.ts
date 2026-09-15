@@ -1,6 +1,5 @@
 import type { ValidationIssue } from "./error.js";
 import { validateTimestamp } from "./formats.js";
-import { validateJsonObject } from "./json.js";
 import {
   checkClosedObject,
   issue,
@@ -27,7 +26,6 @@ export function validateApprovalRequired(
       "contextRevision",
       "origin",
       "tool",
-      "arguments",
       "argsHash",
       "expiresAt",
     ],
@@ -39,7 +37,6 @@ export function validateApprovalRequired(
     validateTypeAndRoute(message, "approval_required") ??
     validateIdentifier(message.approvalId, "approvalId") ??
     validateToolName(message.tool, "tool") ??
-    validateJsonObject(message.arguments, "arguments") ??
     (typeof message.argsHash === "string" && HASH_PATTERN.test(message.argsHash)
       ? undefined
       : issue("INVALID_VALUE", "argsHash")) ??

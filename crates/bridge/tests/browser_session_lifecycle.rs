@@ -7,11 +7,12 @@ use mcpatch_bridge::{
     browser::BrowserSessionErrorCode,
     local_ipc::read_json_frame,
     protocol::{
-        ContextClosed, ContextClosedReason, ErrorCode, Message, PROTOCOL_VERSION, ToolError,
+        ApprovalDecision, ApprovalResult, CapabilitySource, ContextClosed, ContextClosedReason,
+        ErrorCode, Message, PROTOCOL_VERSION, PackReference, Permission, Risk, ToolError,
         ToolResult, parse_message,
     },
     routing::{
-        RegistryErrorCode, RoutedCall, SharedCapabilityRegistry, ToolInvocation,
+        CallReservation, RegistryErrorCode, RoutedCall, SharedCapabilityRegistry, ToolInvocation,
         shared_capability_registry,
     },
 };
@@ -53,6 +54,76 @@ async fn applies_snapshots_and_context_closure_with_cancellation() {
     assert!(revocation.is_cancelled());
     wait_for_capabilities(&registry, 0).await;
     assert!(!task.is_finished());
+
+    drop(client);
+    assert_eq!(join(task).await, Ok(()));
+}
+
+#[tokio::test]
+async fn authenticated_session_completes_an_exact_one_time_approval() {
+    let registry = shared_capability_registry();
+    let manager = manager(registry.clone(), Duration::from_secs(1));
+    let (mut client, task) = start_session(&manager, CancellationToken::new());
+    negotiate(&mut client, vec![1]).await;
+    let mut elevated = snapshot();
+    let capability = &mut elevated.capabilities[0];
+    capability.source = CapabilitySource::Pack;
+    capability.pack = Some(PackReference {
+        publisher: "mcpatch.dev".to_owned(),
+        id: "approval-test".to_owned(),
+        version: "0.1.0".to_owned(),
+        digest: format!("sha256:{}", "a".repeat(64)),
+    });
+    capability.risk = Risk::Action;
+    capability.permissions = vec![Permission::Action];
+    send_message(&mut client, Message::CapabilitySnapshot(elevated)).await;
+    wait_for_capabilities(&registry, 1).await;
+
+    let now = time::OffsetDateTime::now_utc();
+    let approval = {
+        let mut registry = registry.lock().await;
+        match registry
+            .prepare_call(
+                ToolInvocation {
+                    request_id: "request-approval".to_owned(),
+                    tool: "demo.read".to_owned(),
+                    arguments: Map::new(),
+                },
+                now,
+                Duration::from_secs(60),
+            )
+            .unwrap()
+        {
+            CallReservation::Approval(approval) => approval,
+            CallReservation::Call(_) => panic!("action must wait for approval"),
+        }
+    };
+    approval.dispatch().await.unwrap();
+    let Message::ApprovalRequired(required) = receive_message(&mut client).await else {
+        panic!("bridge must send an approval request");
+    };
+    send_message(
+        &mut client,
+        Message::ApprovalResult(ApprovalResult {
+            protocol_version: PROTOCOL_VERSION,
+            approval_id: required.approval_id,
+            request_id: required.request_id,
+            decision: ApprovalDecision::Approved,
+        }),
+    )
+    .await;
+
+    let grant = approval.completion().await.unwrap();
+    let routed = registry
+        .lock()
+        .await
+        .route_approved(grant, time::OffsetDateTime::now_utc())
+        .unwrap();
+    routed.dispatch().await.unwrap();
+    assert!(matches!(
+        receive_message(&mut client).await,
+        Message::ToolCall(_)
+    ));
 
     drop(client);
     assert_eq!(join(task).await, Ok(()));

@@ -15,7 +15,6 @@
         "contextRevision",
         "origin",
         "tool",
-        "arguments",
         "argsHash",
         "expiresAt"
       ],
@@ -43,10 +42,6 @@
         },
         "tool": {
           "$ref": "common.schema.json#/$defs/toolName"
-        },
-        "arguments": {
-          "type": "object",
-          "maxProperties": 128
         },
         "argsHash": {
           "type": "string",
