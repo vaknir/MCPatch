@@ -15,15 +15,18 @@ describe("extension manifest", () => {
     });
   });
 
-  it("has no browser or website authority in the scaffold", () => {
+  it("grants only native messaging and no website authority", () => {
     expect(Object.keys(manifest).sort()).toEqual([
       "background",
       "description",
       "manifest_version",
+      "minimum_chrome_version",
       "name",
+      "permissions",
       "version",
     ]);
-    expect(manifest).not.toHaveProperty("permissions");
+    expect(manifest["minimum_chrome_version"]).toBe("105");
+    expect(manifest["permissions"]).toEqual(["nativeMessaging"]);
     expect(manifest).not.toHaveProperty("optional_permissions");
     expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("optional_host_permissions");

@@ -52,6 +52,9 @@ All notable MCPatch changes are documented here. The format follows
   revocation through the shared capability registry.
 - Downgrade-verifiable hello acknowledgements that carry the acceptor's bounded
   supported-version set for initiator-side recomputation.
+- Manifest V3 native-session supervision with strict hello acknowledgement,
+  fixed-host Native Messaging, bounded heartbeats and reconnects, fail-closed
+  direction checks, and no cross-connection message replay.
 
 ### Fixed
 

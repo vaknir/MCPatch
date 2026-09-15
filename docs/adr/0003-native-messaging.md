@@ -45,6 +45,10 @@ The production channel must enforce these controls:
 - development builds use a separate host name and extension identity;
 - the host verifies Chrome's caller-origin process argument as defense in depth;
 - the service worker uses one long-lived `runtime.connectNative` port;
+- Chromium 105 is the minimum supported version because its open Native Messaging
+  port lifetime extends the service worker lifetime;
+- extension reconnects use bounded sub-30-second backoff and never replay
+  application messages from a disconnected session;
 - messages are UTF-8 JSON and follow Chrome's 32-bit native-endian framing;
 - MCPatch applies a 1 MiB limit in both directions, regardless of Chrome's larger
   extension-to-host allowance;
@@ -100,4 +104,5 @@ messaging through the service worker.
 ## References
 
 - [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging)
+- [Chrome extension service-worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle)
 - [Chrome runtime API](https://developer.chrome.com/docs/extensions/reference/api/runtime)

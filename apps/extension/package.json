@@ -5,11 +5,15 @@
   "description": "MCPatch Chromium Manifest V3 browser runtime",
   "type": "module",
   "scripts": {
-    "build": "node scripts/prepare-dist.mjs && tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@mcpatch/protocol": "workspace:*"
+  },
   "devDependencies": {
-    "@types/node": "24.13.4"
+    "@types/node": "24.13.4",
+    "esbuild": "0.28.2"
   }
 }
