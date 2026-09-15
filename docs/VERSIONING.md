@@ -76,3 +76,8 @@ Before a product release:
 
 Automated publication, signing, and provenance are required before the first public
 release and will be specified in a dedicated release-engineering issue.
+
+The pre-alpha local equivalent is `pnpm package:local`. It requires a clean commit
+and emits an `artifact-manifest.json` that binds every included file digest to that
+full source revision. This is local provenance, not a substitute for signed release
+attestations.

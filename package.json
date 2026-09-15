@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "test": "pnpm -r --if-present test",
+    "package:local": "node scripts/package-local.mjs",
+    "test": "pnpm -r --if-present test && node --test scripts/*.test.mjs",
     "verify:packs": "pnpm --filter @mcpatch/sdk test:fixtures && pnpm --filter './packs/**' test",
     "typecheck": "pnpm -r --if-present typecheck"
   },

@@ -1,6 +1,8 @@
 use std::{process::Stdio, time::Duration};
 
-use mcpatch_bridge::native_host::{ALLOWED_EXTENSION_ORIGIN_ENV, MAX_NATIVE_MESSAGE_BYTES};
+use mcpatch_bridge::{
+    installation::STABLE_EXTENSION_ORIGIN, native_host::MAX_NATIVE_MESSAGE_BYTES,
+};
 use serde_json::Value;
 #[cfg(target_os = "linux")]
 use serde_json::json;
@@ -11,11 +13,11 @@ use tokio::{
 };
 
 const PROCESS_TIMEOUT: Duration = Duration::from_secs(5);
-const ALLOWED_ORIGIN: &str = "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
+const ALLOWED_ORIGIN: &str = STABLE_EXTENSION_ORIGIN;
 
 #[tokio::test]
 async fn authorized_host_stops_cleanly_on_eof_without_stdout_noise() {
-    let child = spawn_native_host(ALLOWED_ORIGIN, ALLOWED_ORIGIN);
+    let child = spawn_native_host(ALLOWED_ORIGIN);
     let (status, stdout, stderr) = finish(child).await;
 
     assert!(status.success());
@@ -26,11 +28,13 @@ async fn authorized_host_stops_cleanly_on_eof_without_stdout_noise() {
 }
 
 #[tokio::test]
-async fn missing_origin_policy_fails_closed() {
+async fn environment_cannot_override_the_compiled_origin_policy() {
     let child = Command::new(env!("CARGO_BIN_EXE_mcpatch"))
-        .arg("native-host")
         .arg(ALLOWED_ORIGIN)
-        .env_remove(ALLOWED_EXTENSION_ORIGIN_ENV)
+        .env(
+            "MCPATCH_ALLOWED_EXTENSION_ORIGIN",
+            "chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/",
+        )
         .env("MCPATCH_LOG", "trace")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -40,16 +44,17 @@ async fn missing_origin_policy_fails_closed() {
         .expect("native host must spawn");
     let (status, stdout, stderr) = finish(child).await;
 
-    assert!(!status.success());
+    assert!(status.success());
     assert!(stdout.is_empty());
-    assert!(stderr.contains(r#""code":"caller_origin_policy_unconfigured""#));
+    assert!(stderr.contains(r#""event":"native_host_started""#));
+    assert!(stderr.contains(r#""event":"native_host_stopped""#));
     assert_json_lines(&stderr);
 }
 
 #[tokio::test]
 async fn rejects_unauthorized_caller_without_logging_the_origin() {
     let denied = "chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/";
-    let child = spawn_native_host(denied, ALLOWED_ORIGIN);
+    let child = spawn_native_host(denied);
     let (status, stdout, stderr) = finish(child).await;
 
     assert!(!status.success());
@@ -61,7 +66,7 @@ async fn rejects_unauthorized_caller_without_logging_the_origin() {
 
 #[tokio::test]
 async fn malformed_frame_terminates_without_echoing_payload() {
-    let mut child = spawn_native_host(ALLOWED_ORIGIN, ALLOWED_ORIGIN);
+    let mut child = spawn_native_host(ALLOWED_ORIGIN);
     let marker = b"private-browser-payload";
     let mut frame = u32::try_from(marker.len()).unwrap().to_ne_bytes().to_vec();
     frame.extend_from_slice(marker);
@@ -83,7 +88,7 @@ async fn malformed_frame_terminates_without_echoing_payload() {
 
 #[tokio::test]
 async fn oversized_prefix_is_rejected_without_reading_a_payload() {
-    let mut child = spawn_native_host(ALLOWED_ORIGIN, ALLOWED_ORIGIN);
+    let mut child = spawn_native_host(ALLOWED_ORIGIN);
     child
         .stdin
         .as_mut()
@@ -106,7 +111,7 @@ async fn oversized_prefix_is_rejected_without_reading_a_payload() {
 #[cfg(target_os = "linux")]
 #[tokio::test]
 async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
-    let mut command = native_host_command(ALLOWED_ORIGIN, ALLOWED_ORIGIN);
+    let mut command = native_host_command(ALLOWED_ORIGIN);
     command.env_remove("XDG_RUNTIME_DIR");
     let mut child = command.spawn().expect("native host must spawn");
     let payload = serde_json::to_vec(&json!({
@@ -134,18 +139,16 @@ async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
     assert_json_lines(&stderr);
 }
 
-fn spawn_native_host(caller: &str, allowed: &str) -> Child {
-    native_host_command(caller, allowed)
+fn spawn_native_host(caller: &str) -> Child {
+    native_host_command(caller)
         .spawn()
         .expect("native host must spawn")
 }
 
-fn native_host_command(caller: &str, allowed: &str) -> Command {
+fn native_host_command(caller: &str) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_mcpatch"));
     command
-        .arg("native-host")
         .arg(caller)
-        .env(ALLOWED_EXTENSION_ORIGIN_ENV, allowed)
         .env("RUST_LOG", "trace")
         .env("MCPATCH_LOG", "trace")
         .stdin(Stdio::piped())

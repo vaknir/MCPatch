@@ -16,12 +16,18 @@ mcpatch native-host chrome-extension://<32-character-extension-id>/ --parent-win
 ```
 
 Before reading a frame or attempting local rendezvous, the process requires a
-canonical Chromium extension origin and authorizes it against one exact configured
-origin. The current pre-installer
-bootstrap reads that exact value from `MCPATCH_ALLOWED_EXTENSION_ORIGIN`; a missing,
-invalid, or different value fails closed. Packaging work must replace this bootstrap
-with installer-owned channel configuration and an exact `allowed_origins` entry in
-the Native Messaging host manifest. Origin values are never logged.
+canonical Chromium extension origin and authorizes it against the one stable origin
+compiled from MCPatch's committed public extension identity. Environment values
+cannot override the policy. The installer emits that same single origin in the
+Native Messaging manifest's `allowed_origins`; tests derive the extension ID from
+the manifest public key and require exact agreement with the Rust constant. Origin
+values are never logged.
+
+Chromium launches the manifest's executable directly, passing the caller origin as
+the first argument and the optional Windows parent-window handle as the second. The
+binary recognizes that exact direct form. The explicit `mcpatch native-host` form
+remains available only for controlled process tests and diagnostics; no wrapper
+script or command fragment is generated during installation.
 
 ## Framing
 

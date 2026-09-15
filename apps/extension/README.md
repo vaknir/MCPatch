@@ -20,6 +20,12 @@ enablement controller registers it only for user-approved reviewed origins. Load
 development. The native-host manifest must allow the resulting extension ID. The
 toolbar enablement flow is active, while a real-site capability arrives in Phase 7.
 
+The committed public `key` fixes unpacked builds to extension ID
+`imbnpameklobbabbkfkalcfcggpjacdi`; it is public identity material, not a signing
+secret. A clean-checkout `pnpm package:local` build records source provenance and
+produces the bridge plus extension together. The packaged bridge's `install`
+command registers the exact ID. See [local installation](../../docs/installation.md).
+
 The runtime requires Chromium 106 or newer so each accepted content port has a
 browser-attested document ID. An open Native Messaging port keeps the extension
 service worker alive. A failed
@@ -48,8 +54,9 @@ for admission, native precedence, lifecycle, and remaining real-site work.
 
 The cross-platform automated workflow that exercises this contract through the real
 Native Messaging and MCP stdio processes is documented in
-[../../docs/local-demo.md](../../docs/local-demo.md). Loading the extension unpacked
-does not yet install or authorize the native-host manifest automatically.
+[../../docs/local-demo.md](../../docs/local-demo.md). Registration is an explicit
+local command because Chromium does not allow an unpacked extension to install its
+own native host.
 
 ## Current permissions
 

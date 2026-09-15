@@ -62,6 +62,12 @@ Changes must preserve these rules:
 - Development fixtures must contain synthetic data only.
 - A release artifact must be reproducibly attributable to its source commit and
   signing identity before MCPatch is offered to end users.
+- The local native-host installer must use its canonical executable path, one exact
+  compiled extension origin, user-level registration, and an integrity-bound
+  ownership receipt. It must reject foreign or weakened files rather than adopting
+  them.
+- Local uninstall must unregister and preserve only receipt-proven MCPatch files;
+  it must not recursively remove browser or user configuration directories.
 
 ## Scope boundaries
 

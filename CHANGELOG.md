@@ -8,6 +8,10 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Reproducible local bridge/extension packaging with source-commit metadata and
+  per-file SHA-256 digests, plus deterministic public extension identity and
+  user-level Native Messaging install, dry-run, idempotent update, receipt-bound
+  recoverable uninstall, and cross-platform registration-plan tests.
 - Internal extension page-channel protocol version 1 with bounded duplicate-aware
   JSON parsing, direction validation, exact document bindings, and golden fixtures.
 - Top-level document context ownership through browser-attested content ports with

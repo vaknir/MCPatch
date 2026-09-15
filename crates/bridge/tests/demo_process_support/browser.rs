@@ -1,7 +1,8 @@
 use std::process::{ExitStatus, Stdio};
 
 use mcpatch_bridge::{
-    native_host::{ALLOWED_EXTENSION_ORIGIN_ENV, read_message, write_message},
+    installation::STABLE_EXTENSION_ORIGIN,
+    native_host::{read_message, write_message},
     protocol::{Hello, Implementation, Message, PROTOCOL_VERSION, Role},
 };
 use tokio::{
@@ -12,7 +13,7 @@ use tokio::{
 
 use super::{TEST_TIMEOUT, runtime::TestDirectory, runtime::configure_runtime_environment};
 
-const ALLOWED_ORIGIN: &str = "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
+const ALLOWED_ORIGIN: &str = STABLE_EXTENSION_ORIGIN;
 
 pub(crate) struct BrowserAdapter {
     child: Child,
@@ -23,9 +24,7 @@ impl BrowserAdapter {
     pub(crate) async fn connect(fixture: &TestDirectory) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_mcpatch"));
         child
-            .arg("native-host")
             .arg(ALLOWED_ORIGIN)
-            .env(ALLOWED_EXTENSION_ORIGIN_ENV, ALLOWED_ORIGIN)
             .env("MCPATCH_LOG", "trace")
             .env("RUST_LOG", "trace")
             .stdin(Stdio::piped())

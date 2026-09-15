@@ -5,6 +5,7 @@ export default tseslint.config(
   {
     ignores: [
       "**/coverage/**",
+      "**/.artifacts/**",
       "**/dist/**",
       "**/node_modules/**",
       "**/target/**",

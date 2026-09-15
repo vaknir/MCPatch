@@ -5,11 +5,10 @@ use std::{env, ffi::OsString, process::ExitCode};
 use mcpatch_bridge::{
     PRODUCT_VERSION,
     cli::{self, Command},
+    installation::{ChromiumBrowser, STABLE_EXTENSION_ORIGIN, install_current, uninstall_current},
     local_ipc::InstallChannel,
     logging, mcp,
-    native_host::{
-        self, ALLOWED_EXTENSION_ORIGIN_ENV, CoreBrowserChannelFactory, ExactCallerOriginPolicy,
-    },
+    native_host::{self, CoreBrowserChannelFactory, ExactCallerOriginPolicy},
 };
 
 fn main() -> ExitCode {
@@ -24,10 +23,12 @@ fn main() -> ExitCode {
     match command {
         Command::Help => {
             println!(
-                "MCPatch {PRODUCT_VERSION}\n\nUsage: mcpatch [mcp-stdio|native-host <caller-origin> [--parent-window=<handle>]|bridge-core [--channel=development|--channel=production]|--help|--version]"
+                "MCPatch {PRODUCT_VERSION}\n\nUsage: mcpatch [mcp-stdio|install [--browser=google-chrome|chrome-for-testing|chromium] [--dry-run]|uninstall [--browser=google-chrome|chrome-for-testing|chromium] [--dry-run]|native-host <caller-origin> [--parent-window=<handle>]|bridge-core [--channel=development|--channel=production]|--help|--version]"
             );
             ExitCode::SUCCESS
         }
+        Command::Install { browser, dry_run } => run_install(browser, dry_run),
+        Command::Uninstall { browser, dry_run } => run_uninstall(browser, dry_run),
         Command::Version => {
             println!("mcpatch {PRODUCT_VERSION}");
             ExitCode::SUCCESS
@@ -58,7 +59,53 @@ fn run_async_command(command: Command) -> ExitCode {
             exit_code
         }
         Command::BridgeCore { channel } => runtime.block_on(run_bridge_core(channel)),
-        Command::Help | Command::Version => unreachable!("handled before runtime startup"),
+        Command::Help | Command::Install { .. } | Command::Uninstall { .. } | Command::Version => {
+            unreachable!("handled before runtime startup")
+        }
+    }
+}
+
+fn run_install(browser: ChromiumBrowser, dry_run: bool) -> ExitCode {
+    match install_current(browser, dry_run) {
+        Ok(outcome) => {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "status": outcome.status.as_str(),
+                    "browser": browser.cli_name(),
+                    "manifestPath": outcome.manifest_path,
+                    "registryKey": outcome.registry_key,
+                })
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("MCPatch installation failed ({})", error.code());
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run_uninstall(browser: ChromiumBrowser, dry_run: bool) -> ExitCode {
+    match uninstall_current(browser, dry_run) {
+        Ok(outcome) => {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "status": outcome.status.as_str(),
+                    "browser": browser.cli_name(),
+                    "manifestPath": outcome.manifest_path,
+                    "registryKey": outcome.registry_key,
+                    "backupManifestPath": outcome.backup_manifest_path,
+                    "backupReceiptPath": outcome.backup_receipt_path,
+                })
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("MCPatch uninstall failed ({})", error.code());
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -182,14 +229,8 @@ async fn run_native_host(caller_origin: OsString) -> ExitCode {
         tracing::error!(target: "mcpatch", event = "native_host_failed", code = "caller_origin_invalid");
         return ExitCode::FAILURE;
     };
-    let Ok(allowed_origin) = env::var(ALLOWED_EXTENSION_ORIGIN_ENV) else {
-        tracing::error!(target: "mcpatch", event = "native_host_failed", code = "caller_origin_policy_unconfigured");
-        return ExitCode::FAILURE;
-    };
-    let Ok(origin_policy) = ExactCallerOriginPolicy::new(allowed_origin) else {
-        tracing::error!(target: "mcpatch", event = "native_host_failed", code = "caller_origin_policy_invalid");
-        return ExitCode::FAILURE;
-    };
+    let origin_policy = ExactCallerOriginPolicy::new(STABLE_EXTENSION_ORIGIN)
+        .expect("the compiled extension origin must remain valid");
 
     tracing::info!(target: "mcpatch", event = "native_host_started");
     let result = native_host::run(
