@@ -38,11 +38,13 @@ The current architecture and security invariants are documented in
 The repository has its initial architecture, threat model, protocol contracts,
 and build foundation. The Rust bridge provides bounded MCP and Native Messaging
 adapters, a transport-independent browser connection boundary, and a deterministic
-capability registry. A zero-permission MV3 extension scaffold is also present;
+capability registry. A zero-site-permission MV3 extension scaffold is also present;
 private Unix and Windows local transports and bridge-core lifecycles are implemented,
 along with bounded connect-first rendezvous and isolated bridge-core process start.
 Both public adapters now use their distinct authenticated bridge-core endpoints;
-pairing, browser negotiation, and live capabilities remain upcoming slices.
+browser negotiation and lifecycle ingestion are live, with one synthetic read-only
+demo capability proving extension-to-registry publication. User-facing pairing and
+real-site packs remain upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 

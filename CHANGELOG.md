@@ -60,6 +60,9 @@ All notable MCPatch changes are documented here. The format follows
   through Native Messaging plus authenticated local IPC.
 - Negotiated browser-session ingestion for atomic capability snapshots, context
   closure, bound tool responses, and cancellation dispatch.
+- Bundled extension demo capability with post-negotiation publication, exact
+  request binding, deterministic typed results, reconnect snapshots, and explicit
+  context closure without site permissions.
 
 ### Fixed
 

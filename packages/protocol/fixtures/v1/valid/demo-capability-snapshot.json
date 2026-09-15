@@ -1,0 +1,38 @@
+{
+  "protocolVersion": 1,
+  "type": "capability_snapshot",
+  "contextId": "mcpatch.demo",
+  "contextRevision": 1,
+  "origin": "https://demo.mcpatch.invalid",
+  "capabilities": [
+    {
+      "name": "mcpatch.demo.status",
+      "title": "MCPatch demo status",
+      "description": "Return deterministic MCPatch demo runtime status.",
+      "origin": "https://demo.mcpatch.invalid",
+      "source": "pack",
+      "pack": {
+        "publisher": "mcpatch",
+        "id": "builtin-demo",
+        "version": "0.1.0",
+        "digest": "sha256:879486d0000d36f06d47958b5285dec823c7805112a4bd086962c20e1d54fb78"
+      },
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "maxProperties": 0,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {
+          "status": { "const": "ready", "type": "string" }
+        }
+      }
+    }
+  ]
+}
