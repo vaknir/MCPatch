@@ -1,0 +1,13 @@
+{
+  "pageProtocolVersion": 2,
+  "type": "page_tool_call",
+  "channelId": "channel-1",
+  "contextId": "page-7",
+  "contextRevision": 1,
+  "tabId": 7,
+  "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+  "origin": "https://example.com",
+  "requestId": "request-1",
+  "tool": "example.read",
+  "args": {}
+}

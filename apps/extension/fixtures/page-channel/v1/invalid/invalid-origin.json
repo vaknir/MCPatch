@@ -1,0 +1,12 @@
+{
+  "pageProtocolVersion": 1,
+  "type": "page_capability_snapshot",
+  "channelId": "channel-1",
+  "contextId": "page-7",
+  "contextRevision": 1,
+  "tabId": 7,
+  "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+  "origin": "https://example.com/path",
+  "snapshotRevision": 1,
+  "capabilities": []
+}

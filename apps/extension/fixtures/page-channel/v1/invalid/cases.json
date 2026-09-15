@@ -1,0 +1,32 @@
+[
+  {
+    "file": "duplicate-field.txt",
+    "direction": "page_to_worker",
+    "code": "DUPLICATE_FIELD"
+  },
+  {
+    "file": "invalid-origin.json",
+    "direction": "page_to_worker",
+    "code": "INVALID_ORIGIN"
+  },
+  {
+    "file": "malformed.txt",
+    "direction": "page_to_worker",
+    "code": "MALFORMED_JSON"
+  },
+  {
+    "file": "unknown-field.json",
+    "direction": "page_to_worker",
+    "code": "UNKNOWN_FIELD"
+  },
+  {
+    "file": "wrong-direction.json",
+    "direction": "page_to_worker",
+    "code": "WRONG_DIRECTION"
+  },
+  {
+    "file": "wrong-version.json",
+    "direction": "worker_to_page",
+    "code": "UNSUPPORTED_VERSION"
+  }
+]

@@ -1,0 +1,75 @@
+[
+  {
+    "pageProtocolVersion": 1,
+    "type": "page_hello",
+    "supportedPageProtocolVersions": [1],
+    "implementation": { "name": "mcpatch-content", "version": "0.1.0" }
+  },
+  {
+    "pageProtocolVersion": 1,
+    "type": "page_capability_snapshot",
+    "channelId": "channel-1",
+    "contextId": "page-7",
+    "contextRevision": 1,
+    "tabId": 7,
+    "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+    "origin": "https://example.com",
+    "snapshotRevision": 1,
+    "capabilities": [
+      { "source": "pack", "name": "example.read" },
+      {
+        "source": "native_webmcp",
+        "name": "example.native_read",
+        "title": "Native example",
+        "description": "Read the synthetic current-page value.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "consequentialHint": false,
+          "untrustedContentHint": true
+        }
+      }
+    ]
+  },
+  {
+    "pageProtocolVersion": 1,
+    "type": "page_tool_result",
+    "channelId": "channel-1",
+    "contextId": "page-7",
+    "contextRevision": 1,
+    "tabId": 7,
+    "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+    "origin": "https://example.com",
+    "requestId": "request-1",
+    "tool": "example.read",
+    "result": { "status": "ready" }
+  },
+  {
+    "pageProtocolVersion": 1,
+    "type": "page_tool_error",
+    "channelId": "channel-1",
+    "contextId": "page-7",
+    "contextRevision": 1,
+    "tabId": 7,
+    "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+    "origin": "https://example.com",
+    "requestId": "request-2",
+    "tool": "example.read",
+    "code": "EXECUTION_FAILED"
+  },
+  {
+    "pageProtocolVersion": 1,
+    "type": "page_context_closed",
+    "channelId": "channel-1",
+    "contextId": "page-7",
+    "contextRevision": 1,
+    "tabId": 7,
+    "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+    "origin": "https://example.com",
+    "reason": "document_unloading"
+  }
+]
