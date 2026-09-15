@@ -9,15 +9,25 @@ import {
   FLIGHTS_CURRENT_SEARCH,
   FLIGHTS_PRICE_INSIGHTS,
   FLIGHTS_RESULTS,
+  FLIGHTS_SEARCH,
+  GOOGLE_FLIGHTS_FINGERPRINT,
   GoogleFlightsExtractionError,
+  GoogleFlightsInteractionError,
   type GoogleFlightsSemanticSnapshot,
+  type GoogleFlightsToolName,
 } from "./model.js";
+import {
+  GoogleFlightsSearchInputError,
+  type GoogleFlightsSearchInput,
+  validateGoogleFlightsSearchInput,
+} from "./search-input.js";
 
 export type GoogleFlightsAdapterErrorCode =
   "CANCELLED" | "EXECUTION_FAILED" | "TOOL_UNAVAILABLE";
 
 export type GoogleFlightsAdapterErrorReason =
   | GoogleFlightsExtractionError["reason"]
+  | GoogleFlightsInteractionError["reason"]
   | "invalid_arguments"
   | "source_failure"
   | "tool_unavailable";
@@ -42,15 +52,16 @@ export interface GoogleFlightsSnapshotSource {
   read(
     signal: AbortSignal,
   ): GoogleFlightsSemanticSnapshot | Promise<GoogleFlightsSemanticSnapshot>;
+  search?(
+    input: GoogleFlightsSearchInput,
+    signal: AbortSignal,
+  ): void | Promise<void>;
   subscribe?(listener: () => void): () => void;
 }
 
 export interface GoogleFlightsPageCapability {
   readonly source: "pack";
-  readonly name:
-    | typeof FLIGHTS_CURRENT_SEARCH
-    | typeof FLIGHTS_PRICE_INSIGHTS
-    | typeof FLIGHTS_RESULTS;
+  readonly name: GoogleFlightsToolName;
 }
 
 export interface GoogleFlightsPageAdapter {
@@ -69,8 +80,11 @@ const CURRENT_CAPABILITY = Object.freeze({
   source: "pack" as const,
   name: FLIGHTS_CURRENT_SEARCH,
 });
-const SEARCH_CAPABILITIES = Object.freeze([
-  CURRENT_CAPABILITY,
+const SEARCH_ACTION_CAPABILITY = Object.freeze({
+  source: "pack" as const,
+  name: FLIGHTS_SEARCH,
+});
+const RESULT_CAPABILITIES = Object.freeze([
   Object.freeze({ source: "pack" as const, name: FLIGHTS_RESULTS }),
   Object.freeze({ source: "pack" as const, name: FLIGHTS_PRICE_INSIGHTS }),
 ]);
@@ -83,6 +97,7 @@ export function createGoogleFlightsPageAdapter(
 
 class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
   readonly #source: GoogleFlightsSnapshotSource;
+  #searchState: "accepted" | "failed" | "idle" | "running" = "idle";
 
   constructor(source: GoogleFlightsSnapshotSource) {
     if (typeof source?.read !== "function") {
@@ -96,10 +111,14 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
   ): Promise<readonly GoogleFlightsPageCapability[]> {
     const snapshot = await this.#read(signal);
     const current = this.#extract(() => extractCurrentSearch(snapshot, signal));
-    if (current.path === "landing") return Object.freeze([CURRENT_CAPABILITY]);
+    const capabilities: GoogleFlightsPageCapability[] = [CURRENT_CAPABILITY];
+    if (this.#source.search !== undefined && this.#searchState === "idle") {
+      capabilities.push(SEARCH_ACTION_CAPABILITY);
+    }
+    if (current.path === "landing") return Object.freeze(capabilities);
     this.#extract(() => extractResults(snapshot, signal));
     this.#extract(() => extractPriceInsights(snapshot, signal));
-    return SEARCH_CAPABILITIES;
+    return Object.freeze([...capabilities, ...RESULT_CAPABILITIES]);
   }
 
   async execute(
@@ -107,6 +126,9 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
     args: JsonObject,
     signal: AbortSignal,
   ): Promise<JsonValue> {
+    if (tool === FLIGHTS_SEARCH) {
+      return this.#search(args, signal);
+    }
     if (!isEmptyDataObject(args)) {
       throw new GoogleFlightsAdapterError(
         "EXECUTION_FAILED",
@@ -137,11 +159,75 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
     return value as unknown as JsonValue;
   }
 
+  async #search(args: JsonObject, signal: AbortSignal): Promise<JsonValue> {
+    const search = this.#source.search;
+    if (search === undefined || this.#searchState !== "idle") {
+      throw new GoogleFlightsAdapterError(
+        search === undefined ? "TOOL_UNAVAILABLE" : "EXECUTION_FAILED",
+        search === undefined ? "tool_unavailable" : "search_already_started",
+      );
+    }
+    let input: GoogleFlightsSearchInput;
+    try {
+      input = validateGoogleFlightsSearchInput(args);
+    } catch (error) {
+      if (error instanceof GoogleFlightsSearchInputError) {
+        throw new GoogleFlightsAdapterError(
+          "EXECUTION_FAILED",
+          "invalid_arguments",
+        );
+      }
+      throw error;
+    }
+    const snapshot = await this.#read(signal);
+    const current = this.#extract(() => extractCurrentSearch(snapshot, signal));
+    if (
+      current.tripType !== "round_trip" ||
+      current.cabinClass !== "economy" ||
+      current.passengers !== "1 passenger"
+    ) {
+      throw new GoogleFlightsAdapterError(
+        "EXECUTION_FAILED",
+        "unsupported_search_options",
+      );
+    }
+    if (this.#searchState !== "idle") {
+      throw new GoogleFlightsAdapterError(
+        "EXECUTION_FAILED",
+        "search_already_started",
+      );
+    }
+    this.#searchState = "running";
+    try {
+      await search.call(this.#source, input, signal);
+    } catch (error) {
+      this.#searchState = "failed";
+      if (error instanceof GoogleFlightsInteractionError) {
+        throw mapInteractionError(error);
+      }
+      if (signal.aborted) {
+        throw new GoogleFlightsAdapterError("CANCELLED", "cancelled");
+      }
+      throw new GoogleFlightsAdapterError("EXECUTION_FAILED", "source_failure");
+    }
+    if (signal.aborted) {
+      this.#searchState = "failed";
+      throw new GoogleFlightsAdapterError("CANCELLED", "cancelled");
+    }
+    this.#searchState = "accepted";
+    return {
+      fingerprint: GOOGLE_FLIGHTS_FINGERPRINT,
+      state: "accepted",
+    };
+  }
+
   subscribe(listener: () => void): () => void {
     if (typeof listener !== "function") {
       throw new TypeError("Google Flights listener is invalid");
     }
-    const cleanup = this.#source.subscribe?.(listener);
+    const cleanup = this.#source.subscribe?.(() => {
+      if (this.#searchState !== "running") listener();
+    });
     if (cleanup !== undefined && typeof cleanup !== "function") {
       throw new TypeError("Google Flights source cleanup is invalid");
     }
@@ -189,6 +275,15 @@ class SnapshotPageAdapter implements GoogleFlightsPageAdapter {
 
 function mapExtractionError(
   error: GoogleFlightsExtractionError,
+): GoogleFlightsAdapterError {
+  return new GoogleFlightsAdapterError(
+    error.code === "CANCELLED" ? "CANCELLED" : "EXECUTION_FAILED",
+    error.reason,
+  );
+}
+
+function mapInteractionError(
+  error: GoogleFlightsInteractionError,
 ): GoogleFlightsAdapterError {
   return new GoogleFlightsAdapterError(
     error.code === "CANCELLED" ? "CANCELLED" : "EXECUTION_FAILED",

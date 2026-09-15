@@ -1,8 +1,8 @@
 {
   "name": "@mcpatch/google-flights-pack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Reviewed read-only Google Flights pack for MCPatch",
+  "description": "Reviewed Google Flights pack for MCPatch",
   "type": "module",
   "files": [
     "dist"

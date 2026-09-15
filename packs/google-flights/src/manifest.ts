@@ -8,6 +8,7 @@ import {
   FLIGHTS_CURRENT_SEARCH,
   FLIGHTS_PRICE_INSIGHTS,
   FLIGHTS_RESULTS,
+  FLIGHTS_SEARCH,
   GOOGLE_FLIGHTS_FINGERPRINT,
   GOOGLE_FLIGHTS_LANDING_PATH,
   GOOGLE_FLIGHTS_ORIGIN,
@@ -31,6 +32,40 @@ const FINGERPRINT = {
   type: "string",
   const: GOOGLE_FLIGHTS_FINGERPRINT,
 } as const;
+
+const AIRPORT_CODE = { type: "string", minLength: 3, maxLength: 3 } as const;
+const ISO_DATE = { type: "string", minLength: 10, maxLength: 10 } as const;
+
+const search = defineTool({
+  name: FLIGHTS_SEARCH,
+  title: "Search Google Flights",
+  description:
+    "Submit one adult economy round trip between exact IATA airport codes on the current compatible Google Flights page.",
+  risk: "action",
+  permissions: ["ACTION"],
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    maxProperties: 4,
+    required: ["origin", "destination", "outboundDate", "returnDate"],
+    properties: {
+      origin: AIRPORT_CODE,
+      destination: AIRPORT_CODE,
+      outboundDate: ISO_DATE,
+      returnDate: ISO_DATE,
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["fingerprint", "state"],
+    properties: {
+      fingerprint: FINGERPRINT,
+      state: { type: "string", const: "accepted" },
+    },
+  },
+  execute: adapterRequired,
+});
 
 const currentSearch = defineTool({
   name: FLIGHTS_CURRENT_SEARCH,
@@ -165,10 +200,10 @@ export const googleFlightsPack = definePack({
   id: "google-flights",
   name: "Google Flights",
   description:
-    "Reviewed read-only access to bounded, visible state on compatible Google Flights pages.",
-  version: "0.1.0",
+    "Reviewed bounded reads and one approved round-trip search action on compatible Google Flights pages.",
+  version: "0.2.0",
   digest:
-    "sha256:4f6199820cd950f960134118de54c120251b694800df93420587358dc4c6f202",
+    "sha256:2f5faa701921b9b914c706f080e62dd246ddb9b9942898eb2b08dfd06e8e5448",
   compatibility: {
     runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
     bridgeProtocol: { minimum: 1, maximum: 1 },
@@ -184,8 +219,19 @@ export const googleFlightsPack = definePack({
     },
   ],
   networkPolicy: { extensionRequests: "none" },
-  tools: [currentSearch, results, priceInsights],
+  tools: [currentSearch, search, results, priceInsights],
   fixtures: [
+    {
+      id: "page-adapter-required-search",
+      tool: FLIGHTS_SEARCH,
+      input: {
+        origin: "LHR",
+        destination: "CDG",
+        outboundDate: "2026-10-27",
+        returnDate: "2026-11-03",
+      },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
     {
       id: "page-adapter-required-current-search",
       tool: FLIGHTS_CURRENT_SEARCH,

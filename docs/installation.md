@@ -72,12 +72,15 @@ click the MCPatch toolbar action. Chromium should request only
 pack identity and registers the packaged isolated-world content script. Reload the
 page once after first enablement so the newly registered script owns that document.
 
-The pack then exposes only `flights.current_search`, `flights.results`, and
-`flights.price_insights` when the English rendered-page fingerprint is compatible.
-It does not search, select, book, sign in, inspect credentials, or make extension
-network requests. Click the toolbar action again on a supported page to disable the
-pack; MCPatch revokes live tool contexts before unregistering the script and removing
-the now-unused optional host permission.
+The pack exposes `flights.current_search`, `flights.results`, and
+`flights.price_insights` when their English rendered-page states are compatible. It
+also exposes `flights.search` for one adult economy round trips between exact IATA
+airport codes. Every search call opens an extension-owned prompt and requires a
+fresh argument-bound approval before the fixed form interaction runs. The pack does
+not select, book, sign in, inspect credentials, or make extension network requests.
+Click the toolbar action again on a supported page to disable the pack; MCPatch
+revokes live tool contexts before unregistering the script and removing the now-unused
+optional host permission.
 
 ## Uninstall and recovery
 

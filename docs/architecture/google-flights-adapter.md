@@ -1,7 +1,8 @@
 # Google Flights rendered-page adapter
 
-The first real MCPatch pack is a reviewed, bundled, read-only adapter for current
-Google Flights page state. It implements the reconnaissance in
+The first real MCPatch pack is a reviewed, bundled adapter for bounded Google
+Flights page state and one typed search action. Its read tools implement the
+reconnaissance in
 [Google Flights public-page reconnaissance](../research/google-flights-2026-09-15.md)
 without turning the content runtime into a generic DOM interface.
 
@@ -15,7 +16,7 @@ rechecked inside MCPatch. Booking and all other Google paths publish no pack too
 The adapter is compiled into the reviewed extension artifact. A static catalog maps
 the validated pack identity to its constructor. A page cannot name an adapter,
 provide code, change its manifest, or add a tool. There is no downloaded script,
-main-world injection, page-provided selector, generic DOM command, or
+main-world injection, caller- or page-provided selector, generic DOM command, or
 extension-originated request.
 
 The reviewed implementation lives in `packs/google-flights`. Its document source
@@ -51,10 +52,10 @@ parameters, and network responses are explicitly outside the fingerprint.
 
 ## Tool contracts
 
-Every input is the closed empty object. Output strings are copied from visible page
-semantics, normalized only for whitespace, bounded in length, and remain untrusted.
-The adapter never returns markup, selectors, node identifiers, URLs, opaque query
-state, or raw page dumps.
+Read-tool inputs are the closed empty object. Output strings are copied from visible
+page semantics, normalized only for whitespace, bounded in length, and remain
+untrusted. The adapter never returns markup, selectors, node identifiers, URLs,
+opaque query state, or raw page dumps.
 
 ### `flights.current_search`
 
@@ -80,13 +81,38 @@ available state contains only the bounded short assessment rendered under the pr
 insight region. It does not open price history, infer a recommendation, or return a
 chart.
 
+### `flights.search`
+
+This `ACTION` accepts exactly `origin`, `destination`, `outboundDate`, and
+`returnDate`. Locations must be distinct three-letter uppercase IATA airport codes.
+Dates must be real `YYYY-MM-DD` calendar dates after today, no more than 330 days
+ahead, with return on or after departure. The JSON Schema is closed and the page
+adapter independently repeats semantic validation.
+
+Each invocation requires a bridge-owned, argument-bound one-time approval. After
+approval, the adapter revalidates the English fingerprint and requires the existing
+form to be one adult, economy, round trip. It then uses only hard-coded accessibility
+labels and roles to select one unique visible origin option, destination option,
+outbound date, return date, and Search button. Missing, duplicated, changed, or
+timed-out controls fail closed. It never accepts a selector, script, URL, endpoint,
+filter, passenger count, cabin, trip type, or network instruction from the caller.
+
+The adapter schedules the final Search click for the next browser task and returns
+only `{ fingerprint, state: "accepted" }`. This lets the page channel emit the MCP
+acknowledgement before navigation revokes the old document. A document accepts at
+most one search attempt; concurrent or repeated calls fail closed.
+
 ## Resource and lifecycle bounds
 
-Discovery considers at most 64 semantic candidates and emits no more than three
-capabilities. Tool execution visits at most 64 result candidates, returns at most 20
+Discovery considers at most 64 semantic candidates and emits no more than four
+capabilities. Read execution visits at most 64 result candidates, returns at most 20
 choices, accepts at most four caveats per choice, and enforces the existing page JSON
 depth, node-count, and 256 KiB frame bounds. It checks the call `AbortSignal` while
 iterating and before returning.
+
+The search action considers at most 64 candidates for each fixed semantic query,
+requires one unique visible match, polls dynamic airport/date choices for at most
+four seconds per step, and checks cancellation between steps and while waiting.
 
 A document-local mutation observer watches rendered structure, coalesces changes for
 250 milliseconds, and recomputes a small non-content signature. It requests a new
@@ -105,14 +131,17 @@ hidden controls, malformed cards, output limits, mutation coalescing, and
 cancellation.
 
 After fixtures pass, one fresh signed-out Chromium profile may run a neutral public
-search. The field report records only date, browser version, locale, tool names,
-fingerprint, pass/fail state, and limitations. It must not retain the browser profile,
-cookies, raw result output, screenshots containing live results, or request logs.
+search by calling `flights.search` through MCP and approving it in the trusted
+extension page. Playwright may host the disposable browser and observe lifecycle,
+but it must not fill or click the Google Flights form. The field report records only
+date, browser version, locale, tool names, fingerprint, pass/fail state, and
+limitations. It must not retain the browser profile, cookies, raw result output,
+screenshots containing live results, or request logs.
 
 ## Explicit non-goals
 
-- searching for flights or changing page state;
 - selecting or booking a flight;
+- changing filters, passengers, cabin class, or trip type;
 - tracking prices or signing in;
 - reading cookies, credentials, browser storage, or hidden page state;
 - calling or reverse-engineering private Google endpoints; and
