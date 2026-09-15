@@ -121,11 +121,15 @@ async function run(command, arguments_, additionalEnvironment = {}) {
 async function runPnpm(arguments_, additionalEnvironment) {
   const pnpmEntrypoint = process.env["npm_execpath"];
   if (pnpmEntrypoint) {
-    await run(
-      process.execPath,
-      [pnpmEntrypoint, ...arguments_],
-      additionalEnvironment,
-    );
+    if (/\.(?:c?js|mjs)$/iu.test(pnpmEntrypoint)) {
+      await run(
+        process.execPath,
+        [pnpmEntrypoint, ...arguments_],
+        additionalEnvironment,
+      );
+    } else {
+      await run(pnpmEntrypoint, arguments_, additionalEnvironment);
+    }
   } else {
     await run(
       process.platform === "win32" ? "pnpm.cmd" : "pnpm",
