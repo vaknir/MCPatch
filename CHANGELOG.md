@@ -10,6 +10,9 @@ All notable MCPatch changes are documented here. The format follows
 
 - Internal extension page-channel protocol version 1 with bounded duplicate-aware
   JSON parsing, direction validation, exact document bindings, and golden fixtures.
+- Top-level document context ownership through browser-attested content ports with
+  deny-by-default origin authority, navigation replacement, bounded discovery and
+  calls, exact cancellation, and an inert isolated-world content runtime bundle.
 - Initial architecture, trust boundaries, and roadmap.
 - Security policy and threat model.
 - ADRs for the monorepo, Rust bridge, Native Messaging transport, bridge protocol,

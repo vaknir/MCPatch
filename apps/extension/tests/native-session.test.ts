@@ -15,11 +15,18 @@ import {
 } from "../src/native-session.js";
 import { startExtensionRuntime } from "../src/runtime.js";
 import {
+  encodePageToWorkerMessage,
+  PAGE_PROTOCOL_VERSION,
+  parseWorkerToPageFrame,
+} from "../src/page-channel.js";
+import { MCPATCH_PAGE_PORT_NAME } from "../src/page-context-model.js";
+import {
   FakeRuntime,
   FakeScheduler,
   parsePosted,
   TEST_OPTIONS,
 } from "./support/native-session.js";
+import { FakePagePort } from "./support/page-context.js";
 
 describe("native session supervisor", () => {
   it("registers lifecycle listeners and opens only the fixed native host", () => {
@@ -32,6 +39,7 @@ describe("native session supervisor", () => {
 
     expect(runtime.onInstalled.listenerCount).toBe(1);
     expect(runtime.onStartup.listenerCount).toBe(1);
+    expect(runtime.onConnect.listenerCount).toBe(1);
     expect(runtime.applications).toEqual([MCPATCH_NATIVE_HOST_NAME]);
     expect(supervisor.state).toEqual({ phase: "negotiating" });
     expect(parsePosted(runtime.latestPort, 0)).toEqual({
@@ -209,6 +217,44 @@ describe("native session supervisor", () => {
     runtime.latestPort.emitDisconnect();
 
     expect(onDisconnected).toHaveBeenCalledOnce();
+  });
+
+  it("admits page ownership only while the bridge session is ready", () => {
+    const runtime = new FakeRuntime();
+    const scheduler = new FakeScheduler();
+    startExtensionRuntime(runtime, {
+      ...TEST_OPTIONS,
+      scheduler,
+      pageAuthority: {
+        authorize() {
+          return { packTools: new Set(["flights.current_search"]) };
+        },
+      },
+      pageRandomId: () => "channel.test",
+      pageScheduler: scheduler,
+    });
+
+    const premature = new FakePagePort(MCPATCH_PAGE_PORT_NAME);
+    runtime.onConnect.emit(premature);
+    expect(premature.disconnected).toBe(true);
+
+    runtime.latestPort.emitMessage(helloAck());
+    const accepted = new FakePagePort(MCPATCH_PAGE_PORT_NAME);
+    runtime.onConnect.emit(accepted);
+    accepted.emitMessage(
+      encodePageToWorkerMessage({
+        pageProtocolVersion: PAGE_PROTOCOL_VERSION,
+        type: "page_hello",
+        supportedPageProtocolVersions: [PAGE_PROTOCOL_VERSION],
+        implementation: { name: "test-content", version: "0.1.0" },
+      }),
+    );
+    expect(parseWorkerToPageFrame(accepted.posted[0]).type).toBe(
+      "page_hello_ack",
+    );
+
+    runtime.latestPort.emitDisconnect();
+    expect(accepted.disconnected).toBe(true);
   });
 
   it("fails closed around application lifecycle hook errors", () => {

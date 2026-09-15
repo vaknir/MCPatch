@@ -25,7 +25,7 @@ describe("extension manifest", () => {
       "permissions",
       "version",
     ]);
-    expect(manifest["minimum_chrome_version"]).toBe("105");
+    expect(manifest["minimum_chrome_version"]).toBe("106");
     expect(manifest["permissions"]).toEqual(["nativeMessaging"]);
     expect(manifest).not.toHaveProperty("optional_permissions");
     expect(manifest).not.toHaveProperty("host_permissions");

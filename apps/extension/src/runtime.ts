@@ -8,15 +8,57 @@ import {
   NativeSessionSupervisor,
   type ChromeNativeRuntimeApi,
   type NativeSessionOptions,
+  type SessionScheduler,
 } from "./native-session.js";
+import { denyPageAuthority, PageContextOwner } from "./page-context-owner.js";
+import type {
+  ChromePageServiceRuntimeApi,
+  PageAuthority,
+  PageContextOwnerHooks,
+} from "./page-context-model.js";
 
 export type ExtensionRuntimeApi = ChromeRuntimeLifecycleApi &
-  ChromeNativeRuntimeApi;
+  ChromeNativeRuntimeApi &
+  ChromePageServiceRuntimeApi;
+
+export interface ExtensionRuntimeOptions
+  extends NativeSessionOptions, PageContextOwnerHooks {
+  readonly pageAuthority?: PageAuthority;
+  readonly pageCallTimeoutMs?: number;
+  readonly pageHandshakeTimeoutMs?: number;
+  readonly pageRandomId?: () => string;
+  readonly pageScheduler?: SessionScheduler;
+}
 
 export function startExtensionRuntime(
   runtime: ExtensionRuntimeApi,
-  options: NativeSessionOptions = {},
+  options: ExtensionRuntimeOptions = {},
 ): NativeSessionSupervisor {
+  let bridgeReady = false;
+  const pageContexts = new PageContextOwner(runtime, {
+    authority: {
+      authorize(identity) {
+        if (!bridgeReady) return undefined;
+        return (options.pageAuthority ?? denyPageAuthority).authorize(identity);
+      },
+    },
+    ...(options.pageCallTimeoutMs === undefined
+      ? {}
+      : { callTimeoutMs: options.pageCallTimeoutMs }),
+    ...(options.pageHandshakeTimeoutMs === undefined
+      ? {}
+      : { handshakeTimeoutMs: options.pageHandshakeTimeoutMs }),
+    ...(options.onClosed === undefined ? {} : { onClosed: options.onClosed }),
+    ...(options.onSnapshot === undefined
+      ? {}
+      : { onSnapshot: options.onSnapshot }),
+    ...(options.pageRandomId === undefined
+      ? {}
+      : { randomId: options.pageRandomId }),
+    ...((options.pageScheduler ?? options.scheduler) === undefined
+      ? {}
+      : { scheduler: options.pageScheduler ?? options.scheduler }),
+  });
   const session: { supervisor?: NativeSessionSupervisor } = {};
   const packs = new CompiledPackRuntime(
     (message) => session.supervisor?.send(message) ?? false,
@@ -37,10 +79,13 @@ export function startExtensionRuntime(
       options.onMessage(message);
     },
     onDisconnected() {
+      bridgeReady = false;
       packs.disconnect();
+      pageContexts.closeAll("disconnected");
       options.onDisconnected?.();
     },
     onReady() {
+      bridgeReady = true;
       const activation = packs.activateContext({
         contextId: DEMO_CONTEXT_ID,
         url: DEMO_URL,
@@ -52,7 +97,9 @@ export function startExtensionRuntime(
       options.onReady?.();
     },
     onStopping() {
+      bridgeReady = false;
       packs.closeAll("disconnected");
+      pageContexts.closeAll("disconnected");
       options.onStopping?.();
     },
   };

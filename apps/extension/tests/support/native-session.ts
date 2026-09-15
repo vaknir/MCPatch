@@ -6,6 +6,10 @@ import type {
   NativePort,
   SessionScheduler,
 } from "../../src/native-session.js";
+import type {
+  ChromePageServiceRuntimeApi,
+  PagePort,
+} from "../../src/page-context-model.js";
 
 const BASE_TIME = Date.UTC(2026, 8, 15, 0, 0, 0);
 
@@ -19,8 +23,12 @@ export function parsePosted(port: FakePort, index: number): Message {
   return parseMessage(port.posted[index]);
 }
 
-export class FakeRuntime implements ChromeNativeRuntimeApi {
+export class FakeRuntime
+  implements ChromeNativeRuntimeApi, ChromePageServiceRuntimeApi
+{
+  readonly id = "test-extension-id";
   readonly applications: string[] = [];
+  readonly onConnect = new FakeChromeEvent<[PagePort]>();
   readonly onInstalled = new FakeChromeEvent<[InstalledDetails]>();
   readonly onStartup = new FakeChromeEvent<[]>();
   readonly ports: FakePort[] = [];
@@ -64,7 +72,7 @@ export class FakePort implements NativePort {
   }
 }
 
-class FakeChromeEvent<
+export class FakeChromeEvent<
   Arguments extends unknown[],
 > implements ChromeEvent<Arguments> {
   readonly #listeners: Array<(...arguments_: Arguments) => void> = [];
