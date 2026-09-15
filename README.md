@@ -55,8 +55,9 @@ in [docs/local-demo.md](docs/local-demo.md).
 Pack development now has a separately versioned, closed Pack Manifest v1 contract
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
 Strict `definePack` and `defineTool` authoring primitives keep serializable metadata
-separate from reviewed compiled handlers. The matcher, fixture runner, and real-site
-adapters remain Phase 5 work.
+separate from reviewed compiled handlers. Pure exact URL matching and deterministic
+native-first capability resolution are also implemented. The fixture runner and
+real-site adapters remain Phase 5 work.
 
 ## Bridge development
 

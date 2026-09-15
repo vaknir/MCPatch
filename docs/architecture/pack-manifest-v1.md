@@ -52,8 +52,8 @@ the manifest string.
 Path rules are either exact paths or prefixes. Version 1 paths are absolute ASCII
 URL paths without percent encoding, backslashes, repeated separators, queries,
 fragments, control characters, or normalizable dot segments. Prefix paths end in
-`/`. Query parameters never broaden activation. The pure matching behavior is a
-separate Phase 5 slice.
+`/`. Query parameters never broaden activation. Runtime semantics are defined in
+[Pack matching and capability resolution](pack-resolution.md).
 
 `networkPolicy.extensionRequests` is required and its only version 1 value is
 `none`. It means pack execution cannot initiate extension-originated requests;

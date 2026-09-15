@@ -98,7 +98,9 @@ permission and approval semantics. It is not part of protocol version 1.
 
 Native and pack tools with the same logical name do not merge. Native capabilities
 win, and the collision is recorded without exposing page-controlled metadata as a
-trusted description.
+trusted description. Canonical URL matching, collision outcomes, and context binding
+are detailed in
+[Pack matching and capability resolution](docs/architecture/pack-resolution.md).
 
 The bridge does not guess which tab is active in protocol version 1. If the same
 tool name is live in multiple contexts or connections, it is hidden from discovery
