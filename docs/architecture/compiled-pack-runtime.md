@@ -66,9 +66,10 @@ snapshot. Reconnection reevaluates the synthetic context with a fresh revision.
 ## Remaining real-site work
 
 The document owner, bounded page channel, and user-gesture enablement reconciler now
-exist. Remaining slices before a real website can complete the path are:
+exist. The isolated content runtime also projects the current same-origin read-only
+subset of the draft `document.modelContext` API through a bounded adapter. Remaining
+slices before a real website can complete the path are:
 
-- a native `document.modelContext` detector and validated adapter;
 - approval enforcement for action or sensitive tools; and
 - installer, stable extension identity, signing, and compatibility attestation.
 
