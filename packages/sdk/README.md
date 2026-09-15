@@ -83,6 +83,40 @@ shapes infer handler input and output types. That compile-time convenience does 
 replace call-time schema validation; the runtime and fixture harness must still
 validate every argument and result.
 
+## Fixture verification
+
+Verify a locally compiled definition against an explicit environment and permission
+ceiling:
+
+```ts
+import { verifyPackFixtures } from "@mcpatch/sdk";
+
+const verification = await verifyPackFixtures(pack, {
+  runtimeVersion: "0.1.0",
+  bridgeProtocolVersion: 1,
+  allowedPermissions: ["READ"],
+  timeoutMs: 1_000,
+});
+
+if (!verification.ok) {
+  throw new Error(`${verification.issue.code} at ${verification.issue.field}`);
+}
+if (!verification.evidence.passed) {
+  throw new Error("pack fixtures failed");
+}
+```
+
+The harness validates the manifest, exact handler table, compatibility, declared
+permissions, all schemas, and all fixtures before it invokes any handler. It then
+runs fixtures sequentially and emits immutable, deterministic, payload-free
+evidence. Use `PackToolExecutionError` when a fixture intentionally expects a typed
+tool error.
+
+Run the focused workspace verification with `pnpm verify:packs`. See
+[Pack fixture verification](../../docs/architecture/pack-fixture-verification.md)
+for failure semantics and security limits. In particular, the harness does not
+sandbox compiled JavaScript and its evidence is never runtime authorization.
+
 ## Matching and resolution
 
 `canonicalizePageLocation` and `packMatchesLocation` implement Pack Manifest v1 URL

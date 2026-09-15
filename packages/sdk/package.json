@@ -19,10 +19,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
+    "test:fixtures": "vitest run tests/fixture-harness*.test.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
   "devDependencies": {
-    "@types/node": "24.13.4",
-    "ajv": "8.20.0"
+    "@types/node": "24.13.4"
   }
 }

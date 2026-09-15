@@ -56,8 +56,10 @@ Pack development now has a separately versioned, closed Pack Manifest v1 contrac
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
 Strict `definePack` and `defineTool` authoring primitives keep serializable metadata
 separate from reviewed compiled handlers. Pure exact URL matching and deterministic
-native-first capability resolution are also implemented. The fixture runner and
-real-site adapters remain Phase 5 work.
+native-first capability resolution are also implemented. A deterministic fixture
+harness now preflights compatibility, permission ceilings, schemas, and fixtures,
+then emits payload-free evidence for reviewed compiled packs. Runtime integration
+and real-site adapters remain Phase 5 work.
 
 ## Bridge development
 

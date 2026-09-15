@@ -68,8 +68,10 @@ fixture IDs are unique, fixture tool references must resolve, and all collection
 text, JSON depth, JSON node count, and total content are bounded.
 
 Fixtures are untrusted test data. They are part of the pack artifact and identity,
-not runtime authority. The later compatibility harness will compile schemas and
-execute fixtures without logging their inputs or results.
+not runtime authority. The
+[fixture verification harness](pack-fixture-verification.md) compiles every schema,
+preflights every fixture, and executes reviewed local handlers without placing
+inputs or results in its deterministic evidence.
 
 ## Validation and compatibility policy
 

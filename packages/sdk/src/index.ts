@@ -1,4 +1,9 @@
 export { definePack, defineTool } from "./authoring.js";
+export { verifyPackFixtures } from "./fixture-harness.js";
+export {
+  PACK_EVIDENCE_VERSION,
+  PackToolExecutionError,
+} from "./fixture-harness-types.js";
 export { canonicalizePageLocation, packMatchesLocation } from "./location.js";
 export { resolveContextCapabilities } from "./resolution.js";
 export type {
@@ -10,6 +15,7 @@ export type {
   PackToolDefinition,
   PackToolHandler,
 } from "./authoring.js";
+export type * from "./fixture-harness-types.js";
 export type {
   InferJsonSchema,
   InferPackInput,
