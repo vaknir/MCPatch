@@ -63,6 +63,20 @@ the Native Messaging session. Unix and Windows integration tests exercise the re
 authenticated local transport; injected tests cover authorization ordering, startup
 failure, bidirectional relay, browser failure, and IPC loss.
 
+Tokio implements standard-input reads with a blocking worker that cannot be
+cancelled by dropping its async future. After the native-host relay has awaited local
+channel cleanup and emitted its terminal diagnostic, its process entrypoint shuts
+the runtime down in the background instead of waiting forever on a cancelled stdin
+read. The process exit then releases that worker and the browser pipe together.
+
+A bounded cross-platform process scenario also launches the real `mcpatch
+native-host` executable against a live bridge core. It carries hello,
+acknowledgement, and heartbeat messages across both framing layers; verifies that
+pre-negotiation, wrong-version, and wrong-direction traffic terminates only its
+browser session; reconnects without replay under a fresh connection ID; and repeats
+negotiation after a core restart. The scenario checks that adapter diagnostics remain
+JSON lines containing stable codes rather than origins or message data.
+
 This separation keeps Native Messaging's native-endian framing out of the local IPC
 implementation, which uses its own little-endian framing and peer-identity checks as
 specified by [ADR 0007](../adr/0007-local-ipc-and-core-lifecycle.md). Bridge-protocol

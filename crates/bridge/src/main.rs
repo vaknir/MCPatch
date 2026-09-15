@@ -12,8 +12,7 @@ use mcpatch_bridge::{
     },
 };
 
-#[tokio::main]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
     let command = match cli::parse(env::args_os().skip(1)) {
         Ok(command) => command,
         Err(_) => {
@@ -33,9 +32,33 @@ async fn main() -> ExitCode {
             println!("mcpatch {PRODUCT_VERSION}");
             ExitCode::SUCCESS
         }
-        Command::McpStdio => run_mcp_stdio().await,
-        Command::NativeHost { caller_origin } => run_native_host(caller_origin).await,
-        Command::BridgeCore { channel } => run_bridge_core(channel).await,
+        command => run_async_command(command),
+    }
+}
+
+fn run_async_command(command: Command) -> ExitCode {
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(_) => {
+            eprintln!("MCPatch could not initialize its async runtime");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    match command {
+        Command::McpStdio => runtime.block_on(run_mcp_stdio()),
+        Command::NativeHost { caller_origin } => {
+            let exit_code = runtime.block_on(run_native_host(caller_origin));
+            // Tokio stdin uses an uncancellable blocking read. All adapter cleanup
+            // has completed, so do not wait on that worker after peer-driven exit.
+            runtime.shutdown_background();
+            exit_code
+        }
+        Command::BridgeCore { channel } => runtime.block_on(run_bridge_core(channel)),
+        Command::Help | Command::Version => unreachable!("handled before runtime startup"),
     }
 }
 
