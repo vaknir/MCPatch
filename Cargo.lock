@@ -691,6 +691,7 @@ dependencies = [
  "interprocess",
  "jsonschema",
  "libc",
+ "mcpatch-windows-kernel",
  "rmcp",
  "semver",
  "serde",
@@ -703,6 +704,15 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "widestring",
+]
+
+[[package]]
+name = "mcpatch-windows-kernel"
+version = "0.1.0"
+dependencies = [
+ "interprocess",
+ "widestring",
+ "windows-sys",
 ]
 
 [[package]]

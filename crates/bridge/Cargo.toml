@@ -33,6 +33,7 @@ libc = "=0.2.189"
 [target.'cfg(windows)'.dependencies]
 firehazard = "=0.0.0-2022-09-10"
 interprocess = "=2.4.4"
+mcpatch-windows-kernel = { path = "../windows-kernel" }
 widestring = "=1.2.1"
 
 [[bin]]
