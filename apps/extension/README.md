@@ -58,11 +58,14 @@ for admission, page routing, native precedence, and lifecycle.
 The private pre-alpha build includes `packs/google-flights` for the exact origin
 `https://www.google.com` and exact paths `/travel/flights` and
 `/travel/flights/search`. Three tools read current search state, visible result
-summaries, and a short price insight. A fourth `flights.search` ACTION submits only a
+summaries, and a short price insight. A fourth `flights.search` ACTION opens only a
 one-adult economy round trip between two exact airport codes and future dates after
-an argument-bound approval in the extension-owned UI. It returns a bounded
-acknowledgement before navigation. No tool makes extension network requests; website
-strings remain bounded untrusted content.
+an argument-bound approval in the extension-owned UI. It generates a fixed
+same-origin search URL and returns a bounded acknowledgement before navigation;
+Google then loads results with the tab's browser session. No tool clicks the website
+form, replays a captured request, transports credentials, or makes
+extension-originated network requests. Website strings remain bounded untrusted
+content.
 
 The content adapter is a static build dependency constructed only after the service
 worker authorizes its complete declared tool set. A page snapshot limits the pack

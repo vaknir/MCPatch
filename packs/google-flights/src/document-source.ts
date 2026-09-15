@@ -4,7 +4,6 @@ import {
   type GoogleFlightsChangeScheduler,
 } from "./coalescing.js";
 import { collectControls } from "./dom-controls.js";
-import { submitGoogleFlightsDocumentSearch } from "./dom-search.js";
 import {
   collectCards,
   collectPriceSemantics,
@@ -22,12 +21,19 @@ import type {
   GoogleFlightsSemanticSnapshot,
   SemanticTextCandidate,
 } from "./model.js";
+import {
+  scheduleGoogleFlightsSearch,
+  type GoogleFlightsSearchNavigation,
+} from "./search-navigation.js";
 import type { GoogleFlightsSearchInput } from "./search-input.js";
 
 export function createGoogleFlightsDocumentSource(
   document: Document,
+  navigation: GoogleFlightsSearchNavigation = createDocumentSearchNavigation(
+    document,
+  ),
 ): GoogleFlightsSnapshotSource {
-  return new GoogleFlightsDocumentSource(document);
+  return new GoogleFlightsDocumentSource(document, navigation);
 }
 
 /** Reads only the reviewed, bounded semantic surface from one document. */
@@ -76,12 +82,14 @@ export function collectGoogleFlightsSemanticSnapshot(
 
 class GoogleFlightsDocumentSource implements GoogleFlightsSnapshotSource {
   readonly #document: Document;
+  readonly #navigation: GoogleFlightsSearchNavigation;
 
-  constructor(document: Document) {
+  constructor(document: Document, navigation: GoogleFlightsSearchNavigation) {
     if (document?.nodeType !== 9) {
       throw new TypeError("Google Flights document source is invalid");
     }
     this.#document = document;
+    this.#navigation = navigation;
   }
 
   read(signal: AbortSignal): GoogleFlightsSemanticSnapshot {
@@ -89,7 +97,8 @@ class GoogleFlightsDocumentSource implements GoogleFlightsSnapshotSource {
   }
 
   search(input: GoogleFlightsSearchInput, signal: AbortSignal): Promise<void> {
-    return submitGoogleFlightsDocumentSearch(this.#document, input, signal);
+    scheduleGoogleFlightsSearch(this.#navigation, input, signal);
+    return Promise.resolve();
   }
 
   subscribe(listener: () => void): () => void {
@@ -122,6 +131,24 @@ class GoogleFlightsDocumentSource implements GoogleFlightsSnapshotSource {
       return "incompatible";
     }
   }
+}
+
+function createDocumentSearchNavigation(
+  document: Document,
+): GoogleFlightsSearchNavigation {
+  const view = document.defaultView;
+  if (view === null) {
+    return {
+      schedule() {
+        throw new TypeError("Google Flights document cannot navigate");
+      },
+    };
+  }
+  return {
+    schedule(url) {
+      view.setTimeout(() => view.location.assign(url), 0);
+    },
+  };
 }
 
 function elementCandidates(

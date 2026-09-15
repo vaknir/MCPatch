@@ -1,10 +1,12 @@
 # Google Flights rendered-page adapter
 
 The first real MCPatch pack is a reviewed, bundled adapter for bounded Google
-Flights page state and one typed search action. Its read tools implement the
-reconnaissance in
+Flights page state and one typed search-navigation action. Its read tools implement
+the reconnaissance in
 [Google Flights public-page reconnaissance](../research/google-flights-2026-09-15.md)
-without turning the content runtime into a generic DOM interface.
+and its action follows the bounded decision in
+[Google Flights browser-network reconnaissance](../research/google-flights-network-2026-09-15.md)
+without turning the content runtime into a generic DOM or network interface.
 
 ## Authority and activation
 
@@ -16,8 +18,8 @@ rechecked inside MCPatch. Booking and all other Google paths publish no pack too
 The adapter is compiled into the reviewed extension artifact. A static catalog maps
 the validated pack identity to its constructor. A page cannot name an adapter,
 provide code, change its manifest, or add a tool. There is no downloaded script,
-main-world injection, caller- or page-provided selector, generic DOM command, or
-extension-originated request.
+main-world injection, caller- or page-provided selector, generic DOM command,
+captured-request replay, or extension-originated fetch.
 
 The reviewed implementation lives in `packs/google-flights`. Its document source
 collects a minimal semantic snapshot, its pure extractor validates the fingerprint,
@@ -47,8 +49,9 @@ unrecognized result-card grammar, or contradictory loading/terminal states.
 Compatibility failure publishes no pack capability and records only the local
 fingerprint/error code, never page text.
 
-Obfuscated CSS classes, `jsname`, `data-ved`, hidden application state, opaque URL
-parameters, and network responses are explicitly outside the fingerprint.
+Obfuscated CSS classes, `jsname`, `data-ved`, hidden application state, and network
+responses are explicitly outside the rendered-page fingerprint. The search action
+has a separate golden-tested URL encoding contract; read tools never decode it.
 
 ## Tool contracts
 
@@ -90,17 +93,20 @@ ahead, with return on or after departure. The JSON Schema is closed and the page
 adapter independently repeats semantic validation.
 
 Each invocation requires a bridge-owned, argument-bound one-time approval. After
-approval, the adapter revalidates the English fingerprint and requires the existing
-form to be one adult, economy, round trip. It then uses only hard-coded accessibility
-labels and roles to select one unique visible origin option, destination option,
-outbound date, return date, and Search button. Missing, duplicated, changed, or
-timed-out controls fail closed. It never accepts a selector, script, URL, endpoint,
-filter, passenger count, cabin, trip type, or network instruction from the caller.
+approval, the adapter revalidates the English page fingerprint. It encodes a fixed
+one-adult economy round trip into the same compact search-state URL produced by
+Google Flights' public form. The origin, path, locale, trip type, passenger count,
+cabin, and query-key set are constants; only the four validated arguments enter the
+encoding. It never accepts a selector, script, URL, endpoint, filter, passenger
+count, cabin, trip type, header, cookie, or network instruction from the caller.
 
-The adapter schedules the final Search click for the next browser task and returns
+The adapter schedules same-tab navigation for the next browser task and returns
 only `{ fingerprint, state: "accepted" }`. This lets the page channel emit the MCP
-acknowledgement before navigation revokes the old document. A document accepts at
-most one search attempt; concurrent or repeated calls fail closed.
+acknowledgement before navigation revokes the old document. Google Flights then
+issues its own shopping RPC with the browser's current same-origin session. MCPatch
+does not observe, copy, store, or forward those credentials or RPC payloads. A
+document accepts at most one search attempt; concurrent or repeated calls fail
+closed.
 
 ## Resource and lifecycle bounds
 
@@ -110,9 +116,9 @@ choices, accepts at most four caveats per choice, and enforces the existing page
 depth, node-count, and 256 KiB frame bounds. It checks the call `AbortSignal` while
 iterating and before returning.
 
-The search action considers at most 64 candidates for each fixed semantic query,
-requires one unique visible match, polls dynamic airport/date choices for at most
-four seconds per step, and checks cancellation between steps and while waiting.
+The search action has no DOM interaction loop. It validates a closed four-field
+object, emits a bounded 91-byte search-state message for the current contract, and
+checks cancellation before scheduling exactly one navigation.
 
 A document-local mutation observer watches rendered structure, coalesces changes for
 250 milliseconds, and recomputes a small non-content signature. It requests a new
@@ -132,8 +138,9 @@ cancellation.
 
 After fixtures pass, one fresh signed-out Chromium profile may run a neutral public
 search by calling `flights.search` through MCP and approving it in the trusted
-extension page. Playwright may host the disposable browser and observe lifecycle,
-but it must not fill or click the Google Flights form. The field report records only
+extension page. A browser test harness may host the disposable browser and observe
+lifecycle, but the search itself must be performed only through MCPatch's typed
+tool; it must not fill or click the Google Flights form. The field report records only
 date, browser version, locale, tool names, fingerprint, pass/fail state, and
 limitations. It must not retain the browser profile, cookies, raw result output,
 screenshots containing live results, or request logs.
@@ -144,7 +151,7 @@ screenshots containing live results, or request logs.
 - changing filters, passengers, cabin class, or trip type;
 - tracking prices or signing in;
 - reading cookies, credentials, browser storage, or hidden page state;
-- calling or reverse-engineering private Google endpoints; and
+- replaying captured Google requests or exporting browser credentials; and
 - background, repeated, or scaled scraping.
 
 ## Related decisions

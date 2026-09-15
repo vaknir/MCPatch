@@ -8,6 +8,7 @@
     "build": "node scripts/build.mjs",
     "test": "vitest run",
     "test:browser": "cargo build --locked --package mcpatch-bridge && pnpm build && node scripts/build-chromium-fixture.mjs && playwright test --config playwright.config.ts",
+    "test:field:google-flights": "cargo build --locked --package mcpatch-bridge && pnpm build && node scripts/run-google-flights-field.mjs",
     "typecheck": "tsc --noEmit && tsc --project tsconfig.e2e.json --noEmit"
   },
   "dependencies": {

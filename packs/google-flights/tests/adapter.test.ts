@@ -136,18 +136,6 @@ describe("Google Flights page adapter", () => {
       "CANCELLED",
       "cancelled",
     );
-
-    const unsupportedOptions = structuredClone(fixture.landing);
-    if (unsupportedOptions === undefined) throw new Error("fixture invariant");
-    unsupportedOptions.controls.tripType = [{ visible: true, text: "One way" }];
-    await expectAdapterError(
-      createGoogleFlightsPageAdapter({
-        ...memorySource(unsupportedOptions),
-        async search() {},
-      }).execute(FLIGHTS_SEARCH, futureSearch(), signal()),
-      "EXECUTION_FAILED",
-      "unsupported_search_options",
-    );
   });
 
   it("omits the action when no reviewed search source is installed", async () => {
@@ -163,6 +151,43 @@ describe("Google Flights page adapter", () => {
       "TOOL_UNAVAILABLE",
       "tool_unavailable",
     );
+  });
+
+  it("withholds each incompatible read capability independently", async () => {
+    const snapshot = structuredClone(fixture.ready);
+    if (snapshot === undefined || snapshot.results === undefined) {
+      throw new Error("fixture invariant");
+    }
+    snapshot.results.cards = [];
+    const adapter = createGoogleFlightsPageAdapter({
+      ...memorySource(snapshot),
+      async search() {},
+    });
+
+    await expect(adapter.capabilities(signal())).resolves.toEqual([
+      { source: "pack", name: FLIGHTS_CURRENT_SEARCH },
+      { source: "pack", name: FLIGHTS_SEARCH },
+      { source: "pack", name: FLIGHTS_PRICE_INSIGHTS },
+    ]);
+
+    const missingCurrentSearch = structuredClone(fixture.ready);
+    if (missingCurrentSearch === undefined)
+      throw new Error("fixture invariant");
+    missingCurrentSearch.controls.origin = [];
+    const search = vi.fn(async (): Promise<void> => undefined);
+    const currentAdapter = createGoogleFlightsPageAdapter({
+      ...memorySource(missingCurrentSearch),
+      search,
+    });
+    await expect(currentAdapter.capabilities(signal())).resolves.toEqual([
+      { source: "pack", name: FLIGHTS_SEARCH },
+      { source: "pack", name: FLIGHTS_RESULTS },
+      { source: "pack", name: FLIGHTS_PRICE_INSIGHTS },
+    ]);
+    await expect(
+      currentAdapter.execute(FLIGHTS_SEARCH, futureSearch(), signal()),
+    ).resolves.toMatchObject({ state: "accepted" });
+    expect(search).toHaveBeenCalledOnce();
   });
 
   it("passes through one source subscription and cleans it up exactly once", () => {

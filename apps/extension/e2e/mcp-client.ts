@@ -20,11 +20,16 @@ export interface StartedRequest {
 
 export class McpStdioClient {
   readonly #child: ChildProcessWithoutNullStreams;
+  readonly #forbiddenLogFragments: readonly string[];
   readonly #pending = new Map<number, PendingResponse>();
   readonly #stderr: string[] = [];
   #nextId = 1;
 
-  private constructor(binary: string) {
+  private constructor(
+    binary: string,
+    forbiddenLogFragments: readonly string[],
+  ) {
+    this.#forbiddenLogFragments = Object.freeze([...forbiddenLogFragments]);
     this.#child = spawn(binary, ["mcp-stdio"], {
       env: { ...process.env, MCPATCH_LOG: "info", RUST_LOG: "info" },
       stdio: "pipe",
@@ -46,8 +51,11 @@ export class McpStdioClient {
     });
   }
 
-  static async connect(binary: string): Promise<McpStdioClient> {
-    const client = new McpStdioClient(binary);
+  static async connect(
+    binary: string,
+    forbiddenLogFragments: readonly string[] = [],
+  ): Promise<McpStdioClient> {
+    const client = new McpStdioClient(binary, forbiddenLogFragments);
     const initialized = await client.request("initialize", {
       protocolVersion: "2025-11-25",
       capabilities: {},
@@ -72,12 +80,14 @@ export class McpStdioClient {
 
   callTool(
     name: string,
-    arguments_: Record<string, never> = {},
+    arguments_: Record<string, unknown> = {},
+    timeoutMs = 5_000,
   ): StartedRequest {
     return this.startRequest(
       "tools/call",
       { name, arguments: arguments_ },
       name,
+      timeoutMs,
     );
   }
 
@@ -125,6 +135,7 @@ export class McpStdioClient {
       "updated",
       "fixture.current_state",
       "fixture.wait",
+      ...this.#forbiddenLogFragments,
     ]) {
       if (stderr.includes(secret)) {
         throw new Error("MCP logs contain fixture capability data");
@@ -140,13 +151,14 @@ export class McpStdioClient {
     method: string,
     params: unknown,
     label = method,
+    timeoutMs = 5_000,
   ): StartedRequest {
     const id = this.#nextId++;
     const response = new Promise<JsonRpcResponse>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.#pending.delete(id);
         reject(new Error(`MCP ${label} response timed out`));
-      }, 5_000);
+      }, timeoutMs);
       this.#pending.set(id, { resolve, reject, timeout });
     });
     this.#write({ jsonrpc: "2.0", id, method, params });

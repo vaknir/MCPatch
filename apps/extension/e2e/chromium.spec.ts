@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -175,6 +175,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
   } finally {
     await mcp?.close();
     await context?.close();
+    await rm(profile, { recursive: true, force: true });
   }
 });
 

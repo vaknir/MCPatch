@@ -15,6 +15,7 @@ const CABIN_VALUES = new Set([
   "Business",
   "First",
 ]);
+const PASSENGER_ACCESSIBLE_NAME = /^([1-9]\d? passengers?)(?:[,.]|$)/u;
 
 export function collectControls(
   document: Document,
@@ -28,12 +29,12 @@ export function collectControls(
   return {
     origin: collectControlsBySelector(
       document,
-      'input[aria-label="Where from?"],input[placeholder="Where from?"]',
+      'input[aria-label^="Where from?"],input[placeholder="Where from?"]',
       signal,
     ),
     destination: collectControlsBySelector(
       document,
-      'input[aria-label="Where to?"],input[placeholder="Where to?"]',
+      'input[aria-label^="Where to?"],input[placeholder="Where to?"]',
       signal,
     ),
     departure: collectControlsBySelector(
@@ -52,11 +53,19 @@ export function collectControls(
     ),
     passengers: collectControlsBySelector(
       document,
-      '[aria-label$=" passenger"],[aria-label$=" passengers"]',
+      '[aria-label*=" passenger"]',
       signal,
-      (element) => readAccessibleName(element, CONTROL_TEXT_LIMIT),
-    ).filter((candidate) => /^[1-9]\d? passengers?$/u.test(candidate.text)),
+      (element) =>
+        normalizePassengerAccessibleName(
+          readAccessibleName(element, CONTROL_TEXT_LIMIT),
+        ),
+    ).filter((candidate) => candidate.text !== ""),
   };
+}
+
+/** Keeps only the bounded passenger count from the live control description. */
+export function normalizePassengerAccessibleName(value: string): string {
+  return PASSENGER_ACCESSIBLE_NAME.exec(value)?.[1] ?? "";
 }
 
 export function collectControlsBySelector(

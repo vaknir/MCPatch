@@ -76,8 +76,10 @@ The pack exposes `flights.current_search`, `flights.results`, and
 `flights.price_insights` when their English rendered-page states are compatible. It
 also exposes `flights.search` for one adult economy round trips between exact IATA
 airport codes. Every search call opens an extension-owned prompt and requires a
-fresh argument-bound approval before the fixed form interaction runs. The pack does
-not select, book, sign in, inspect credentials, or make extension network requests.
+fresh argument-bound approval before the current tab opens the exact generated
+search URL. Google Flights then uses the browser's existing session to load results.
+MCPatch does not click the form, replay captured credentials, select, book, sign in,
+or inspect credentials.
 Click the toolbar action again on a supported page to disable the pack; MCPatch
 revokes live tool contexts before unregistering the script and removing the now-unused
 optional host permission.

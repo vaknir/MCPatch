@@ -84,12 +84,7 @@ export type GoogleFlightsExtractionReason =
   | "unsupported_trip_type";
 
 export type GoogleFlightsInteractionReason =
-  | "ambiguous_search_control"
-  | "cancelled"
-  | "missing_search_control"
-  | "search_already_started"
-  | "search_timeout"
-  | "unsupported_search_options";
+  "cancelled" | "navigation_unavailable" | "search_already_started";
 
 /** Payload-free compatibility error safe to map across the page channel. */
 export class GoogleFlightsExtractionError extends Error {
@@ -107,7 +102,7 @@ export class GoogleFlightsExtractionError extends Error {
   }
 }
 
-/** Payload-free failure from the fixed reviewed form interaction. */
+/** Payload-free failure from the fixed reviewed browser navigation. */
 export class GoogleFlightsInteractionError extends Error {
   readonly code: GoogleFlightsExtractionCode;
   readonly reason: GoogleFlightsInteractionReason;

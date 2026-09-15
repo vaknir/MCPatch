@@ -19,9 +19,10 @@ export {
   createGoogleFlightsDocumentSource,
 } from "./document-source.js";
 export {
-  googleFlightsDateLabels,
-  submitGoogleFlightsDocumentSearch,
-} from "./dom-search.js";
+  createGoogleFlightsSearchUrl,
+  scheduleGoogleFlightsSearch,
+} from "./search-navigation.js";
+export type { GoogleFlightsSearchNavigation } from "./search-navigation.js";
 export {
   extractCurrentSearch,
   extractPriceInsights,
@@ -61,15 +62,6 @@ export {
   GoogleFlightsSearchInputError,
   validateGoogleFlightsSearchInput,
 } from "./search-input.js";
-export {
-  abortInteraction,
-  performGoogleFlightsSearch,
-} from "./search-action.js";
-export type {
-  AirportField,
-  DateField,
-  GoogleFlightsSearchControls,
-} from "./search-action.js";
 export type {
   GoogleFlightsSearchInput,
   GoogleFlightsSearchInputErrorReason,
