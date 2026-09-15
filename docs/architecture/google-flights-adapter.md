@@ -18,6 +18,12 @@ provide code, change its manifest, or add a tool. There is no downloaded script,
 main-world injection, page-provided selector, generic DOM command, or
 extension-originated request.
 
+The reviewed implementation lives in `packs/google-flights`. Its document source
+collects a minimal semantic snapshot, its pure extractor validates the fingerprint,
+and its page adapter re-reads current state per call. The compiled manifest handlers
+fail closed with `TOOL_NOT_FOUND`; production results must come from the authorized
+page-capability route.
+
 Native WebMCP discovery runs alongside the pack adapter. The existing resolver
 prefers one eligible native tool with the same name. If Google later publishes a
 valid native capability, MCPatch does not invoke the fallback pack for that name.

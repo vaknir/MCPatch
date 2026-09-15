@@ -251,6 +251,16 @@ importers:
         specifier: 24.13.4
         version: 24.13.4
 
+  packs/google-flights:
+    dependencies:
+      '@mcpatch/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.4
+        version: 24.13.4
+
 packages:
 
   '@cacheable/memory@2.2.0':
