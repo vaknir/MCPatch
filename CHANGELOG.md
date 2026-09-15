@@ -63,6 +63,9 @@ All notable MCPatch changes are documented here. The format follows
 - Bundled extension demo capability with post-negotiation publication, exact
   request binding, deterministic typed results, reconnect snapshots, and explicit
   context closure without site permissions.
+- Live MCP `tools/list` projection of policy-visible registry capabilities with
+  stable ordering, exact schemas, conservative annotations, and no internal route
+  metadata.
 
 ### Fixed
 
