@@ -6,6 +6,10 @@ use serde_json::{Map, Number, Value};
 /// JSON value decoder that rejects duplicate object keys at every depth.
 pub(crate) struct StrictJson(pub Value);
 
+pub(crate) fn parse_value(input: &[u8]) -> Result<Value, serde_json::Error> {
+    serde_json::from_slice::<StrictJson>(input).map(|value| value.0)
+}
+
 impl<'de> Deserialize<'de> for StrictJson {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

@@ -34,5 +34,7 @@ All notable MCPatch changes are documented here. The format follows
   registration, reproducible build output, and zero browser or host permissions.
 - Bounded Native Messaging host adapter with exact caller-origin policy, strict
   protocol decoding, bidirectional typed relay, and audit-safe process behavior.
+- User-private Unix local IPC primitives with distinct role endpoints, strict
+  little-endian JSON framing, peer-UID authentication, and safe socket cleanup.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

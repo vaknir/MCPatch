@@ -39,7 +39,8 @@ The repository has its initial architecture, threat model, protocol contracts,
 and build foundation. The Rust bridge provides bounded MCP and Native Messaging
 adapters, a transport-independent browser connection boundary, and a deterministic
 capability registry. A zero-permission MV3 extension scaffold is also present;
-local IPC, pairing, and live capabilities are the next implementation slices.
+the user-private Unix IPC primitive is implemented, while Windows IPC, process
+election, pairing, and live capabilities remain upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 

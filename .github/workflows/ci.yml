@@ -59,6 +59,18 @@ jobs:
       - name: Audit dependencies
         run: cargo audit
 
+  rust-macos:
+    name: Rust (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Test platform-specific transport
+        run: cargo test --workspace --all-features --locked
+
   typescript:
     name: TypeScript
     runs-on: ubuntu-latest
