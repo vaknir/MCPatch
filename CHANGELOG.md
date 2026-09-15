@@ -13,6 +13,9 @@ All notable MCPatch changes are documented here. The format follows
 - Top-level document context ownership through browser-attested content ports with
   deny-by-default origin authority, navigation replacement, bounded discovery and
   calls, exact cancellation, and an inert isolated-world content runtime bundle.
+- Explicit extension-action pack enablement with a closed trusted-storage record,
+  exact optional-origin grants, deterministic isolated content registration, and
+  fail-closed reconciliation across startup, corruption, permission, and disable.
 - Initial architecture, trust boundaries, and roadmap.
 - Security policy and threat model.
 - ADRs for the monorepo, Rust bridge, Native Messaging transport, bridge protocol,

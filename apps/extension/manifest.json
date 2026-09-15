@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "description": "Safe, typed website capabilities for MCP clients.",
   "minimum_chrome_version": "106",
-  "permissions": ["nativeMessaging"],
+  "permissions": ["activeTab", "nativeMessaging", "scripting", "storage"],
+  "optional_host_permissions": ["https://www.google.com/*"],
+  "action": {
+    "default_title": "MCPatch"
+  },
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"
