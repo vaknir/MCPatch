@@ -11,16 +11,18 @@ heartbeat every 15 seconds while connected.
 pnpm --filter @mcpatch/extension build
 ```
 
-The build bundles the shared protocol validator, the codegen-free pack runtime, and
-reviewed example pack into one local service-worker module, then copies the
-manifest. It fails if dynamic `eval` or `Function` code generation enters the
-bundle. Load `apps/extension/dist` with **Load unpacked** on
+The build bundles the shared protocol validator, codegen-free pack runtime, reviewed
+example pack, service worker, and isolated-world content runtime, then copies the
+manifest. It fails if dynamic `eval` or `Function` code generation enters either
+executable bundle. The content artifact is intentionally inert until a later slice
+adds user-approved dynamic registration. Load `apps/extension/dist` with **Load unpacked** on
 `chrome://extensions` for local development. The native-host manifest must allow
 the resulting extension ID. There is no toolbar enablement behavior or real-site
 capability yet.
 
-The runtime requires Chromium 105 or newer. That is the first release where an
-open Native Messaging port keeps an extension service worker alive. A failed
+The runtime requires Chromium 106 or newer so each accepted content port has a
+browser-attested document ID. An open Native Messaging port keeps the extension
+service worker alive. A failed
 handshake is closed after five seconds; reconnect delays increase from 250 ms to a
 five-second ceiling. Messages are not queued or replayed across connections.
 
@@ -65,7 +67,14 @@ The closed, bounded JSON contract for those ports is implemented as page-channel
 protocol version 1 and documented in
 [Extension page-channel protocol](../../docs/architecture/page-channel-protocol.md).
 It contains only handshake, capability refresh, exact call/result/error,
-cancellation, and lifecycle messages.
+cancellation, and lifecycle messages. The service worker now owns top-level
+document ports through that contract, validates extension ID, active lifecycle,
+frame zero, tab/document IDs, and canonical HTTPS sender origin before handshake,
+and atomically replaces a tab context on navigation. Calls, discovery, and retries
+are bounded; crossed traffic or revoked pack authority closes the context. Runtime
+authority still defaults to deny, remains unavailable until bridge negotiation is
+ready, and is revoked with all page state if that bridge session is lost. No content
+script is registered in the manifest yet.
 
 The service worker uses package-local ES modules only. Runtime-downloaded code,
 `eval`, dynamic code generation, and remote script imports are prohibited by the

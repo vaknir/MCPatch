@@ -29,23 +29,28 @@ await build({
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,
   },
   bundle: true,
-  entryPoints: [
-    fileURLToPath(new URL("src/service-worker.ts", extensionDirectory)),
-  ],
+  entryPoints: {
+    "content-script": fileURLToPath(
+      new URL("src/content-script.ts", extensionDirectory),
+    ),
+    "service-worker": fileURLToPath(
+      new URL("src/service-worker.ts", extensionDirectory),
+    ),
+  },
   format: "esm",
   legalComments: "none",
-  outfile: fileURLToPath(new URL("service-worker.js", distributionDirectory)),
+  outdir: fileURLToPath(distributionDirectory),
   platform: "browser",
   sourcemap: false,
-  target: "chrome105",
+  target: "chrome106",
 });
 
-const serviceWorker = await readFile(
-  new URL("service-worker.js", distributionDirectory),
-  "utf8",
-);
-if (/\b(?:eval|Function)\s*\(/u.test(serviceWorker)) {
-  throw new Error(
-    "extension build contains prohibited dynamic code generation",
+for (const artifact of ["content-script.js", "service-worker.js"]) {
+  const source = await readFile(
+    new URL(artifact, distributionDirectory),
+    "utf8",
   );
+  if (/\b(?:eval|Function)\s*\(/u.test(source)) {
+    throw new Error(`${artifact} contains prohibited dynamic code generation`);
+  }
 }

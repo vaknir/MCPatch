@@ -34,6 +34,14 @@ Every later message repeats the complete binding. It must equal both the accepte
 port state and its current authority. Sender identity and enablement are deliberately
 outside the JSON message because a content payload cannot attest either one.
 
+The service worker accepts only the fixed internal port name from its own extension,
+frame zero, an active document, a bounded tab/document identity, and a canonical
+HTTPS sender URL whose origin exactly matches Chromium's sender origin. It allows at
+most 128 page ports, four negotiating ports per tab, 64 pending calls per document,
+a five-second handshake, and a 25-second call deadline. A newer document for the
+same tab receives the next context revision and revokes the previous owner before it
+can publish or complete more work.
+
 ## Messages
 
 | Direction     | Type                       | Purpose                                     |
@@ -65,6 +73,19 @@ this channel.
 
 One pack and one native candidate may share a logical name because deterministic
 resolution must select native WebMCP. Duplicates within the same source are invalid.
+
+The content runtime validates and re-encodes adapter discovery before publication,
+executes only currently announced names, and validates results before returning
+them. Synchronous adapter throws are contained, cancellation uses an `AbortSignal`,
+and unloading sends a bounded closure message. Both ends reconnect without replaying
+calls. The service worker re-evaluates origin-scoped pack authority before every
+snapshot, result, and invocation; removing an authority revokes the whole document
+port and its pending work.
+
+The content bundle currently carries an empty adapter and is not statically or
+dynamically registered. The service worker authority defaults to deny. Optional host
+permission and reviewed-pack enablement are a separate slice, so landing this owner
+does not expand site access.
 
 ## Explicit absences
 
