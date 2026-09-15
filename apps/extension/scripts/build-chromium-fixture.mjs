@@ -50,7 +50,7 @@ await writeFile(
   { flag: "wx", mode: 0o600 },
 );
 
-await build({
+const sharedBuildOptions = {
   alias: {
     "@mcpatch/example-packs": examplePacksEntry,
     "@mcpatch/google-flights-pack": googleFlightsPackEntry,
@@ -59,10 +59,25 @@ await build({
   },
   bundle: true,
   banner: { js: `/* ${marker} */` },
+  legalComments: "none",
+  outdir: fileURLToPath(distributionDirectory),
+  platform: "browser",
+  sourcemap: false,
+  target: "chrome106",
+};
+
+await build({
+  ...sharedBuildOptions,
   entryPoints: {
     "content-script": fileURLToPath(
       new URL("fixture-content-script.ts", fixtureDirectory),
     ),
+  },
+  format: "iife",
+});
+await build({
+  ...sharedBuildOptions,
+  entryPoints: {
     "fixture-control": fileURLToPath(
       new URL("fixture-control.ts", fixtureDirectory),
     ),
@@ -71,11 +86,6 @@ await build({
     ),
   },
   format: "esm",
-  legalComments: "none",
-  outdir: fileURLToPath(distributionDirectory),
-  platform: "browser",
-  sourcemap: false,
-  target: "chrome106",
 });
 
 await copyFile(
@@ -113,6 +123,12 @@ for (const artifact of [
   }
   if (/\b(?:eval|Function)\s*\(/u.test(source)) {
     throw new Error(`${artifact} contains prohibited dynamic code generation`);
+  }
+  if (
+    artifact === "content-script.js" &&
+    !source.startsWith(`/* ${marker} */\n"use strict";\n(() => {`)
+  ) {
+    throw new Error("fixture content script is not isolated in an IIFE");
   }
 }
 

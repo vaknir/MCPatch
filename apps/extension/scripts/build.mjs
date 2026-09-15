@@ -46,7 +46,7 @@ await writeFile(
   { flag: "wx", mode: 0o600 },
 );
 
-await build({
+const sharedBuildOptions = {
   alias: {
     "@mcpatch/example-packs": examplePacksEntry,
     "@mcpatch/google-flights-pack": googleFlightsPackEntry,
@@ -54,20 +54,34 @@ await build({
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,
   },
   bundle: true,
-  entryPoints: {
-    "content-script": fileURLToPath(
-      new URL("src/content-script.ts", extensionDirectory),
-    ),
-    "service-worker": fileURLToPath(
-      new URL("src/service-worker.ts", extensionDirectory),
-    ),
-  },
-  format: "esm",
   legalComments: "none",
   outdir: fileURLToPath(distributionDirectory),
   platform: "browser",
   sourcemap: false,
   target: "chrome106",
+};
+
+// Registered content scripts are classic scripts even when the extension uses
+// an ESM service worker. Keep every bundled symbol out of the page Window: a
+// top-level name such as `status` otherwise aliases a browser global and can
+// corrupt a validated pack definition before MCPatch starts.
+await build({
+  ...sharedBuildOptions,
+  entryPoints: {
+    "content-script": fileURLToPath(
+      new URL("src/content-script.ts", extensionDirectory),
+    ),
+  },
+  format: "iife",
+});
+await build({
+  ...sharedBuildOptions,
+  entryPoints: {
+    "service-worker": fileURLToPath(
+      new URL("src/service-worker.ts", extensionDirectory),
+    ),
+  },
+  format: "esm",
 });
 
 for (const artifact of ["content-script.js", "service-worker.js"]) {
@@ -77,5 +91,11 @@ for (const artifact of ["content-script.js", "service-worker.js"]) {
   );
   if (/\b(?:eval|Function)\s*\(/u.test(source)) {
     throw new Error(`${artifact} contains prohibited dynamic code generation`);
+  }
+  if (
+    artifact === "content-script.js" &&
+    !/^"use strict";\n\(\(\) => \{/u.test(source)
+  ) {
+    throw new Error("content-script.js is not isolated in an IIFE");
   }
 }
