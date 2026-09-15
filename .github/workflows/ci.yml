@@ -82,8 +82,10 @@ jobs:
         run: rustup toolchain install 1.98.1 --profile minimal --component clippy
       - name: Lint platform-specific transport
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: Test platform-specific transport
-        run: cargo test --workspace --all-features --locked
+      - name: Test Windows library units
+        run: cargo test --package mcpatch-bridge --lib --all-features --locked
+      - name: Test Windows local IPC
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked -- --test-threads=1
 
   typescript:
     name: TypeScript
