@@ -58,7 +58,13 @@ fn protected_mutex_allows_exactly_one_racing_core() {
     drop(results_tx);
 
     start.wait();
-    let results = results_rx.iter().collect::<Vec<_>>();
+    let results = (0..RACERS)
+        .map(|_| {
+            results_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("every election racer must report within the bound")
+        })
+        .collect::<Vec<_>>();
     assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
     assert!(
         results
