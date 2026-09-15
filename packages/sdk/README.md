@@ -83,6 +83,24 @@ shapes infer handler input and output types. That compile-time convenience does 
 replace call-time schema validation; the runtime and fixture harness must still
 validate every argument and result.
 
+## Matching and resolution
+
+`canonicalizePageLocation` and `packMatchesLocation` implement Pack Manifest v1 URL
+semantics. `resolveContextCapabilities` accepts native candidates, enabled pack
+candidates, and an exact context/revision URL binding. It returns either a stable
+payload-free issue or a frozen resolution containing sorted capabilities and explicit
+collision diagnostics.
+
+One native capability wins over matching packs with the same name. Multiple native
+capabilities or multiple matching packs are ambiguous and therefore hidden; arrival
+order never selects a winner. Candidate `value` fields are opaque route tokens and
+are not inspected or serialized.
+
+See
+[Pack matching and capability resolution](../../docs/architecture/pack-resolution.md)
+for canonical URL rules, the complete precedence table, limits, and lifecycle
+requirements.
+
 Validation failures contain only a stable code and field path. They never include
 the rejected value. Accepted data is returned as a detached deeply frozen snapshot
 so later mutation cannot bypass validation. The input must be decoded with a

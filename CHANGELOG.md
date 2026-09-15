@@ -78,6 +78,9 @@ All notable MCPatch changes are documented here. The format follows
 - Strict pack authoring primitives with common JSON Schema type inference,
   immutable definitions, a minimal execution context, and separate serializable
   manifests and reviewed compiled-handler tables.
+- Pure bounded pack matching and context-bound capability resolution with canonical
+  HTTPS origins, native WebMCP precedence, stable ordering, and explicit fail-closed
+  collision diagnostics.
 
 ### Fixed
 

@@ -1,4 +1,6 @@
 export { definePack, defineTool } from "./authoring.js";
+export { canonicalizePageLocation, packMatchesLocation } from "./location.js";
+export { resolveContextCapabilities } from "./resolution.js";
 export type {
   PackAuthoringInput,
   PackDefinition,
@@ -13,6 +15,7 @@ export type {
   InferPackInput,
   InferPackOutput,
 } from "./schema-inference.js";
+export type * from "./resolution-types.js";
 export {
   PackManifestValidationError,
   parsePackManifest,
