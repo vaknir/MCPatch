@@ -61,6 +61,12 @@ added as baseline permissions, while each site remains an optional HTTPS host gr
 Reviewed scripts will be registered dynamically in the isolated world, and their
 top-level document ports—not `tabs` or `webNavigation`—will own context lifecycle.
 
+The closed, bounded JSON contract for those ports is implemented as page-channel
+protocol version 1 and documented in
+[Extension page-channel protocol](../../docs/architecture/page-channel-protocol.md).
+It contains only handshake, capability refresh, exact call/result/error,
+cancellation, and lifecycle messages.
+
 The service worker uses package-local ES modules only. Runtime-downloaded code,
 `eval`, dynamic code generation, and remote script imports are prohibited by the
 pack execution model.

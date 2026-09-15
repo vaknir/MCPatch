@@ -1,0 +1,12 @@
+{
+  "pageProtocolVersion": 1,
+  "type": "page_hello_ack",
+  "selectedPageProtocolVersion": 1,
+  "implementation": { "name": "mcpatch-extension", "version": "0.1.0" },
+  "channelId": "channel-1",
+  "contextId": "page-7",
+  "contextRevision": 1,
+  "tabId": 7,
+  "documentId": "62cf7d3d-6c51-46be-a312-8ea503b9609f",
+  "origin": "https://example.com"
+}
