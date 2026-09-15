@@ -1,4 +1,5 @@
 export { definePack, defineTool } from "./authoring.js";
+export { MCPatch } from "./mcpatch.js";
 export { verifyPackFixtures } from "./fixture-harness.js";
 export {
   PACK_EVIDENCE_VERSION,
@@ -19,6 +20,13 @@ export type {
   PackToolDefinition,
   PackToolHandler,
 } from "./authoring.js";
+export type {
+  MCPatchBuildOptions,
+  MCPatchDefinition,
+  MCPatchOptions,
+  MCPatchToolHandler,
+  MCPatchToolOptions,
+} from "./mcpatch.js";
 export type * from "./fixture-harness-types.js";
 export type {
   InferJsonSchema,

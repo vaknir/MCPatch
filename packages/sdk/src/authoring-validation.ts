@@ -32,7 +32,7 @@ export function remapToolIssue(
 ): PackManifestValidationIssue {
   return {
     code: validationIssue.code,
-    field: validationIssue.field.replace(/^tools\[0\]/, "tool"),
+    field: validationIssue.field.replace(/^(?:tools\[0\]|\$)/, "tool"),
   };
 }
 

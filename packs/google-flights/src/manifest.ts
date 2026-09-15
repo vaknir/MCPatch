@@ -1,8 +1,4 @@
-import {
-  PackToolExecutionError,
-  definePack,
-  defineTool,
-} from "@mcpatch/sdk/runtime";
+import { MCPatch, PackToolExecutionError } from "@mcpatch/sdk/runtime";
 
 import {
   FLIGHTS_CURRENT_SEARCH,
@@ -36,165 +32,7 @@ const FINGERPRINT = {
 const AIRPORT_CODE = { type: "string", minLength: 3, maxLength: 3 } as const;
 const ISO_DATE = { type: "string", minLength: 10, maxLength: 10 } as const;
 
-const search = defineTool({
-  name: FLIGHTS_SEARCH,
-  title: "Search Google Flights",
-  description:
-    "Open one adult economy round-trip results for exact IATA airport codes in the current compatible Google Flights tab.",
-  risk: "action",
-  permissions: ["ACTION"],
-  inputSchema: {
-    type: "object",
-    additionalProperties: false,
-    maxProperties: 4,
-    required: ["origin", "destination", "outboundDate", "returnDate"],
-    properties: {
-      origin: AIRPORT_CODE,
-      destination: AIRPORT_CODE,
-      outboundDate: ISO_DATE,
-      returnDate: ISO_DATE,
-    },
-  },
-  outputSchema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["fingerprint", "state"],
-    properties: {
-      fingerprint: FINGERPRINT,
-      state: { type: "string", const: "accepted" },
-    },
-  },
-  execute: adapterRequired,
-});
-
-const currentSearch = defineTool({
-  name: FLIGHTS_CURRENT_SEARCH,
-  title: "Current Google Flights search",
-  description:
-    "Read bounded, visible search-form state from the current compatible Google Flights page.",
-  risk: "read",
-  permissions: ["READ"],
-  inputSchema: EMPTY_INPUT_SCHEMA,
-  outputSchema: {
-    type: "object",
-    additionalProperties: false,
-    required: [
-      "fingerprint",
-      "path",
-      "tripType",
-      "cabinClass",
-      "passengers",
-      "origin",
-      "destination",
-      "departure",
-    ],
-    properties: {
-      fingerprint: FINGERPRINT,
-      path: { type: "string", enum: ["landing", "search"] },
-      tripType: { type: "string", enum: ["one_way", "round_trip"] },
-      cabinClass: {
-        type: "string",
-        enum: ["economy", "premium_economy", "business", "first"],
-      },
-      passengers: { type: "string", minLength: 1, maxLength: 64 },
-      origin: DISPLAY,
-      destination: DISPLAY,
-      departure: DISPLAY,
-      return: DISPLAY,
-    },
-  },
-  execute: adapterRequired,
-});
-
-const results = defineTool({
-  name: FLIGHTS_RESULTS,
-  title: "Visible Google Flights results",
-  description:
-    "Read at most 20 complete, visible flight summaries from the current compatible results page.",
-  risk: "read",
-  permissions: ["READ"],
-  inputSchema: EMPTY_INPUT_SCHEMA,
-  outputSchema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["fingerprint", "state", "offers"],
-    properties: {
-      fingerprint: FINGERPRINT,
-      state: {
-        type: "string",
-        enum: ["loading", "ready", "empty", "error"],
-      },
-      reportedCount: { type: "integer", minimum: 1, maximum: 9_999 },
-      offers: {
-        type: "array",
-        maxItems: 20,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: [
-            "rank",
-            "summary",
-            "price",
-            "priceScope",
-            "stops",
-            "carrier",
-            "departure",
-            "arrival",
-            "duration",
-            "caveats",
-          ],
-          properties: {
-            rank: { type: "integer", minimum: 1, maximum: 20 },
-            summary: { type: "string", minLength: 1, maxLength: 1_024 },
-            price: NONEMPTY_DISPLAY,
-            priceScope: {
-              type: "string",
-              enum: ["one way total", "round trip total"],
-            },
-            stops: NONEMPTY_DISPLAY,
-            carrier: NONEMPTY_DISPLAY,
-            departure: NONEMPTY_DISPLAY,
-            arrival: NONEMPTY_DISPLAY,
-            duration: NONEMPTY_DISPLAY,
-            emissions: NONEMPTY_DISPLAY,
-            caveats: {
-              type: "array",
-              maxItems: 4,
-              items: NONEMPTY_DISPLAY,
-            },
-          },
-        },
-      },
-    },
-  },
-  execute: adapterRequired,
-});
-
-const priceInsights = defineTool({
-  name: FLIGHTS_PRICE_INSIGHTS,
-  title: "Google Flights price insight",
-  description:
-    "Read the bounded short assessment visible in the current Google Flights price-insight region.",
-  risk: "read",
-  permissions: ["READ"],
-  inputSchema: EMPTY_INPUT_SCHEMA,
-  outputSchema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["fingerprint", "state"],
-    properties: {
-      fingerprint: FINGERPRINT,
-      state: {
-        type: "string",
-        enum: ["loading", "available", "unavailable"],
-      },
-      assessment: { type: "string", minLength: 1, maxLength: 512 },
-    },
-  },
-  execute: adapterRequired,
-});
-
-export const googleFlightsPack = definePack({
+const mcp = new MCPatch({
   manifestVersion: 1,
   publisher: "flights",
   id: "google-flights",
@@ -219,7 +57,175 @@ export const googleFlightsPack = definePack({
     },
   ],
   networkPolicy: { extensionRequests: "none" },
-  tools: [currentSearch, search, results, priceInsights],
+});
+
+mcp.tool(
+  {
+    name: FLIGHTS_CURRENT_SEARCH,
+    title: "Current Google Flights search",
+    description:
+      "Read bounded, visible search-form state from the current compatible Google Flights page.",
+    risk: "read",
+    permissions: ["READ"],
+    inputSchema: EMPTY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "fingerprint",
+        "path",
+        "tripType",
+        "cabinClass",
+        "passengers",
+        "origin",
+        "destination",
+        "departure",
+      ],
+      properties: {
+        fingerprint: FINGERPRINT,
+        path: { type: "string", enum: ["landing", "search"] },
+        tripType: { type: "string", enum: ["one_way", "round_trip"] },
+        cabinClass: {
+          type: "string",
+          enum: ["economy", "premium_economy", "business", "first"],
+        },
+        passengers: { type: "string", minLength: 1, maxLength: 64 },
+        origin: DISPLAY,
+        destination: DISPLAY,
+        departure: DISPLAY,
+        return: DISPLAY,
+      },
+    },
+  },
+  adapterRequired,
+);
+
+mcp.tool(
+  {
+    name: FLIGHTS_SEARCH,
+    title: "Search Google Flights",
+    description:
+      "Open one adult economy round-trip results for exact IATA airport codes in the current compatible Google Flights tab.",
+    risk: "action",
+    permissions: ["ACTION"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 4,
+      required: ["origin", "destination", "outboundDate", "returnDate"],
+      properties: {
+        origin: AIRPORT_CODE,
+        destination: AIRPORT_CODE,
+        outboundDate: ISO_DATE,
+        returnDate: ISO_DATE,
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state"],
+      properties: {
+        fingerprint: FINGERPRINT,
+        state: { type: "string", const: "accepted" },
+      },
+    },
+  },
+  adapterRequired,
+);
+
+mcp.tool(
+  {
+    name: FLIGHTS_RESULTS,
+    title: "Visible Google Flights results",
+    description:
+      "Read at most 20 complete, visible flight summaries from the current compatible results page.",
+    risk: "read",
+    permissions: ["READ"],
+    inputSchema: EMPTY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "offers"],
+      properties: {
+        fingerprint: FINGERPRINT,
+        state: {
+          type: "string",
+          enum: ["loading", "ready", "empty", "error"],
+        },
+        reportedCount: { type: "integer", minimum: 1, maximum: 9_999 },
+        offers: {
+          type: "array",
+          maxItems: 20,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "rank",
+              "summary",
+              "price",
+              "priceScope",
+              "stops",
+              "carrier",
+              "departure",
+              "arrival",
+              "duration",
+              "caveats",
+            ],
+            properties: {
+              rank: { type: "integer", minimum: 1, maximum: 20 },
+              summary: { type: "string", minLength: 1, maxLength: 1_024 },
+              price: NONEMPTY_DISPLAY,
+              priceScope: {
+                type: "string",
+                enum: ["one way total", "round trip total"],
+              },
+              stops: NONEMPTY_DISPLAY,
+              carrier: NONEMPTY_DISPLAY,
+              departure: NONEMPTY_DISPLAY,
+              arrival: NONEMPTY_DISPLAY,
+              duration: NONEMPTY_DISPLAY,
+              emissions: NONEMPTY_DISPLAY,
+              caveats: {
+                type: "array",
+                maxItems: 4,
+                items: NONEMPTY_DISPLAY,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  adapterRequired,
+);
+
+mcp.tool(
+  {
+    name: FLIGHTS_PRICE_INSIGHTS,
+    title: "Google Flights price insight",
+    description:
+      "Read the bounded short assessment visible in the current Google Flights price-insight region.",
+    risk: "read",
+    permissions: ["READ"],
+    inputSchema: EMPTY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state"],
+      properties: {
+        fingerprint: FINGERPRINT,
+        state: {
+          type: "string",
+          enum: ["loading", "available", "unavailable"],
+        },
+        assessment: { type: "string", minLength: 1, maxLength: 512 },
+      },
+    },
+  },
+  adapterRequired,
+);
+
+export const googleFlightsPack = mcp.build({
   fixtures: [
     {
       id: "page-adapter-required-search",

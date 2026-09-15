@@ -14,33 +14,13 @@ import { parsePackManifest } from "@mcpatch/sdk";
 const manifest = parsePackManifest(untrustedDecodedJson);
 ```
 
-Reviewed extension-bundled packs use `defineTool` and `definePack`:
+Reviewed extension-bundled packs use the FastMCP-style `MCPatch` builder. Create
+one pack, register typed tools, and finalize its immutable runtime definition:
 
 ```ts
-import { definePack, defineTool } from "@mcpatch/sdk";
+import { MCPatch } from "@mcpatch/sdk/runtime";
 
-const currentSearch = defineTool({
-  name: "example.current_search",
-  description: "Read the current search",
-  risk: "read",
-  permissions: ["READ"],
-  inputSchema: {
-    type: "object",
-    additionalProperties: false,
-    properties: { includeNearby: { type: "boolean" } },
-  },
-  outputSchema: {
-    type: "object",
-    properties: { query: { type: "string" } },
-    required: ["query"],
-  },
-  async execute(context, input) {
-    context.signal.throwIfAborted();
-    return readReviewedSearchAdapter(context.contextId, input.includeNearby);
-  },
-});
-
-const pack = definePack({
+const mcp = new MCPatch({
   manifestVersion: 1,
   publisher: "example",
   id: "search",
@@ -60,7 +40,33 @@ const pack = definePack({
     },
   ],
   networkPolicy: { extensionRequests: "none" },
-  tools: [currentSearch],
+});
+
+export const readCurrentSearch = mcp.tool(
+  {
+    name: "example.current_search",
+    description: "Read the current search",
+    risk: "read",
+    permissions: ["READ"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { includeNearby: { type: "boolean" } },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { query: { type: "string" } },
+      required: ["query"],
+    },
+  },
+  async (input, context) => {
+    context.signal.throwIfAborted();
+    return readReviewedSearchAdapter(context.contextId, input.includeNearby);
+  },
+);
+
+export const pack = mcp.build({
   fixtures: [
     {
       id: "current-search",
@@ -71,6 +77,14 @@ const pack = definePack({
   ],
 });
 ```
+
+The callback returned by `mcp.tool(...)` is the original function, so it remains
+directly callable in focused unit tests. Its input and output types are inferred
+from the explicit JSON Schemas. TypeScript types disappear at runtime, so MCPatch
+does not pretend it can safely derive a validation boundary from annotations alone.
+
+`defineTool` and `definePack` remain available as lower-level immutable primitives
+for code generation and advanced composition.
 
 The complete serializable artifact is `pack.manifest`. Executable functions exist
 only in the separately frozen `pack.handlers` table, whose names and metadata are
