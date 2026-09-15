@@ -12,7 +12,7 @@ use std::{
 use mcpatch_bridge::{
     local_ipc::{
         AuthenticatedUnixStream, CoreRendezvousError, EndpointRole, InstallChannel,
-        LocalCoreConnection, LocalRuntime, UnixEndpointListener, UnixRuntime,
+        LocalCoreConnection, LocalRuntime, UnixCoreElection, UnixEndpointListener, UnixRuntime,
     },
     mcp::{BridgeRuntimeError, McpStdioFrameErrorCode, run},
 };
@@ -26,7 +26,7 @@ const INITIALIZE: &[u8] = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","par
 
 #[tokio::test]
 async fn stdio_eof_closes_the_authenticated_local_session() {
-    let (connection, mut core, _listener, _fixture) = connection_pair().await;
+    let (connection, mut core, _election, _listener, _fixture) = connection_pair().await;
     let (mut client_input, host_input) = tokio::io::duplex(4096);
     let runtime = tokio::spawn(run(host_input, tokio::io::sink(), || async move {
         Ok::<_, CoreRendezvousError>(connection)
@@ -52,7 +52,7 @@ async fn stdio_eof_closes_the_authenticated_local_session() {
 
 #[tokio::test]
 async fn local_eof_closes_stdio_promptly() {
-    let (connection, mut core, _listener, _fixture) = connection_pair().await;
+    let (connection, mut core, _election, _listener, _fixture) = connection_pair().await;
     let (mut client_input, host_input) = tokio::io::duplex(4096);
     let (host_output, mut client_output) = tokio::io::duplex(4096);
     let runtime = tokio::spawn(run(host_input, host_output, || async move {
@@ -80,7 +80,7 @@ async fn local_eof_closes_stdio_promptly() {
 
 #[tokio::test]
 async fn malformed_stdio_after_connect_closes_local_ipc() {
-    let (connection, mut core, _listener, _fixture) = connection_pair().await;
+    let (connection, mut core, _election, _listener, _fixture) = connection_pair().await;
     let (mut client_input, host_input) = tokio::io::duplex(4096);
     let runtime = tokio::spawn(run(host_input, tokio::io::sink(), || async move {
         Ok::<_, CoreRendezvousError>(connection)
@@ -112,6 +112,7 @@ async fn malformed_stdio_after_connect_closes_local_ipc() {
 async fn connection_pair() -> (
     LocalCoreConnection,
     AuthenticatedUnixStream,
+    UnixCoreElection,
     UnixEndpointListener,
     TestDirectory,
 ) {
@@ -119,15 +120,16 @@ async fn connection_pair() -> (
     let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
         .await
         .unwrap();
+    let election = runtime.try_elect_core().unwrap();
     let listener = runtime
-        .bind_after_election(EndpointRole::Mcp)
+        .bind_after_election(&election, EndpointRole::Mcp)
         .await
         .unwrap();
     let adapter_runtime = LocalRuntime::from(runtime);
     let connect = tokio::spawn(async move { adapter_runtime.connect(EndpointRole::Mcp).await });
     let core = listener.accept_authenticated().await.unwrap();
     let connection = connect.await.unwrap().unwrap();
-    (connection, core, listener, fixture)
+    (connection, core, election, listener, fixture)
 }
 
 async fn write_line(writer: &mut (impl AsyncWrite + Unpin), payload: &[u8]) {

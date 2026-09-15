@@ -145,6 +145,29 @@ async fn core_owns_multiple_independent_mcp_sessions() {
 }
 
 #[tokio::test]
+async fn initialized_mcp_disconnect_starts_idle_grace_without_stopping_the_core() {
+    let fixture = TestDirectory::new();
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let core = UnixBridgeCore::start(runtime.clone()).await.unwrap();
+    let core_task = tokio::spawn(core.run(Duration::from_millis(30), CancellationToken::new()));
+    let mut client = runtime.connect(EndpointRole::Mcp).await.unwrap();
+
+    initialize_and_list_tools(&mut client, 1).await;
+    drop(client);
+
+    assert_eq!(
+        timeout(Duration::from_secs(1), core_task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        CoreStopReason::Idle
+    );
+}
+
+#[tokio::test]
 async fn core_bounds_sessions_per_parser_role() {
     const SESSION_LIMIT: usize = 8;
     let fixture = TestDirectory::new();

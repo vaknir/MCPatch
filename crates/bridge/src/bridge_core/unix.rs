@@ -26,8 +26,12 @@ pub struct UnixBridgeCore {
 impl UnixBridgeCore {
     pub async fn start(runtime: UnixRuntime) -> Result<Self, BridgeCoreError> {
         let election = runtime.try_elect_core()?;
-        let browser_listener = runtime.bind_after_election(EndpointRole::Browser).await?;
-        let mcp_listener = runtime.bind_after_election(EndpointRole::Mcp).await?;
+        let browser_listener = runtime
+            .bind_after_election(&election, EndpointRole::Browser)
+            .await?;
+        let mcp_listener = runtime
+            .bind_after_election(&election, EndpointRole::Mcp)
+            .await?;
         let epoch = BridgeEpoch::generate().map_err(BridgeCoreError::Epoch)?;
 
         Ok(Self {

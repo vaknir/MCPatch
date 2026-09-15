@@ -45,5 +45,13 @@ All notable MCPatch changes are documented here. The format follows
 - Core-owned MCP sessions with a bounded newline-to-local-frame stdio adapter,
   shared per-role session limits, partial-frame deadlines, and authenticated async
   Unix and Windows relay lifecycles.
+- Process-level bridge-core race, idle-stop, crash-revocation, and reconnect coverage,
+  with Unix stale-socket replacement gated by the exact held channel election.
+
+### Fixed
+
+- Isolated MCP session cancellation from the core-wide shutdown token so an
+  initialized client disconnect starts the idle grace period instead of stopping the
+  shared core.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
