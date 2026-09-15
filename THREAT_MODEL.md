@@ -71,7 +71,7 @@ Rust bridge: schema, registry, policy, approval, routing
         │ authenticated and versioned MCPatch message
         ▼
 extension service worker: connection, context, pack dispatch
-        │ exact typed operation
+        │ bounded page protocol over browser-authenticated document port
         ▼
 content script / native WebMCP / installed trusted pack
         │ browser-mediated access
@@ -157,6 +157,7 @@ Mitigations:
 - bind identity to publisher key, pack ID, version, and content digest;
 - validate exact origins, permissions, runtime compatibility, and network policy;
 - request optional host permission only when a user enables a pack;
+- dynamically register only the enabled origin's top-level isolated content bundle;
 - isolate pack APIs and deny ambient cookies, arbitrary fetch, and extension APIs;
 - make permission increases an explicit reinstall/reapproval event; and
 - maintain revocation and local disable controls before a public marketplace.
@@ -177,6 +178,27 @@ Mitigations:
 - prevent page scripts from messaging the native host directly; and
 - require deterministic approval for action, sensitive, credential, external
   network, and arbitrary execution classes according to local policy.
+
+### Forged or stale page context
+
+A page, subframe, stale document, or compromised content message attempts to own a
+context, replace a newer document, or route a result after navigation.
+
+Mitigations:
+
+- accept only fixed-name ports created by the extension's top-level isolated-world
+  content runtime;
+- validate browser-attested extension ID, frame ID, tab ID, document ID, URL, and
+  canonical HTTPS origin before protocol parsing;
+- require the origin to have both an enabled reviewed pack and a current Chromium
+  host permission;
+- allow only one owner for an exact tab/document pair and assign monotonic context
+  revisions in the service worker;
+- bind page calls and responses to request, context, revision, origin, and tool;
+- revoke pending calls and snapshots on port disconnect, permission removal, pack
+  disablement, origin change, or bridge disconnect; and
+- reconstruct no live page authority from persistent storage after a service-worker
+  restart.
 
 ### Unauthorized native or local connection
 
@@ -260,5 +282,6 @@ Before the relevant feature can merge, tests must cover:
 - malformed, oversized, unknown-version, and unknown-type messages;
 - duplicate request identifiers and unauthorized local connections;
 - navigation/disconnect revocation and cancellation races;
+- forged, subframe, stale-document, and permission-revoked content ports;
 - schema complexity and output-size limits; and
 - redaction/absence of sensitive data in structured logs.

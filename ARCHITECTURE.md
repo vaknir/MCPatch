@@ -66,6 +66,14 @@ The extension does not expose cookies, arbitrary JavaScript, unrestricted fetch,
 or generic page dumps. Host permissions should be optional and requested when the
 user enables a pack.
 
+Real-site contexts are owned by top-level isolated-world content ports rather than
+global browsing-history observation. A user action grants one declared optional
+HTTPS origin, after which the service worker dynamically registers the reviewed
+content bundle. Browser-attested sender metadata binds the tab, document, URL, and
+origin; disconnect or any authority change revokes the context. The complete
+decision is recorded in
+[ADR 0008](docs/adr/0008-origin-scoped-content-runtime.md).
+
 ### Packs
 
 A pack is a versioned description and implementation of site-specific tools. It
@@ -138,11 +146,13 @@ invalidates the affected registrations and pending calls.
 
 ## Protocol boundaries
 
-There are three independent version domains:
+There are four independent version domains:
 
 - MCP product version: SemVer, beginning at `0.1.0`.
 - MCPatch bridge protocol: integer compatibility version, beginning at `1`.
 - Pack manifest format: integer compatibility version, beginning at `1`.
+- Internal extension page-channel protocol: integer compatibility version,
+  beginning at `1` and never exposed as an MCP tool API.
 
 The bridge protocol uses UTF-8 JSON messages with an explicit message type,
 protocol version, request/correlation identifier where applicable, and bounded
