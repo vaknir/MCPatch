@@ -32,6 +32,14 @@ stable payload-free classifications: `core_startup_entropy_unavailable`,
 `core_spawn_failed`, and `core_startup_timeout`. The policy neither accepts nor stores
 application frames, so there is no disconnected message queue.
 
+The production composition resolves the running MCPatch executable through the
+operating system, never through `PATH` or an environment-provided command. It supplies
+only the fixed `bridge-core` and install-channel arguments and sets the child working
+directory to the executable's installation directory rather than inheriting an MCP
+client's project directory. Entropy for retry jitter is requested only after the first
+authenticated connection reports that the endpoint is unavailable; a ready core
+therefore does not depend on startup entropy or process creation.
+
 ## Unix implementation
 
 On Linux, the runtime base is `XDG_RUNTIME_DIR`. On macOS it is the process's
@@ -139,13 +147,31 @@ distinction reliably through all library wrappers.
 Partial frames are retained only up to the shared 1 MiB limit and are disconnected
 after five seconds. Worker shutdown is ordered before mutex release.
 
+## Isolated process start
+
+On Unix, the adapter starts the exact current executable with stdin, stdout, and
+stderr connected to `/dev/null` and process group ID zero, which creates a process
+group separate from the adapter. A dedicated reaper thread is created before the
+child; it waits for the child while the adapter remains alive, but dropping its join
+handle does not couple the core's lifetime to the adapter. Every MCPatch-owned Unix
+descriptor that can exist at this boundary is close-on-exec, including singleton and
+transport descriptors.
+
+On Windows, the narrow kernel facade calls `CreateProcessW` with the exact executable
+as `lpApplicationName`, a generated command line containing only the fixed arguments,
+`bInheritHandles = FALSE`, and `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`. Its
+`STARTUPINFOW` does not opt into standard handles, so the child receives neither the
+adapter console nor stdin, stdout, or stderr. The process and primary-thread handles
+returned to the adapter are closed immediately. This avoids the unstable Rust handle-
+inheritance API while making the security-relevant creation configuration directly
+testable.
+
 ## Current scope and residual risk
 
 Unix and Windows now provide the internal bridge-core process and lifecycle
-primitive, authenticated adapter-side connections, and the deterministic bounded
-rendezvous policy. Production process creation and composition remain in
-[#60](https://github.com/vaknir/MCPatch/issues/60); neither public adapter uses the
-connection boundary yet. Adapter wiring follows in
+primitive, authenticated adapter-side connections, deterministic bounded rendezvous,
+and isolated production process start. Neither public adapter uses the connection
+boundary yet. Adapter wiring follows in
 [#56](https://github.com/vaknir/MCPatch/issues/56) and
 [#57](https://github.com/vaknir/MCPatch/issues/57). Protocol negotiation remains in
 [#38](https://github.com/vaknir/MCPatch/issues/38).

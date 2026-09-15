@@ -40,8 +40,8 @@ and build foundation. The Rust bridge provides bounded MCP and Native Messaging
 adapters, a transport-independent browser connection boundary, and a deterministic
 capability registry. A zero-permission MV3 extension scaffold is also present;
 private Unix and Windows local transports and bridge-core lifecycles are implemented,
-along with a bounded connect-first adapter rendezvous policy. Isolated process start,
-adapter wiring, pairing, and live capabilities remain upcoming slices.
+along with bounded connect-first rendezvous and isolated bridge-core process start.
+Adapter wiring, pairing, and live capabilities remain upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
@@ -65,7 +65,7 @@ an empty tool list until browser capabilities are connected in subsequent slices
 The internal bridge core can be started for development with
 `cargo run --bin mcpatch -- bridge-core --channel=development`. It currently owns
 the protected local endpoints and lifecycle. The reusable rendezvous policy is not
-yet composed with isolated OS process startup or enabled in the public adapters.
+yet enabled in the public adapters.
 
 ## License
 

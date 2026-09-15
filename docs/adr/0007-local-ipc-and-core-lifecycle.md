@@ -91,6 +91,13 @@ Unrelated inherited handles are explicitly excluded. Multiple adapters may race 
 start it; only the process that acquires the protected singleton becomes the core,
 and losing processes exit.
 
+The executable is obtained from the operating system's current-process identity, not
+from `PATH` or another environment-provided command. On Unix the child enters a new
+process group and a pre-created reaper thread waits for it without owning its lifetime.
+On Windows a narrow `CreateProcessW` facade disables handle inheritance, supplies no
+standard handles, requests a detached new process group, and closes the returned
+process and thread handles immediately.
+
 On Unix, a core holding the singleton lock rechecks the socket after acquisition. It
 may remove a stale node only when all of these are true:
 
@@ -194,3 +201,5 @@ installer privileges and cross-user design before the on-demand lifecycle is pro
 - [Tokio Unix peer credentials](https://docs.rs/tokio/1.53.1/tokio/net/unix/struct.UCred.html)
 - [Windows named-pipe security and access rights](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights)
 - [Windows named-pipe client impersonation](https://learn.microsoft.com/en-us/windows/win32/ipc/impersonating-a-named-pipe-client)
+- [Windows process creation and handle inheritance](https://learn.microsoft.com/en-us/windows/win32/procthread/creating-processes)
+- [Rust Unix process-group configuration](https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html#tymethod.process_group)
