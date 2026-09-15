@@ -17,7 +17,10 @@
     "@mcpatch/sdk": "workspace:*"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@types/node": "24.13.4",
-    "esbuild": "0.28.2"
+    "daisyui": "^5.7.37",
+    "esbuild": "0.28.2",
+    "tailwindcss": "^4.3.3"
   }
 }

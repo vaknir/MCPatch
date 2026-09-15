@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@source "../approval.html";
+
+html {
+  color-scheme: light dark;
+}

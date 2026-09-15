@@ -82,9 +82,10 @@ page-backed pack through the real Native Messaging and MCP processes. The Google
 Flights compatibility fingerprint still requires a fresh signed-out field smoke;
 public distribution still requires platform signing and release provenance.
 
-The bridge now enforces one-time approvals for action and sensitive tools. The
-trusted approval UI is a later product slice; until it exists the extension denies
-every elevated request.
+The bridge enforces one-time approvals for action and sensitive tools. The
+extension-owned approval page exposes only bridge-bound metadata and returns one
+decision over a tab-bound internal channel; website pages cannot present or answer
+approval prompts. Missing or failed presentation remains a deterministic denial.
 
 The manifest carries only the baseline APIs accepted by ADR 0008 and one Google
 optional-origin declaration for the bundled reference pack. The synthetic pack

@@ -212,12 +212,21 @@ importers:
         specifier: workspace:*
         version: link:../../packages/sdk
     devDependencies:
+      '@tailwindcss/cli':
+        specifier: ^4.3.3
+        version: 4.3.3
       '@types/node':
         specifier: 24.13.4
         version: 24.13.4
+      daisyui:
+        specifier: ^5.7.37
+        version: 5.7.37
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
 
   packages/protocol:
     devDependencies:

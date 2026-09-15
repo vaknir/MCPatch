@@ -205,7 +205,7 @@ describe("native session supervisor", () => {
     expect(unhandled.runtime.latestPort.disconnected).toBe(true);
   });
 
-  it("denies approvals until a trusted extension UI is installed", () => {
+  it("denies approvals when the trusted extension UI is unavailable", () => {
     const runtime = new FakeRuntime();
     const scheduler = new FakeScheduler();
     startExtensionRuntime(runtime, { ...TEST_OPTIONS, scheduler });
@@ -221,6 +221,68 @@ describe("native session supervisor", () => {
       requestId: "request-approval",
       decision: "denied",
     });
+    expect(port.disconnected).toBe(false);
+  });
+
+  it("returns exactly one decision from the trusted approval surface", () => {
+    const runtime = new FakeRuntime();
+    const scheduler = new FakeScheduler();
+    let resolve: ((decision: "approved" | "denied") => void) | undefined;
+    const approvalSurface = {
+      request: vi.fn((message: ApprovalRequired, callback: typeof resolve) => {
+        expect(message).toEqual(approvalRequired());
+        resolve = callback;
+        return true;
+      }),
+      cancel: vi.fn(() => false),
+      closeAll: vi.fn(),
+    };
+    startExtensionRuntime(runtime, {
+      ...TEST_OPTIONS,
+      approvalSurface,
+      scheduler,
+    });
+    const port = runtime.latestPort;
+    port.emitMessage(helloAck());
+
+    port.emitMessage(approvalRequired());
+    expect(port.posted).toHaveLength(2);
+    resolve?.("approved");
+    resolve?.("denied");
+
+    expect(parsePosted(port, 2)).toEqual({
+      protocolVersion: PROTOCOL_VERSION,
+      type: "approval_result",
+      approvalId: "approval.0123456789abcdef0123456789abcdef",
+      requestId: "request-approval",
+      decision: "approved",
+    });
+    expect(port.posted).toHaveLength(3);
+  });
+
+  it("cancels approval prompts before compiled call cancellation", () => {
+    const runtime = new FakeRuntime();
+    const scheduler = new FakeScheduler();
+    const approvalSurface = {
+      request: vi.fn(() => true),
+      cancel: vi.fn(() => true),
+      closeAll: vi.fn(),
+    };
+    startExtensionRuntime(runtime, {
+      ...TEST_OPTIONS,
+      approvalSurface,
+      scheduler,
+    });
+    const port = runtime.latestPort;
+    port.emitMessage(helloAck());
+
+    port.emitMessage({
+      protocolVersion: PROTOCOL_VERSION,
+      type: "cancel",
+      requestId: "request-approval",
+    });
+
+    expect(approvalSurface.cancel).toHaveBeenCalledWith("request-approval");
     expect(port.disconnected).toBe(false);
   });
 
