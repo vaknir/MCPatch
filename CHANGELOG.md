@@ -69,6 +69,9 @@ All notable MCPatch changes are documented here. The format follows
 - MCP `tools/call` routing through bridge-owned correlation IDs, exact browser
   completion, schema enforcement, bounded deadlines, cancellation propagation, and
   safe errors that do not expose rejected browser data or internal route metadata.
+- Cross-platform process proof for the bundled demo across Native Messaging,
+  authenticated local IPC, bridge-core discovery/routing, and MCP stdio, including
+  context closure, disconnect revocation, and fresh publication after core restart.
 
 ### Fixed
 

@@ -35,6 +35,11 @@ This capability is a transport and routing proof point. It does not inspect an o
 tab or website, and its bundled-pack digest is a stable demo identity rather than a
 marketplace signature.
 
+The cross-platform automated workflow that exercises this contract through the real
+Native Messaging and MCP stdio processes is documented in
+[../../docs/local-demo.md](../../docs/local-demo.md). Loading the extension unpacked
+does not yet install or authorize the native-host manifest automatically.
+
 ## Current permissions
 
 Only `nativeMessaging`. The manifest contains no `host_permissions`,
