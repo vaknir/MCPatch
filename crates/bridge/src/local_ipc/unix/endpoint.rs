@@ -8,7 +8,7 @@ use std::{
 use tokio::net::{UnixListener, UnixStream};
 use tokio::time::timeout;
 
-use super::{AuthenticatedUnixStream, UnixRuntime};
+use super::{AuthenticatedUnixStream, UnixCoreElection, UnixRuntime};
 use crate::local_ipc::{EndpointRole, UnixIpcError, UnixIpcErrorCode};
 
 const PRIVATE_SOCKET_MODE: u32 = 0o600;
@@ -30,15 +30,14 @@ pub struct UnixEndpointListener {
 }
 
 impl UnixRuntime {
-    /// Bind after protected core election, replacing only an owned stale socket.
-    ///
-    /// The caller must hold the channel's singleton election guard. Issue #45
-    /// supplies that guard and is the only production caller of this primitive.
+    /// Bind under the exact channel election, replacing only an owned stale socket.
     pub async fn bind_after_election(
         &self,
+        election: &UnixCoreElection,
         role: EndpointRole,
     ) -> Result<UnixEndpointListener, UnixIpcError> {
         self.verify()?;
+        election.authorizes(self)?;
         let path = self.socket_path(role);
         prepare_socket_path(&path, self.expected_uid()).await?;
 

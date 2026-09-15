@@ -118,6 +118,8 @@ jobs:
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_shutdown_stops_workers_and_releases_election -- --exact --nocapture
       - name: Test Windows core-owned MCP sessions
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_owns_multiple_mcp_sessions -- --exact --nocapture
+      - name: Test Windows process race and recovery
+        run: cargo test --package mcpatch-bridge --test bridge_core_process --all-features --locked adapters_race_recover_and_observe_bounded_core_lifecycle -- --exact --nocapture
       - name: Test Windows MCP stdio end to end
         run: cargo test --package mcpatch-bridge --test mcp_stdio_process --all-features --locked initializes_lists_no_tools_and_keeps_logs_off_stdout -- --exact --nocapture
 

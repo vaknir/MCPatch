@@ -128,8 +128,9 @@ async fn authenticates_same_user_peers_before_exchanging_frames() {
     let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
         .await
         .unwrap();
+    let election = runtime.try_elect_core().unwrap();
     let listener = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap();
     let socket_path = runtime.socket_path(EndpointRole::Browser).to_owned();
@@ -164,8 +165,9 @@ async fn adapter_connection_exchanges_bounded_frames_with_the_selected_role() {
     let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
         .await
         .unwrap();
+    let election = runtime.try_elect_core().unwrap();
     let listener = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap();
     let adapter_runtime = LocalRuntime::from(runtime);
@@ -239,14 +241,15 @@ async fn detects_live_listener_and_reclaims_only_safe_stale_socket() {
     let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
         .await
         .unwrap();
+    let election = runtime.try_elect_core().unwrap();
     let path = runtime.socket_path(EndpointRole::Browser).to_owned();
     let first = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap();
 
     let error = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap_err();
     assert_eq!(error.code(), UnixIpcErrorCode::EndpointInUse);
@@ -258,7 +261,7 @@ async fn detects_live_listener_and_reclaims_only_safe_stale_socket() {
     assert!(path.exists());
 
     let replacement = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap();
     assert!(path.exists());
@@ -272,12 +275,13 @@ async fn refuses_unsafe_endpoint_and_preserves_replacement_on_cleanup() {
     let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
         .await
         .unwrap();
+    let election = runtime.try_elect_core().unwrap();
     let path = runtime.socket_path(EndpointRole::Browser).to_owned();
 
     fs::write(&path, b"not a socket").unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     let error = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap_err();
     assert_eq!(error.code(), UnixIpcErrorCode::UnsafeEndpoint);
@@ -285,13 +289,33 @@ async fn refuses_unsafe_endpoint_and_preserves_replacement_on_cleanup() {
 
     fs::remove_file(&path).unwrap();
     let listener = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap();
     fs::remove_file(&path).unwrap();
     fs::write(&path, b"replacement").unwrap();
     drop(listener);
     assert_eq!(fs::read(&path).unwrap(), b"replacement");
+}
+
+#[tokio::test]
+async fn endpoint_binding_requires_the_exact_channel_election() {
+    let fixture = TestDirectory::new(0o700);
+    let development = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let production = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Production)
+        .await
+        .unwrap();
+    let development_election = development.try_elect_core().unwrap();
+
+    let error = production
+        .bind_after_election(&development_election, EndpointRole::Browser)
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.code(), UnixIpcErrorCode::UnsafeLock);
+    assert!(!production.socket_path(EndpointRole::Browser).exists());
 }
 
 #[tokio::test]

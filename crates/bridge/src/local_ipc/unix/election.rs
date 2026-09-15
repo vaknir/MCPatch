@@ -2,7 +2,7 @@ use std::{
     fs::{File, OpenOptions, TryLockError},
     io,
     os::unix::fs::{MetadataExt, OpenOptionsExt},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use super::UnixRuntime;
@@ -19,7 +19,9 @@ struct LockIdentity {
 /// Held per-user election lock. Dropping it releases core ownership.
 #[derive(Debug)]
 pub struct UnixCoreElection {
-    _file: File,
+    file: File,
+    path: PathBuf,
+    identity: LockIdentity,
 }
 
 impl UnixRuntime {
@@ -49,7 +51,22 @@ impl UnixRuntime {
         if verify_open_lock(&file, &path, self.expected_uid())? != identity {
             return Err(UnixIpcError::without_source(UnixIpcErrorCode::UnsafeLock));
         }
-        Ok(UnixCoreElection { _file: file })
+        Ok(UnixCoreElection {
+            file,
+            path,
+            identity,
+        })
+    }
+}
+
+impl UnixCoreElection {
+    pub(super) fn authorizes(&self, runtime: &UnixRuntime) -> Result<(), UnixIpcError> {
+        if self.path != runtime.core_lock_path()
+            || verify_open_lock(&self.file, &self.path, runtime.expected_uid())? != self.identity
+        {
+            return Err(UnixIpcError::without_source(UnixIpcErrorCode::UnsafeLock));
+        }
+        Ok(())
     }
 }
 

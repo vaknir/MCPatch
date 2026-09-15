@@ -10,7 +10,7 @@ use std::{
 };
 
 use mcpatch_bridge::{
-    local_ipc::{EndpointRole, InstallChannel, LocalRuntime, UnixRuntime},
+    local_ipc::{EndpointRole, InstallChannel, LocalRuntime, UnixCoreElection, UnixRuntime},
     native_host::{CoreLocalBrowserChannel, LocalBrowserChannel, LocalBrowserChannelErrorCode},
     protocol::{Heartbeat, Message, PROTOCOL_VERSION, parse_message},
 };
@@ -20,7 +20,7 @@ const TEST_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[tokio::test]
 async fn authenticated_channel_relays_one_typed_message_each_way() {
-    let (channel, mut core_peer, _listener, _fixture) = connected_channel().await;
+    let (channel, mut core_peer, _election, _listener, _fixture) = connected_channel().await;
 
     let from_browser = heartbeat("from-browser");
     channel.send(from_browser.clone()).await.unwrap();
@@ -56,7 +56,7 @@ async fn authenticated_channel_relays_one_typed_message_each_way() {
 
 #[tokio::test]
 async fn authenticated_channel_reports_core_eof_and_malformed_protocol() {
-    let (closed_channel, core_peer, _listener, _fixture) = connected_channel().await;
+    let (closed_channel, core_peer, _election, _listener, _fixture) = connected_channel().await;
     drop(core_peer);
     let error = timeout(TEST_TIMEOUT, closed_channel.receive())
         .await
@@ -65,7 +65,8 @@ async fn authenticated_channel_reports_core_eof_and_malformed_protocol() {
     assert_eq!(error.code(), LocalBrowserChannelErrorCode::Closed);
     closed_channel.close().await.unwrap();
 
-    let (malformed_channel, mut core_peer, _listener, _fixture) = connected_channel().await;
+    let (malformed_channel, mut core_peer, _election, _listener, _fixture) =
+        connected_channel().await;
     core_peer.write_json(br#"{}"#).await.unwrap();
     let error = timeout(TEST_TIMEOUT, malformed_channel.receive())
         .await
@@ -78,6 +79,7 @@ async fn authenticated_channel_reports_core_eof_and_malformed_protocol() {
 async fn connected_channel() -> (
     std::sync::Arc<CoreLocalBrowserChannel>,
     mcpatch_bridge::local_ipc::AuthenticatedUnixStream,
+    UnixCoreElection,
     mcpatch_bridge::local_ipc::UnixEndpointListener,
     TestDirectory,
 ) {
@@ -85,8 +87,9 @@ async fn connected_channel() -> (
     let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
         .await
         .unwrap();
+    let election = runtime.try_elect_core().unwrap();
     let listener = runtime
-        .bind_after_election(EndpointRole::Browser)
+        .bind_after_election(&election, EndpointRole::Browser)
         .await
         .unwrap();
     let adapter_runtime = LocalRuntime::from(runtime);
@@ -97,6 +100,7 @@ async fn connected_channel() -> (
     (
         CoreLocalBrowserChannel::new(connection),
         core_peer,
+        election,
         listener,
         fixture,
     )

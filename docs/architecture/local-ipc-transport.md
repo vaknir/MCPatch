@@ -76,11 +76,14 @@ UID is obtained through peer credentials on an in-process Unix socket pair, avoi
 an ambient username or environment-variable identity claim.
 
 After the bridge core wins protected singleton election, it binds both role
-endpoints through the explicit `bind_after_election` primitive. Binding probes a
-pre-existing safe socket for at most 250 ms. A successful or indeterminate probe is
-treated as a live owner; only a failed probe of the same device/inode is reclaimed
-as stale. Regular files, symlinks, wrong owners, permissive modes, and identities
-changed during inspection are preserved and rejected.
+endpoints through the explicit `bind_after_election` primitive. The primitive
+requires the live election guard for that exact runtime channel and revalidates its
+lock-file identity before inspecting an endpoint. A guard from another channel is
+rejected before any endpoint is touched. Binding probes a pre-existing safe socket
+for at most 250 ms. A successful or indeterminate probe is treated as a live owner;
+only a failed probe of the same device/inode is reclaimed as stale. Regular files,
+symlinks, wrong owners, permissive modes, and identities changed during inspection
+are preserved and rejected.
 
 The listener records the device/inode it created. On drop it removes only a socket
 with that same identity and owner, so it cannot delete a replacement path. The
@@ -166,6 +169,26 @@ adapter console nor stdin, stdout, or stderr. The process and primary-thread han
 returned to the adapter are closed immediately. This avoids the unstable Rust handle-
 inheritance API while making the security-relevant creation configuration directly
 testable.
+
+## Process lifecycle verification
+
+Linux, macOS, and Windows CI run a bounded multi-process scenario against the
+development install channel. Two independent adapter helpers first observe a missing
+core, pause at the spawn boundary, and then release together. Their two real core
+candidates must produce exactly one startup marker and one `core_already_running`
+rejection. Both adapters initialize MCP sessions through the winner and repeat a
+tool-list request after the losing candidate exits.
+
+On Unix, the scenario seeds both role paths with safe stale sockets before the race,
+so successful startup also proves that stale replacement occurs only after election.
+After both adapters disconnect, the winner must report its normal 30-second idle stop
+and release its endpoint within a 40-second bound. A separately owned core is then
+terminated abruptly: its old authenticated session must close, a restarted core must
+accept a new MCP session with a different epoch, and no adapter may start a competing
+core while either explicit core is live. Epochs are written only into the private,
+ephemeral test fixture; production still neither exposes nor logs them. A no-op
+starter additionally exercises the production two-second rendezvous timeout from a
+separate process.
 
 ## Current scope and residual risk
 

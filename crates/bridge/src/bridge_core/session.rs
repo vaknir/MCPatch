@@ -56,7 +56,10 @@ where
     match role {
         EndpointRole::Browser => drain_browser_session(reader, writer, shutdown).await,
         EndpointRole::Mcp => {
-            if let Err(error) = run_core_mcp_session(mcp_server, reader, writer, shutdown).await {
+            let session_shutdown = shutdown.child_token();
+            if let Err(error) =
+                run_core_mcp_session(mcp_server, reader, writer, session_shutdown).await
+            {
                 tracing::warn!(
                     target: "mcpatch",
                     event = "core_mcp_session_failed",
