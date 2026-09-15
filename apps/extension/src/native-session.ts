@@ -45,6 +45,8 @@ export class NativeSessionSupervisor {
   readonly #config: SessionConfig;
   readonly #onMessage:
     ((message: BridgeApplicationMessage) => void) | undefined;
+  readonly #onReady: (() => void) | undefined;
+  readonly #onStopping: (() => void) | undefined;
   #active: ActivePort | undefined;
   #generation = 0;
   #handshakeTimer: unknown;
@@ -62,6 +64,8 @@ export class NativeSessionSupervisor {
     this.#runtime = runtime;
     this.#scheduler = options.scheduler ?? systemScheduler;
     this.#onMessage = options.onMessage;
+    this.#onReady = options.onReady;
+    this.#onStopping = options.onStopping;
     this.#config = createSessionConfig(options);
   }
 
@@ -78,6 +82,13 @@ export class NativeSessionSupervisor {
 
   stop(): void {
     this.#running = false;
+    if (this.#state.phase === "ready") {
+      try {
+        this.#onStopping?.();
+      } catch {
+        // Explicit shutdown must still revoke the port and all local state.
+      }
+    }
     this.#clearTimers();
     const active = this.#active;
     this.#active = undefined;
@@ -215,6 +226,13 @@ export class NativeSessionSupervisor {
       connectionId: message.connectionId,
       protocolVersion: message.selectedProtocolVersion,
     };
+    try {
+      this.#onReady?.();
+    } catch {
+      this.#fail(generation);
+      return;
+    }
+    if (!this.#isCurrent(generation) || this.#state.phase !== "ready") return;
     this.#scheduleHeartbeat(generation);
   }
 

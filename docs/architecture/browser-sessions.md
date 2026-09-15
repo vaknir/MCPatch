@@ -71,6 +71,14 @@ after 250 ms, 500 ms, one second, two seconds, and then five seconds; every time
 kept below Chromium's 30-second worker idle interval. A reconnect creates a fresh
 session and does not queue or replay application traffic from the prior connection.
 
+Once negotiation succeeds, the extension generates a complete snapshot for one
+bundled `mcpatch.demo.status` read capability. Its extension-owned context uses the
+non-resolving synthetic origin `https://demo.mcpatch.invalid` and has no browser or
+site access. Calls are accepted only when context, revision, origin, tool, and empty
+arguments match exactly; other valid calls receive a typed, non-retryable error.
+Reconnects generate a fresh context revision, while an explicit stop sends
+`context_closed` before disconnecting when the port can still deliver it.
+
 The extension targets Chromium 105 or newer because an open Native Messaging port
 has kept extension service workers alive since that release. Its manifest grants
 only `nativeMessaging`; this session layer has no website authority, content script,

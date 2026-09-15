@@ -58,6 +58,8 @@ export interface NativeSessionOptions {
   readonly handshakeTimeoutMs?: number;
   readonly heartbeatIntervalMs?: number;
   readonly onMessage?: (message: BridgeApplicationMessage) => void;
+  readonly onReady?: () => void;
+  readonly onStopping?: () => void;
   readonly retryDelaysMs?: readonly number[];
   readonly scheduler?: SessionScheduler;
   readonly supportedProtocolVersions?: readonly number[];

@@ -58,10 +58,13 @@ describe("protocol v1 golden fixtures", () => {
   });
 
   it("covers every message discriminator with an accepted fixture", () => {
-    const coveredTypes = validFixtures
-      .map((name) => messageType(readJson(join(validDirectory, name))))
-      .filter((type): type is string => type !== undefined)
-      .sort();
+    const coveredTypes = [
+      ...new Set(
+        validFixtures
+          .map((name) => messageType(readJson(join(validDirectory, name))))
+          .filter((type): type is string => type !== undefined),
+      ),
+    ].sort();
 
     expect(coveredTypes).toEqual([
       "approval_required",
