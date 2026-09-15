@@ -1,3 +1,4 @@
+import { DEMO_CONTEXT_ID, demoPack } from "@mcpatch/example-packs";
 import {
   PROTOCOL_VERSION,
   type ApprovalRequired,
@@ -18,6 +19,7 @@ import { startExtensionRuntime } from "../src/runtime.js";
 import {
   encodePageToWorkerMessage,
   PAGE_PROTOCOL_VERSION,
+  type PageBinding,
   parseWorkerToPageFrame,
 } from "../src/page-channel.js";
 import { MCPATCH_PAGE_PORT_NAME } from "../src/page-context-model.js";
@@ -28,6 +30,12 @@ import {
   TEST_OPTIONS,
 } from "./support/native-session.js";
 import { FakePagePort } from "./support/page-context.js";
+import {
+  SITE_ORIGIN,
+  SITE_TOOL,
+  runtimeOptions,
+  sitePack,
+} from "./support/site-pack.js";
 
 describe("native session supervisor", () => {
   it("registers lifecycle listeners and opens only the fixed native host", () => {
@@ -277,6 +285,133 @@ describe("native session supervisor", () => {
     expect(accepted.disconnected).toBe(true);
   });
 
+  it("projects a page-native capability through the bridge and revokes it", async () => {
+    const runtime = new FakeRuntime();
+    const scheduler = new FakeScheduler();
+    startExtensionRuntime(runtime, {
+      ...TEST_OPTIONS,
+      scheduler,
+      compiledPacks: [demoPack, sitePack],
+      compiledPackRuntimeOptions: runtimeOptions(),
+      pageAuthority: {
+        authorize(identity) {
+          return identity.origin === SITE_ORIGIN
+            ? { packTools: new Set([SITE_TOOL]) }
+            : undefined;
+        },
+      },
+      pageRandomId: () => "channel.native",
+      pageScheduler: scheduler,
+    });
+    const bridge = runtime.latestPort;
+    bridge.emitMessage(helloAck());
+
+    const page = new FakePagePort(MCPATCH_PAGE_PORT_NAME, {
+      id: runtime.id,
+      documentId: "document-native",
+      documentLifecycle: "active",
+      frameId: 0,
+      origin: SITE_ORIGIN,
+      tab: { id: 9 },
+      url: `${SITE_ORIGIN}/app/search`,
+    });
+    runtime.onConnect.emit(page);
+    page.emitMessage(
+      encodePageToWorkerMessage({
+        pageProtocolVersion: PAGE_PROTOCOL_VERSION,
+        type: "page_hello",
+        supportedPageProtocolVersions: [PAGE_PROTOCOL_VERSION],
+        implementation: { name: "test-content", version: "0.1.0" },
+      }),
+    );
+    const acknowledgement = parseWorkerToPageFrame(page.posted[0]);
+    if (acknowledgement.type !== "page_hello_ack") {
+      throw new Error("expected page acknowledgement");
+    }
+    const binding: PageBinding = {
+      channelId: acknowledgement.channelId,
+      contextId: acknowledgement.contextId,
+      contextRevision: acknowledgement.contextRevision,
+      tabId: acknowledgement.tabId,
+      documentId: acknowledgement.documentId,
+      origin: acknowledgement.origin,
+    };
+    page.emitMessage(
+      encodePageToWorkerMessage({
+        pageProtocolVersion: PAGE_PROTOCOL_VERSION,
+        type: "page_capability_snapshot",
+        ...binding,
+        snapshotRevision: 1,
+        capabilities: [
+          {
+            source: "native_webmcp",
+            name: SITE_TOOL,
+            description: "Read current fixture state.",
+            inputSchema: {
+              type: "object",
+              additionalProperties: false,
+              maxProperties: 0,
+              properties: {},
+            },
+            annotations: {
+              readOnlyHint: true,
+              consequentialHint: false,
+              untrustedContentHint: true,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(parsePosted(bridge, 2)).toMatchObject({
+      type: "capability_snapshot",
+      contextId: "page.9",
+      contextRevision: 1,
+      origin: SITE_ORIGIN,
+      capabilities: [{ name: SITE_TOOL, source: "native_webmcp" }],
+    });
+
+    bridge.emitMessage(
+      toolCall({
+        contextId: "page.9",
+        origin: SITE_ORIGIN,
+        tool: SITE_TOOL,
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const call = parseWorkerToPageFrame(page.posted[1]);
+    expect(call).toMatchObject({ type: "page_tool_call", tool: SITE_TOOL });
+    if (call.type !== "page_tool_call") throw new Error("expected page call");
+    page.emitMessage(
+      encodePageToWorkerMessage({
+        pageProtocolVersion: PAGE_PROTOCOL_VERSION,
+        type: "page_tool_result",
+        ...binding,
+        requestId: call.requestId,
+        tool: call.tool,
+        result: { status: "page" },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(parsePosted(bridge, 3)).toMatchObject({
+      type: "tool_result",
+      contextId: "page.9",
+      result: { status: "page" },
+    });
+
+    page.emitDisconnect();
+    expect(parsePosted(bridge, 4)).toMatchObject({
+      type: "context_closed",
+      contextId: "page.9",
+      reason: "navigation",
+    });
+    expect(parsePosted(bridge, 1)).toMatchObject({
+      type: "capability_snapshot",
+      contextId: DEMO_CONTEXT_ID,
+    });
+  });
+
   it("fails closed around application lifecycle hook errors", () => {
     const failedReady = setup({
       onReady() {
@@ -337,7 +472,7 @@ function contextClosed(contextId: string): ContextClosed {
   };
 }
 
-function toolCall(): ToolCall {
+function toolCall(overrides: Partial<ToolCall> = {}): ToolCall {
   return {
     protocolVersion: PROTOCOL_VERSION,
     type: "tool_call",
@@ -347,6 +482,7 @@ function toolCall(): ToolCall {
     origin: "https://example.com",
     tool: "demo.read",
     args: {},
+    ...overrides,
   };
 }
 

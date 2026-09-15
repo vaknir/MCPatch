@@ -140,6 +140,11 @@ export class CompiledPackRuntime {
     }
   }
 
+  closeContext(contextId: string, reason: ContextClosedReason): boolean {
+    const context = this.#contexts.get(contextId);
+    return context === undefined ? false : this.#closeContext(context, reason);
+  }
+
   disconnect(): void {
     const contexts = [...this.#contexts.values()];
     this.#contexts.clear();

@@ -8,6 +8,10 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Deterministic real-Chromium fixture coverage for profile-scoped Native Messaging,
+  MV3 enablement, page capability projection, MCP discovery and calls, DOM refresh,
+  cancellation, navigation replacement, malformed page isolation, and revocation,
+  with deny-all network controls and production-artifact leak checks.
 - Reproducible local bridge/extension packaging with source-commit metadata and
   per-file SHA-256 digests, plus deterministic public extension identity and
   user-level Native Messaging install, dry-run, idempotent update, receipt-bound

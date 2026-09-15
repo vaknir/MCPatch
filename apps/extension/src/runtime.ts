@@ -1,7 +1,12 @@
 import { DEMO_CONTEXT_ID, DEMO_URL } from "@mcpatch/example-packs";
+import type { ContextClosedReason } from "@mcpatch/protocol";
 
 import { BUNDLED_PACKS, PACK_RUNTIME_OPTIONS } from "./bundled-packs.js";
 import { CompiledPackRuntime } from "./compiled-pack-runtime.js";
+import type {
+  CompiledPackRuntimeOptions,
+  CompiledPackSubject,
+} from "./compiled-pack-validation.js";
 import type { ChromeRuntimeLifecycleApi } from "./lifecycle.js";
 import { registerLifecycleListeners } from "./lifecycle.js";
 import {
@@ -11,6 +16,7 @@ import {
   type SessionScheduler,
 } from "./native-session.js";
 import { denyPageAuthority, PageContextOwner } from "./page-context-owner.js";
+import { projectPageNativeTools } from "./page-capability-projection.js";
 import type {
   ChromePageServiceRuntimeApi,
   PageAuthority,
@@ -23,6 +29,8 @@ export type ExtensionRuntimeApi = ChromeRuntimeLifecycleApi &
 
 export interface ExtensionRuntimeOptions
   extends NativeSessionOptions, PageContextOwnerHooks {
+  readonly compiledPacks?: readonly CompiledPackSubject[];
+  readonly compiledPackRuntimeOptions?: CompiledPackRuntimeOptions;
   readonly pageAuthority?: PageAuthority;
   readonly pageCallTimeoutMs?: number;
   readonly pageHandshakeTimeoutMs?: number;
@@ -36,6 +44,7 @@ export function startExtensionRuntime(
   options: ExtensionRuntimeOptions = {},
 ): NativeSessionSupervisor {
   let bridgeReady = false;
+  const packState: { runtime?: CompiledPackRuntime } = {};
   const pageContexts = new PageContextOwner(runtime, {
     authority: {
       authorize(identity) {
@@ -49,10 +58,21 @@ export function startExtensionRuntime(
     ...(options.pageHandshakeTimeoutMs === undefined
       ? {}
       : { handshakeTimeoutMs: options.pageHandshakeTimeoutMs }),
-    ...(options.onClosed === undefined ? {} : { onClosed: options.onClosed }),
-    ...(options.onSnapshot === undefined
-      ? {}
-      : { onSnapshot: options.onSnapshot }),
+    onClosed(contextId, reason) {
+      packState.runtime?.closeContext(contextId, toContextClosedReason(reason));
+      options.onClosed?.(contextId, reason);
+    },
+    onSnapshot(snapshot) {
+      const activation = packState.runtime?.activateContext({
+        contextId: snapshot.binding.contextId,
+        url: snapshot.url,
+        native: projectPageNativeTools(snapshot, pageContexts),
+      });
+      if (activation === undefined || !activation.ok) {
+        throw new Error("page capability projection failed");
+      }
+      options.onSnapshot?.(snapshot);
+    },
     ...(options.pageRandomId === undefined
       ? {}
       : { randomId: options.pageRandomId }),
@@ -64,9 +84,10 @@ export function startExtensionRuntime(
   const session: { supervisor?: NativeSessionSupervisor } = {};
   const packs = new CompiledPackRuntime(
     (message) => session.supervisor?.send(message) ?? false,
-    BUNDLED_PACKS,
-    PACK_RUNTIME_OPTIONS,
+    options.compiledPacks ?? BUNDLED_PACKS,
+    options.compiledPackRuntimeOptions ?? PACK_RUNTIME_OPTIONS,
   );
+  packState.runtime = packs;
   const supervisorOptions: NativeSessionOptions = {
     ...options,
     onMessage(message) {
@@ -122,4 +143,10 @@ export function startExtensionRuntime(
   });
   supervisor.wake();
   return supervisor;
+}
+
+function toContextClosedReason(
+  reason: "disconnected" | "navigation" | "pack_disabled",
+): ContextClosedReason {
+  return reason;
 }

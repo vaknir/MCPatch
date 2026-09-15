@@ -46,14 +46,16 @@ browser negotiation and lifecycle ingestion are live, with one synthetic read-on
 demo capability proving extension-to-registry publication, MCP discovery, and exact
 validated tool-call completion. Local packages now bind a deterministic public
 extension identity to platform-correct user-level Native Messaging registration and
-source-commit digests. Deterministic real-Chromium fixtures and real-site packs
-remain upcoming slices.
+source-commit digests. Deterministic real-Chromium fixtures now prove the complete
+synthetic browser-to-MCP path; the first real-site pack remains the next slice.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
 The supported transport proof is described in
 [docs/local-demo.md](docs/local-demo.md). Local packaging and registration are
 documented in [docs/installation.md](docs/installation.md).
+The isolated browser suite is documented in
+[docs/testing/chromium-fixtures.md](docs/testing/chromium-fixtures.md).
 
 Pack development now has a separately versioned, closed Pack Manifest v1 contract
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.

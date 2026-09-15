@@ -60,6 +60,9 @@ Changes must preserve these rules:
 - Secrets must not be committed, placed in extension manifests, passed in command
   arguments, encoded in URLs, or written to logs.
 - Development fixtures must contain synthetic data only.
+- Browser fixtures may pre-authorize only an exact reserved synthetic origin when
+  browser-owned permission UI cannot be automated. Fixture markers, required host
+  authority, and test adapters must be rejected from production extension output.
 - A release artifact must be reproducibly attributable to its source commit and
   signing identity before MCPatch is offered to end users.
 - The local native-host installer must use its canonical executable path, one exact

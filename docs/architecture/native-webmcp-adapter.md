@@ -53,6 +53,18 @@ new snapshot. The page runtime aborts superseded discovery. Document unload clos
 the content port, unsubscribes the adapter, aborts pending calls, and causes the
 service worker and bridge to revoke that document's context.
 
+The service worker projects each accepted page snapshot into the same deterministic
+compiled-capability resolver used by bundled packs. A projected native handler holds
+no page object; it delegates an exact context ID, tool name, arguments, and abort
+signal back through the owned page port. Because the draft does not advertise output
+schemas, the projection declares an unconstrained JSON schema while the page codec
+still enforces its fixed size, depth, data-only, and serialization limits. Native
+precedence is applied before publication to the bridge.
+
+Navigation, malformed page traffic, pack disable, permission loss, or browser
+disconnect closes the projected runtime context and aborts its outstanding calls.
+No document handle or website exception crosses into the bridge protocol.
+
 ## Compatibility posture
 
 As of 2026-09-15, WebMCP is a Web Machine Learning Community Group draft and the
