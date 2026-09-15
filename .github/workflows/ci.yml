@@ -100,6 +100,8 @@ jobs:
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked adapter_connection_authenticates_server_and_classifies_unavailable -- --exact --nocapture
       - name: Test Windows Native Messaging channel
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked native_browser_channel_relays_and_closes_on_core_eof -- --exact --nocapture
+      - name: Test Windows browser adapter negotiation
+        run: cargo test --package mcpatch-bridge --test browser_adapter_integration --all-features --locked browser_negotiation_survives_violations_disconnect_and_core_restart -- --exact --nocapture
       - name: Test Windows isolated spawn configuration
         run: cargo test --package mcpatch-windows-kernel --lib --all-features --locked process::tests
       - name: Test Windows protected core election

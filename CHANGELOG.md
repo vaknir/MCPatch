@@ -55,11 +55,16 @@ All notable MCPatch changes are documented here. The format follows
 - Manifest V3 native-session supervision with strict hello acknowledgement,
   fixed-host Native Messaging, bounded heartbeats and reconnects, fail-closed
   direction checks, and no cross-connection message replay.
+- Cross-platform process coverage for browser negotiation, heartbeat, violation
+  isolation, disconnect revocation, fresh reconnect identities, and core restart
+  through Native Messaging plus authenticated local IPC.
 
 ### Fixed
 
 - Isolated MCP session cancellation from the core-wide shutdown token so an
   initialized client disconnect starts the idle grace period instead of stopping the
   shared core.
+- Native-host peer-driven shutdown no longer waits indefinitely for Tokio's
+  uncancellable blocking standard-input read.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD
