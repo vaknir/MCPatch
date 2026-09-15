@@ -4,6 +4,7 @@ import {
   type GoogleFlightsChangeScheduler,
 } from "./coalescing.js";
 import { collectControls } from "./dom-controls.js";
+import { submitGoogleFlightsDocumentSearch } from "./dom-search.js";
 import {
   collectCards,
   collectPriceSemantics,
@@ -21,6 +22,7 @@ import type {
   GoogleFlightsSemanticSnapshot,
   SemanticTextCandidate,
 } from "./model.js";
+import type { GoogleFlightsSearchInput } from "./search-input.js";
 
 export function createGoogleFlightsDocumentSource(
   document: Document,
@@ -84,6 +86,10 @@ class GoogleFlightsDocumentSource implements GoogleFlightsSnapshotSource {
 
   read(signal: AbortSignal): GoogleFlightsSemanticSnapshot {
     return collectGoogleFlightsSemanticSnapshot(this.#document, signal);
+  }
+
+  search(input: GoogleFlightsSearchInput, signal: AbortSignal): Promise<void> {
+    return submitGoogleFlightsDocumentSearch(this.#document, input, signal);
   }
 
   subscribe(listener: () => void): () => void {

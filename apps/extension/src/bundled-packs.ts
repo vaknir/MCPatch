@@ -12,7 +12,7 @@ export const BUNDLED_PACKS = Object.freeze([demoPack, googleFlightsPack]);
 export const PACK_RUNTIME_OPTIONS: CompiledPackRuntimeOptions = Object.freeze({
   runtimeVersion: "0.1.0",
   bridgeProtocolVersion: PROTOCOL_VERSION,
-  allowedPermissions: Object.freeze(["READ"] as const),
+  allowedPermissions: Object.freeze(["READ", "ACTION"] as const),
 });
 
 // This closed list must mirror manifest.json optional_host_permissions. A reviewed

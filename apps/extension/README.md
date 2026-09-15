@@ -14,7 +14,7 @@ pnpm --filter @mcpatch/extension build
 The build bundles the shared protocol validator, codegen-free pack runtime, reviewed
 example and Google Flights packs, service worker, and isolated-world content
 runtime, then copies the manifest. It fails if dynamic `eval` or `Function` code
-generation enters either executable bundle. The content artifact is never
+generation enters any executable bundle. The content artifact is never
 registered statically; the enablement controller registers it only for user-approved
 reviewed origins. Load
 `apps/extension/dist` with **Load unpacked** on `chrome://extensions` for local
@@ -57,10 +57,12 @@ for admission, page routing, native precedence, and lifecycle.
 
 The private pre-alpha build includes `packs/google-flights` for the exact origin
 `https://www.google.com` and exact paths `/travel/flights` and
-`/travel/flights/search`. Its three tools read current search state, visible result
-summaries, and a short price insight. They are READ-only, have closed empty inputs,
-make no extension network requests, and publish website strings as bounded untrusted
-content.
+`/travel/flights/search`. Three tools read current search state, visible result
+summaries, and a short price insight. A fourth `flights.search` ACTION submits only a
+one-adult economy round trip between two exact airport codes and future dates after
+an argument-bound approval in the extension-owned UI. It returns a bounded
+acknowledgement before navigation. No tool makes extension network requests; website
+strings remain bounded untrusted content.
 
 The content adapter is a static build dependency constructed only after the service
 worker authorizes its complete declared tool set. A page snapshot limits the pack

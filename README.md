@@ -27,7 +27,7 @@ Website
 ```
 
 Capability resolution prefers a site's native WebMCP tools, then an enabled
-MCPatch pack. Browser automation is not part of the initial runtime.
+MCPatch pack. Generic browser automation is not part of the runtime.
 
 The current architecture and security invariants are documented in
 [ARCHITECTURE.md](ARCHITECTURE.md). Work is tracked in the
@@ -47,9 +47,10 @@ demo capability proving extension-to-registry publication, MCP discovery, and ex
 validated tool-call completion. Local packages now bind a deterministic public
 extension identity to platform-correct user-level Native Messaging registration and
 source-commit digests. Deterministic real-Chromium fixtures now prove the complete
-page-backed pack-to-MCP path. The first reviewed real-site pack implements bounded,
-read-only Google Flights extraction and is bundled behind exact optional-origin
-enablement; a signed-out field smoke remains before calling that adapter verified.
+page-backed pack-to-MCP path. The first reviewed real-site pack implements bounded
+Google Flights reads plus one approved typed search action and is bundled behind
+exact optional-origin enablement; an MCP-driven signed-out field smoke remains
+before calling that adapter verified.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
@@ -75,9 +76,11 @@ read-only same-origin subset of native `document.modelContext`. It also runs the
 reviewed Google Flights pack through the authorized page channel; service-worker
 fallback handlers cannot produce real-site results.
 
-The bridge now owns argument-bound, expiring, single-use approval state for action
-and sensitive tools. No trusted approval UI ships yet, so the extension denies those
-requests by default and only read-only capabilities are usable.
+The bridge owns argument-bound, expiring, single-use approval state for action and
+sensitive tools. The extension presents each decision in its own tab-bound UI and
+fails closed if that trusted surface is unavailable. The first real action is the
+narrow `flights.search` capability; no generic click, navigation, selector, or script
+tool is exposed.
 
 ## Bridge development
 

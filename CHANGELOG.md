@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A typed `flights.search` ACTION for one-adult economy round trips between exact
+  airport codes and bounded future dates, using only fixed reviewed form semantics,
+  one attempt per document, and an acknowledgement before navigation.
+- An extension-owned, tab-bound one-time approval UI with a closed hash-only
+  presentation channel, bounded prompts, one-shot decisions, and fail-closed sender,
+  lifecycle, timeout, malformed-message, and presentation handling.
 - Reviewed Google Flights pack bundling with exact optional-origin enablement,
   document-local execution, page-reported capability projection, fail-closed
   service-worker fallbacks, and native WebMCP precedence.
@@ -40,8 +46,8 @@ All notable MCPatch changes are documented here. The format follows
   results, deterministic duplicate rejection, cancellation, and lifecycle refresh.
 - Bridge-owned one-time approvals bound to canonical argument hashes, exact active
   routes and pack identities, with random nonces, bounded expiry, atomic consumption,
-  replay denial, lifecycle revocation, and a deny-only extension fallback until a
-  trusted approval UI exists.
+  replay denial, lifecycle revocation, and deterministic denial when the trusted
+  extension surface is unavailable.
 - Pre-release protocol-v1 approval correction removing raw arguments from approval
   messages before the first distributed build; hash-only approval messages are now
   the frozen version-1 shape.

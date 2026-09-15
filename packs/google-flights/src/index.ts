@@ -19,6 +19,10 @@ export {
   createGoogleFlightsDocumentSource,
 } from "./document-source.js";
 export {
+  googleFlightsDateLabels,
+  submitGoogleFlightsDocumentSearch,
+} from "./dom-search.js";
+export {
   extractCurrentSearch,
   extractPriceInsights,
   extractResults,
@@ -28,12 +32,14 @@ export {
   FLIGHTS_CURRENT_SEARCH,
   FLIGHTS_PRICE_INSIGHTS,
   FLIGHTS_RESULTS,
+  FLIGHTS_SEARCH,
   GOOGLE_FLIGHTS_FINGERPRINT,
   GOOGLE_FLIGHTS_LANDING_PATH,
   GOOGLE_FLIGHTS_ORIGIN,
   GOOGLE_FLIGHTS_SEARCH_PATH,
   GOOGLE_FLIGHTS_TOOLS,
   GoogleFlightsExtractionError,
+  GoogleFlightsInteractionError,
 } from "./model.js";
 export type {
   CurrentSearchResult,
@@ -47,6 +53,24 @@ export type {
   GoogleFlightsSemanticSnapshot,
   GoogleFlightsToolName,
   PriceInsightsResult,
+  SearchAcceptedResult,
   SemanticFlightCard,
   SemanticTextCandidate,
 } from "./model.js";
+export {
+  GoogleFlightsSearchInputError,
+  validateGoogleFlightsSearchInput,
+} from "./search-input.js";
+export {
+  abortInteraction,
+  performGoogleFlightsSearch,
+} from "./search-action.js";
+export type {
+  AirportField,
+  DateField,
+  GoogleFlightsSearchControls,
+} from "./search-action.js";
+export type {
+  GoogleFlightsSearchInput,
+  GoogleFlightsSearchInputErrorReason,
+} from "./search-input.js";

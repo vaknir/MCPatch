@@ -1,18 +1,29 @@
 # Google Flights pack
 
 This private, reviewed package implements MCPatch's first real website adapter. It
-reads only bounded semantics already rendered on compatible English Google Flights
-pages. It does not submit searches, open bookings, make network requests, inspect
-cookies or storage, decode opaque URLs, or expose generic DOM access.
+reads bounded semantics already rendered on compatible English Google Flights pages
+and can submit one approved, exact-airport round-trip search. It does not open
+bookings, make extension network requests, inspect cookies or storage, decode opaque
+URLs, or expose generic DOM access.
 
-The package is split across three trust-preserving layers:
+The package is split across four trust-preserving layers:
 
 - `document-source.ts` collects a small allowlisted semantic snapshot using stable
   accessibility labels and roles, never obfuscated site classes;
 - `extractor.ts` deterministically validates the
   `google-flights-rendered-en-v1` fingerprint and produces bounded typed results;
-- `adapter.ts` exposes only the three declared pack capabilities and re-reads the
-  current snapshot for each call.
+- `search-input.ts` and `search-action.ts` validate the closed airport/date request
+  and fix the only permitted form sequence;
+- `dom-search.ts` maps that sequence to unique visible semantic controls with bounded
+  waits and schedules the final submission after acknowledgement; and
+- `adapter.ts` exposes only the four declared pack capabilities and revalidates the
+  current page before each call.
+
+`flights.search` is an `ACTION` and therefore cannot reach the page until the Rust
+bridge creates an argument-bound one-time approval and the user approves it in the
+extension-owned prompt. It accepts only distinct three-letter uppercase airport
+codes and two valid future ISO dates within 330 days. The fixed action is one adult,
+economy, round trip; it cannot select an itinerary, book, sign in, or track prices.
 
 The manifest's compiled fallback handlers intentionally return `TOOL_NOT_FOUND`.
 Production calls must cross the reviewed page-capability channel; they must never

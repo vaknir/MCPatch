@@ -1,5 +1,6 @@
 import {
   FLIGHTS_CURRENT_SEARCH,
+  FLIGHTS_SEARCH,
   GOOGLE_FLIGHTS_FINGERPRINT,
   GOOGLE_FLIGHTS_ORIGIN,
   GOOGLE_FLIGHTS_SEARCH_PATH,
@@ -77,6 +78,51 @@ describe("page-backed compiled-pack routing", () => {
       }),
     ).toEqual({ ok: true, published: false, contextRevision: 1 });
     expect(sent).toEqual([]);
+  });
+
+  it("routes the closed search action only after bridge approval", async () => {
+    const execute = vi.fn(() => ({
+      fingerprint: GOOGLE_FLIGHTS_FINGERPRINT,
+      state: "accepted",
+    }));
+    const { runtime, sent } = packRuntime([googleFlightsPack]);
+    runtime.activateContext({
+      contextId: CONTEXT_ID,
+      url: URL,
+      native: [],
+      page: [pageTool(FLIGHTS_SEARCH, execute)],
+    });
+
+    expect(sent[0]).toMatchObject({
+      capabilities: [
+        {
+          name: FLIGHTS_SEARCH,
+          risk: "action",
+          permissions: ["ACTION"],
+        },
+      ],
+    });
+    runtime.handle({
+      ...call(),
+      requestId: "request-search-1",
+      tool: FLIGHTS_SEARCH,
+      args: {
+        origin: "LHR",
+        destination: "CDG",
+        outboundDate: "2026-10-27",
+        returnDate: "2026-11-03",
+      },
+    });
+    await flushPromises();
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(sent[1]).toMatchObject({
+      type: "tool_result",
+      result: {
+        fingerprint: GOOGLE_FLIGHTS_FINGERPRINT,
+        state: "accepted",
+      },
+    });
   });
 
   it("rejects undeclared, duplicate, and nonmatching page pack routes", () => {

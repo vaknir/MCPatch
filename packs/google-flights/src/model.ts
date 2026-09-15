@@ -5,10 +5,12 @@ export const GOOGLE_FLIGHTS_FINGERPRINT =
   "google-flights-rendered-en-v1" as const;
 
 export const FLIGHTS_CURRENT_SEARCH = "flights.current_search" as const;
+export const FLIGHTS_SEARCH = "flights.search" as const;
 export const FLIGHTS_RESULTS = "flights.results" as const;
 export const FLIGHTS_PRICE_INSIGHTS = "flights.price_insights" as const;
 export const GOOGLE_FLIGHTS_TOOLS = Object.freeze([
   FLIGHTS_CURRENT_SEARCH,
+  FLIGHTS_SEARCH,
   FLIGHTS_RESULTS,
   FLIGHTS_PRICE_INSIGHTS,
 ] as const);
@@ -81,6 +83,14 @@ export type GoogleFlightsExtractionReason =
   | "unsupported_path"
   | "unsupported_trip_type";
 
+export type GoogleFlightsInteractionReason =
+  | "ambiguous_search_control"
+  | "cancelled"
+  | "missing_search_control"
+  | "search_already_started"
+  | "search_timeout"
+  | "unsupported_search_options";
+
 /** Payload-free compatibility error safe to map across the page channel. */
 export class GoogleFlightsExtractionError extends Error {
   readonly code: GoogleFlightsExtractionCode;
@@ -92,6 +102,22 @@ export class GoogleFlightsExtractionError extends Error {
   ) {
     super(`Google Flights extraction failed: ${reason}`);
     this.name = "GoogleFlightsExtractionError";
+    this.code = code;
+    this.reason = reason;
+  }
+}
+
+/** Payload-free failure from the fixed reviewed form interaction. */
+export class GoogleFlightsInteractionError extends Error {
+  readonly code: GoogleFlightsExtractionCode;
+  readonly reason: GoogleFlightsInteractionReason;
+
+  constructor(
+    code: GoogleFlightsExtractionCode,
+    reason: GoogleFlightsInteractionReason,
+  ) {
+    super(`Google Flights interaction failed: ${reason}`);
+    this.name = "GoogleFlightsInteractionError";
     this.code = code;
     this.reason = reason;
   }
@@ -134,4 +160,9 @@ export interface PriceInsightsResult {
   readonly fingerprint: typeof GOOGLE_FLIGHTS_FINGERPRINT;
   readonly state: "available" | "loading" | "unavailable";
   readonly assessment?: string;
+}
+
+export interface SearchAcceptedResult {
+  readonly fingerprint: typeof GOOGLE_FLIGHTS_FINGERPRINT;
+  readonly state: "accepted";
 }

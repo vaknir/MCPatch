@@ -26,6 +26,7 @@ describe("bundled Google Flights production pack", () => {
     expect(definition?.tools).toEqual(GOOGLE_FLIGHTS_TOOLS);
     expect(typeof definition?.create).toBe("function");
     expect(BUNDLED_PACKS).toContain(googleFlightsPack);
+    expect(PACK_RUNTIME_OPTIONS.allowedPermissions).toEqual(["READ", "ACTION"]);
   });
 
   it("makes only the two exact paths enableable under one declared origin", () => {
