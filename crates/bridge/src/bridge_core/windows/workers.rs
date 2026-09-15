@@ -4,26 +4,25 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use tokio::sync::mpsc;
 
-use super::frames::{FramePoll, NonblockingFrameReader};
+use super::super::session::MAX_SESSIONS_PER_ROLE;
 use crate::local_ipc::{
     AuthenticatedWindowsStream, EndpointRole, WindowsEndpointListener, WindowsIpcError,
     WindowsIpcErrorCode,
 };
 
-const MAX_SESSIONS_PER_ROLE: usize = 8;
 const EVENT_CAPACITY: usize = MAX_SESSIONS_PER_ROLE * 4 + 8;
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
-const PARTIAL_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 
-#[derive(Clone, Copy, Debug)]
 pub(super) enum WorkerEvent {
-    Connected,
-    Disconnected,
+    Accepted {
+        role: EndpointRole,
+        stream: AuthenticatedWindowsStream,
+    },
     PeerRejected,
     WorkerFailed,
 }
@@ -115,30 +114,20 @@ fn spawn_accept_worker(
 fn accept_loop(
     listener: WindowsEndpointListener,
     role: EndpointRole,
-    stop: &Arc<AtomicBool>,
+    stop: &AtomicBool,
     events: &mpsc::Sender<WorkerEvent>,
 ) {
-    let mut sessions = Vec::with_capacity(MAX_SESSIONS_PER_ROLE);
     while !stop.load(Ordering::Acquire) {
-        if !reap_finished(&mut sessions) {
-            let _ = events.blocking_send(WorkerEvent::WorkerFailed);
-            break;
-        }
-
         match listener.try_accept_authenticated() {
-            Ok(Some(stream)) if sessions.len() < MAX_SESSIONS_PER_ROLE => {
-                match spawn_session_worker(stream, role, Arc::clone(stop), events.clone()) {
-                    Ok(session) => sessions.push(session),
-                    Err(()) => {
-                        let _ = events.blocking_send(WorkerEvent::WorkerFailed);
-                        break;
-                    }
+            Ok(Some(stream)) => {
+                if events
+                    .blocking_send(WorkerEvent::Accepted { role, stream })
+                    .is_err()
+                {
+                    return;
                 }
             }
-            Ok(Some(_)) => {
-                let _ = events.blocking_send(WorkerEvent::PeerRejected);
-            }
-            Ok(None) => {}
+            Ok(None) => thread::sleep(POLL_INTERVAL),
             Err(error)
                 if matches!(
                     error.code(),
@@ -147,68 +136,16 @@ fn accept_loop(
                         | WindowsIpcErrorCode::RevertFailed
                 ) =>
             {
-                let _ = events.blocking_send(WorkerEvent::PeerRejected);
+                if events.blocking_send(WorkerEvent::PeerRejected).is_err() {
+                    return;
+                }
             }
             Err(_) => {
                 let _ = events.blocking_send(WorkerEvent::WorkerFailed);
-                break;
-            }
-        }
-        thread::sleep(POLL_INTERVAL);
-    }
-
-    for session in sessions {
-        let _ = session.join();
-    }
-}
-
-fn spawn_session_worker(
-    mut stream: AuthenticatedWindowsStream,
-    role: EndpointRole,
-    stop: Arc<AtomicBool>,
-    events: mpsc::Sender<WorkerEvent>,
-) -> Result<JoinHandle<()>, ()> {
-    thread::Builder::new()
-        .name(session_name(role).to_owned())
-        .spawn(move || {
-            if events.blocking_send(WorkerEvent::Connected).is_err() {
                 return;
             }
-            let mut reader = NonblockingFrameReader::new();
-            let mut partial_frame_deadline = None;
-            while !stop.load(Ordering::Acquire) {
-                match reader.poll(&mut stream) {
-                    Ok(FramePoll::Complete) => partial_frame_deadline = None,
-                    Ok(FramePoll::Pending) => {
-                        if reader.has_partial_frame() {
-                            let deadline = partial_frame_deadline
-                                .get_or_insert_with(|| Instant::now() + PARTIAL_FRAME_TIMEOUT);
-                            if Instant::now() >= *deadline {
-                                break;
-                            }
-                        }
-                        thread::sleep(POLL_INTERVAL);
-                    }
-                    Ok(FramePoll::Closed) | Err(_) => break,
-                }
-            }
-            let _ = events.blocking_send(WorkerEvent::Disconnected);
-        })
-        .map_err(|_| ())
-}
-
-fn reap_finished(sessions: &mut Vec<JoinHandle<()>>) -> bool {
-    let mut index = 0;
-    let mut succeeded = true;
-    while index < sessions.len() {
-        if sessions[index].is_finished() {
-            let session = sessions.swap_remove(index);
-            succeeded &= session.join().is_ok();
-        } else {
-            index += 1;
         }
     }
-    succeeded
 }
 
 fn join_workers(threads: Vec<JoinHandle<()>>) -> Result<(), WindowsIpcError> {
@@ -231,12 +168,5 @@ const fn worker_name(role: EndpointRole) -> &'static str {
     match role {
         EndpointRole::Browser => "mcpatch-browser-accept",
         EndpointRole::Mcp => "mcpatch-mcp-accept",
-    }
-}
-
-const fn session_name(role: EndpointRole) -> &'static str {
-    match role {
-        EndpointRole::Browser => "mcpatch-browser-session",
-        EndpointRole::Mcp => "mcpatch-mcp-session",
     }
 }

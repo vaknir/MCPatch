@@ -3,11 +3,15 @@ use std::time::Duration;
 use tokio::{task::JoinSet, time::Instant};
 use tokio_util::sync::CancellationToken;
 
-use super::{BridgeCoreError, BridgeEpoch, CoreStopReason};
+use super::{
+    BridgeCoreError, BridgeEpoch, CoreStopReason,
+    session::{SessionCounts, run_stream_session},
+};
 use crate::local_ipc::{
     AuthenticatedUnixStream, EndpointRole, UnixCoreElection, UnixEndpointListener, UnixIpcError,
     UnixIpcErrorCode, UnixRuntime,
 };
+use crate::mcp::BridgeMcpServer;
 
 /// Elected Unix bridge core holding both parser-role endpoints.
 #[derive(Debug)]
@@ -16,6 +20,7 @@ pub struct UnixBridgeCore {
     browser_listener: UnixEndpointListener,
     mcp_listener: UnixEndpointListener,
     epoch: BridgeEpoch,
+    mcp_server: BridgeMcpServer,
 }
 
 impl UnixBridgeCore {
@@ -30,6 +35,7 @@ impl UnixBridgeCore {
             browser_listener,
             mcp_listener,
             epoch,
+            mcp_server: BridgeMcpServer,
         })
     }
 
@@ -44,21 +50,40 @@ impl UnixBridgeCore {
         shutdown: CancellationToken,
     ) -> Result<CoreStopReason, BridgeCoreError> {
         let mut sessions = JoinSet::new();
+        let mut session_counts = SessionCounts::default();
         let mut idle_deadline = Some(Instant::now() + idle_timeout);
 
         let reason = loop {
             tokio::select! {
                 result = self.browser_listener.accept_authenticated() => {
-                    accept_session(result, EndpointRole::Browser, &mut sessions, &mut idle_deadline)?;
+                    accept_session(
+                        result,
+                        EndpointRole::Browser,
+                        &self.mcp_server,
+                        &shutdown,
+                        &mut sessions,
+                        &mut session_counts,
+                        &mut idle_deadline,
+                    )?;
                 }
                 result = self.mcp_listener.accept_authenticated() => {
-                    accept_session(result, EndpointRole::Mcp, &mut sessions, &mut idle_deadline)?;
+                    accept_session(
+                        result,
+                        EndpointRole::Mcp,
+                        &self.mcp_server,
+                        &shutdown,
+                        &mut sessions,
+                        &mut session_counts,
+                        &mut idle_deadline,
+                    )?;
                 }
                 completed = sessions.join_next(), if !sessions.is_empty() => {
-                    if completed.is_some_and(|result| result.is_err()) {
-                        tracing::warn!(target: "mcpatch", event = "core_session_task_failed");
-                    }
-                    if sessions.is_empty() {
+                    let Some(completed) = completed else {
+                        continue;
+                    };
+                    let role = completed.map_err(BridgeCoreError::SessionTask)?;
+                    session_counts.remove(role);
+                    if session_counts.is_empty() {
                         idle_deadline = Some(Instant::now() + idle_timeout);
                     }
                 }
@@ -80,12 +105,26 @@ impl UnixBridgeCore {
 fn accept_session(
     result: Result<AuthenticatedUnixStream, UnixIpcError>,
     role: EndpointRole,
+    mcp_server: &BridgeMcpServer,
+    shutdown: &CancellationToken,
     sessions: &mut JoinSet<EndpointRole>,
+    session_counts: &mut SessionCounts,
     idle_deadline: &mut Option<Instant>,
 ) -> Result<(), BridgeCoreError> {
     match result {
         Ok(stream) => {
-            sessions.spawn(drain_session(stream, role));
+            if !session_counts.try_add(role) {
+                tracing::warn!(target: "mcpatch", event = "core_session_rejected", reason = "limit");
+                return Ok(());
+            }
+            let (reader, writer) = stream.into_inner().into_split();
+            sessions.spawn(run_stream_session(
+                role,
+                reader,
+                writer,
+                mcp_server.clone(),
+                shutdown.clone(),
+            ));
             *idle_deadline = None;
             Ok(())
         }
@@ -100,11 +139,6 @@ fn accept_session(
         }
         Err(error) => Err(BridgeCoreError::Transport(error)),
     }
-}
-
-async fn drain_session(mut stream: AuthenticatedUnixStream, role: EndpointRole) -> EndpointRole {
-    while matches!(stream.read_json().await, Ok(Some(_))) {}
-    role
 }
 
 async fn wait_for_idle(deadline: Option<Instant>) {

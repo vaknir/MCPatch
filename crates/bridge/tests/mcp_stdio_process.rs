@@ -42,8 +42,9 @@ async fn initializes_lists_no_tools_and_keeps_logs_off_stdout() {
     assert_eq!(tools["id"], 2);
     assert_eq!(tools["result"]["tools"], serde_json::json!([]));
 
-    let (status, stderr) = finish(child).await;
+    let (status, trailing_stdout, stderr) = finish(child).await;
     assert!(status.success());
+    assert!(trailing_stdout.is_empty());
     assert!(!stderr.contains("integration-secret-marker"));
     assert!(!stderr.contains("initialize"));
     assert_json_lines(&stderr);
@@ -63,14 +64,39 @@ async fn rejects_oversized_input_without_echoing_it() {
         .await
         .expect("oversized input must be writable");
 
-    let (status, stderr) = finish(child).await;
-    assert!(status.success());
-    assert!(stderr.contains(r#""event":"mcp_input_rejected""#));
-    assert!(stderr.contains(r#""reason":"message_too_large""#));
+    let (status, stdout, stderr) = finish(child).await;
+    assert!(!status.success());
+    assert!(stdout.is_empty());
+    assert!(stderr.contains(r#""event":"mcp_stdio_failed""#));
+    assert!(stderr.contains(r#""code":"mcp_stdio_message_too_large""#));
     assert!(
         stderr.len() < 16 * 1024,
         "logs must not echo rejected input"
     );
+    assert_json_lines(&stderr);
+}
+
+#[tokio::test]
+async fn rejects_malformed_input_without_starting_a_session() {
+    let mut child = spawn_bridge();
+    write_json_line(&mut child, r#"{"jsonrpc":"2.0","id":1,"id":2}"#).await;
+
+    let (status, stdout, stderr) = finish(child).await;
+    assert!(!status.success());
+    assert!(stdout.is_empty());
+    assert!(stderr.contains(r#""event":"mcp_stdio_failed""#));
+    assert!(stderr.contains(r#""code":"mcp_stdio_invalid_message""#));
+    assert!(!stderr.contains(r#""id":1"#));
+    assert_json_lines(&stderr);
+}
+
+#[tokio::test]
+async fn clean_initial_eof_exits_without_stdout_noise() {
+    let child = spawn_bridge();
+    let (status, stdout, stderr) = finish(child).await;
+    assert!(status.success());
+    assert!(stdout.is_empty());
+    assert!(!stderr.contains("mcp_client_ready"));
     assert_json_lines(&stderr);
 }
 
@@ -133,9 +159,20 @@ where
     serde_json::from_str(&line).expect("stdout must contain JSON-RPC only")
 }
 
-async fn finish(mut child: Child) -> (std::process::ExitStatus, String) {
+async fn finish(mut child: Child) -> (std::process::ExitStatus, Vec<u8>, String) {
     drop(child.stdin.take());
+    let stdout = child.stdout.take();
     let mut stderr = child.stderr.take().expect("stderr must be piped");
+    let stdout_task = tokio::spawn(async move {
+        let mut bytes = Vec::new();
+        if let Some(mut stdout) = stdout {
+            stdout
+                .read_to_end(&mut bytes)
+                .await
+                .expect("stdout must be readable");
+        }
+        bytes
+    });
     let stderr_task = tokio::spawn(async move {
         let mut bytes = Vec::new();
         stderr
@@ -149,9 +186,11 @@ async fn finish(mut child: Child) -> (std::process::ExitStatus, String) {
         .await
         .expect("bridge did not stop after EOF")
         .expect("bridge must be waitable");
+    let stdout = stdout_task.await.expect("stdout task must complete");
     let stderr = stderr_task.await.expect("stderr task must complete");
     (
         status,
+        stdout,
         String::from_utf8(stderr).expect("structured logs must be UTF-8"),
     )
 }

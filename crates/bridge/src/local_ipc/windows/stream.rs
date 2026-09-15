@@ -1,8 +1,6 @@
-use std::{
-    io::{self, Read},
-    os::windows::io::AsHandle,
-};
+use std::os::windows::io::AsHandle;
 
+use interprocess::os::windows::named_pipe::tokio::DuplexPipeStream as AsyncDuplexPipeStream;
 use interprocess::os::windows::named_pipe::{DuplexPipeStream, pipe_mode};
 use tokio::net::windows::named_pipe::NamedPipeClient;
 
@@ -13,6 +11,7 @@ use crate::local_ipc::{
 };
 
 type BytePipeStream = DuplexPipeStream<pipe_mode::Bytes>;
+pub(crate) type AsyncBytePipeStream = AsyncDuplexPipeStream<pipe_mode::Bytes>;
 
 /// Async named-pipe client whose server logon SID was checked before use.
 #[derive(Debug)]
@@ -79,15 +78,15 @@ impl AuthenticatedWindowsStream {
         write_json_frame_blocking(&mut self.inner, payload)
     }
 
-    pub(crate) fn read_some(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        let available = mcpatch_windows_kernel::named_pipe_available(self.inner.as_handle())?;
-        if available == 0 {
-            return Err(io::Error::from(io::ErrorKind::WouldBlock));
-        }
-
-        let available = usize::try_from(available).unwrap_or(usize::MAX);
-        let read_length = buffer.len().min(available);
-        self.inner.read(&mut buffer[..read_length])
+    /// Convert an already authenticated server stream on a Tokio runtime thread.
+    pub(crate) fn into_async(self) -> Result<AsyncBytePipeStream, WindowsIpcError> {
+        self.inner.set_nonblocking(false).map_err(|error| {
+            WindowsIpcError::with_source(WindowsIpcErrorCode::WorkerFailed, error)
+        })?;
+        let handle = std::os::windows::io::OwnedHandle::try_from(self.inner)
+            .map_err(|_| WindowsIpcError::without_source(WindowsIpcErrorCode::WorkerFailed))?;
+        AsyncBytePipeStream::try_from(handle)
+            .map_err(|_| WindowsIpcError::without_source(WindowsIpcErrorCode::WorkerFailed))
     }
 }
 

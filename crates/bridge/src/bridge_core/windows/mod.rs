@@ -1,21 +1,25 @@
-mod frames;
 mod workers;
 
 use std::{fmt, time::Duration};
 
-use tokio::time::Instant;
+use tokio::{task::JoinSet, time::Instant};
 use tokio_util::sync::CancellationToken;
 
 use self::workers::{WindowsCoreWorkers, WorkerEvent};
-use super::{BridgeCoreError, BridgeEpoch, CoreStopReason};
+use super::{
+    BridgeCoreError, BridgeEpoch, CoreStopReason,
+    session::{SessionCounts, run_stream_session},
+};
 use crate::local_ipc::{
     EndpointRole, WindowsCoreElection, WindowsIpcError, WindowsIpcErrorCode, WindowsRuntime,
 };
+use crate::mcp::BridgeMcpServer;
 
 pub struct WindowsBridgeCore {
     election: Option<WindowsCoreElection>,
     workers: Option<WindowsCoreWorkers>,
     epoch: BridgeEpoch,
+    mcp_server: BridgeMcpServer,
 }
 
 impl fmt::Debug for WindowsBridgeCore {
@@ -47,6 +51,7 @@ impl WindowsBridgeCore {
             election: Some(election),
             workers: Some(workers),
             epoch,
+            mcp_server: BridgeMcpServer,
         })
     }
 
@@ -59,29 +64,45 @@ impl WindowsBridgeCore {
         idle_timeout: Duration,
         shutdown: CancellationToken,
     ) -> Result<CoreStopReason, BridgeCoreError> {
-        let mut peer_count = 0_usize;
+        let mut sessions = JoinSet::new();
+        let mut session_counts = SessionCounts::default();
         let mut idle_deadline = Some(Instant::now() + idle_timeout);
         let workers = self.workers.as_mut().ok_or_else(worker_failed)?;
 
         let reason = loop {
             tokio::select! {
-                biased;
                 event = workers.next_event() => {
                     match event.ok_or_else(worker_failed)? {
-                        WorkerEvent::Connected => {
-                            peer_count = peer_count.checked_add(1).ok_or_else(worker_failed)?;
-                            idle_deadline = None;
-                        }
-                        WorkerEvent::Disconnected => {
-                            peer_count = peer_count.checked_sub(1).ok_or_else(worker_failed)?;
-                            if peer_count == 0 {
-                                idle_deadline = Some(Instant::now() + idle_timeout);
+                        WorkerEvent::Accepted { role, stream } => {
+                            if !session_counts.try_add(role) {
+                                tracing::warn!(target: "mcpatch", event = "core_session_rejected", reason = "limit");
+                                continue;
                             }
+                            let stream = stream.into_async()?;
+                            let (reader, writer) = stream.split();
+                            sessions.spawn(run_stream_session(
+                                role,
+                                reader,
+                                writer,
+                                self.mcp_server.clone(),
+                                shutdown.clone(),
+                            ));
+                            idle_deadline = None;
                         }
                         WorkerEvent::PeerRejected => {
                             tracing::warn!(target: "mcpatch", event = "core_peer_rejected");
                         }
                         WorkerEvent::WorkerFailed => return Err(worker_failed().into()),
+                    }
+                }
+                completed = sessions.join_next(), if !sessions.is_empty() => {
+                    let Some(completed) = completed else {
+                        continue;
+                    };
+                    let role = completed.map_err(BridgeCoreError::SessionTask)?;
+                    session_counts.remove(role);
+                    if session_counts.is_empty() {
+                        idle_deadline = Some(Instant::now() + idle_timeout);
                     }
                 }
                 () = wait_for_idle(idle_deadline), if idle_deadline.is_some() => {
@@ -93,6 +114,8 @@ impl WindowsBridgeCore {
             }
         };
 
+        sessions.abort_all();
+        while sessions.join_next().await.is_some() {}
         let workers_result = self.workers.take().ok_or_else(worker_failed)?.stop().await;
         let election_result = self.election.take().ok_or_else(worker_failed)?.release();
         workers_result?;

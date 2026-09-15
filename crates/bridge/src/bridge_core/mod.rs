@@ -1,5 +1,6 @@
 mod epoch;
 mod error;
+mod session;
 
 use std::time::Duration;
 

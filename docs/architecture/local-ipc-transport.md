@@ -120,10 +120,10 @@ touching the first core's pipes; after clean release or process termination, a n
 core can acquire the same name.
 
 The bridge crate remains free of unsafe code. The small `mcpatch-windows-kernel`
-crate contains the missing raw named-mutex calls and the `PeekNamedPipe` availability
-probe; all other code in that crate denies unsafe operations. Its mutex guard is
-deliberately not `Send`. This keeps the thread-affine kernel contract and pipe probe
-explicit instead of hiding them behind an unrestricted utility layer.
+crate contains the missing raw named-mutex and server-process inspection calls; all
+other code in that crate denies unsafe operations. Its mutex guard is deliberately
+not `Send`. This keeps the thread-affine kernel contract explicit instead of hiding
+it behind an unrestricted utility layer.
 
 The bridge reads its process-token logon SID and creates an explicit protected DACL
 with one allow ACE granting only generic read and write to that SID. It does not add
@@ -139,13 +139,14 @@ blocking stream uses the same bounded little-endian JSON framing validators as U
 Connecting adapters query the named-pipe server process ID, open only the limited
 process-query right needed for token inspection, and require its logon SID to match
 before sending or parsing a frame.
-The bridge core isolates polling accepts and nonblocking session reads on two accept
-workers and at most eight session workers per role, never on Tokio executor threads.
-Before each nonblocking read, a narrow `PeekNamedPipe` probe distinguishes a connected,
-empty pipe from a disconnected peer; `PIPE_NOWAIT` reads alone do not preserve that
-distinction reliably through all library wrappers.
-Partial frames are retained only up to the shared 1 MiB limit and are disconnected
-after five seconds. Worker shutdown is ordered before mutex release.
+The bridge core isolates the synchronous polling accept calls on two small workers.
+Each worker authenticates the client before transferring the connected handle to the
+Tokio runtime, where that individual pipe is returned to blocking mode and converted
+to overlapped async I/O. Unix and Windows then share the same maximum of eight active
+sessions per parser role and the same core-owned session handlers. Partial frames are
+retained only up to the shared 1 MiB limit and are disconnected five seconds after
+their first byte; an otherwise idle session is not timed out. Async sessions stop
+before the accept workers and protected election are released.
 
 ## Isolated process start
 
@@ -170,9 +171,9 @@ testable.
 
 Unix and Windows now provide the internal bridge-core process and lifecycle
 primitive, authenticated adapter-side connections, deterministic bounded rendezvous,
-and isolated production process start. The Native Messaging adapter now uses the
-browser endpoint; MCP stdio adapter wiring follows in
-[#57](https://github.com/vaknir/MCPatch/issues/57).
+and isolated production process start. Native Messaging and MCP stdio now use their
+distinct browser and MCP endpoints. The core owns MCP initialization, handlers, and
+session limits; the stdio process only translates bounded newline frames.
 Protocol negotiation remains in
 [#38](https://github.com/vaknir/MCPatch/issues/38).
 

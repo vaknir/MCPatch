@@ -9,12 +9,13 @@ use std::{
 use mcpatch_bridge::{
     bridge_core::{BridgeCoreError, CoreStopReason, WindowsBridgeCore},
     local_ipc::{
-        EndpointRole, InstallChannel, LocalCoreConnectionErrorCode, LocalRuntime,
-        WindowsIpcErrorCode, WindowsRuntime, write_json_frame,
+        EndpointRole, InstallChannel, LocalCoreConnection, LocalCoreConnectionErrorCode,
+        LocalRuntime, WindowsIpcErrorCode, WindowsRuntime, write_json_frame,
     },
     native_host::{CoreLocalBrowserChannel, LocalBrowserChannel, LocalBrowserChannelErrorCode},
     protocol::{Heartbeat, Message, PROTOCOL_VERSION, parse_message},
 };
+use serde_json::{Value, json};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient},
@@ -274,7 +275,7 @@ async fn bridge_core_times_out_a_stalled_partial_frame() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn bridge_core_rejects_sessions_beyond_the_per_role_worker_bound() {
+async fn bridge_core_rejects_sessions_beyond_the_per_role_bound() {
     const SESSION_LIMIT: usize = 8;
     let runtime = WindowsRuntime::current(InstallChannel::Development).unwrap();
     let core = WindowsBridgeCore::start(runtime.clone()).unwrap();
@@ -320,6 +321,101 @@ async fn bridge_core_shutdown_stops_workers_and_releases_election() {
     assert_eq!(reason, CoreStopReason::Shutdown);
 
     WindowsBridgeCore::start(runtime).unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bridge_core_owns_multiple_mcp_sessions() {
+    let runtime = WindowsRuntime::current(InstallChannel::Development).unwrap();
+    let adapter_runtime = LocalRuntime::from(runtime.clone());
+    let core = WindowsBridgeCore::start(runtime).unwrap();
+    let shutdown = CancellationToken::new();
+    let core_task = tokio::spawn(core.run(Duration::from_secs(60), shutdown.clone()));
+    let mut first = connect_local(&adapter_runtime, EndpointRole::Mcp).await;
+    let mut second = connect_local(&adapter_runtime, EndpointRole::Mcp).await;
+
+    initialize_and_list_tools(&mut first, 1).await;
+    initialize_and_list_tools(&mut second, 11).await;
+
+    drop(first);
+    drop(second);
+    shutdown.cancel();
+    assert_eq!(
+        timeout(Duration::from_secs(2), core_task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        CoreStopReason::Shutdown
+    );
+}
+
+async fn initialize_and_list_tools(stream: &mut LocalCoreConnection, id: u64) {
+    let initialize = json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "windows-core-session-test", "version": "0.1.0"}
+        }
+    });
+    stream
+        .send_json(&serde_json::to_vec(&initialize).unwrap())
+        .await
+        .unwrap();
+    let response: Value = serde_json::from_slice(
+        &timeout(Duration::from_secs(2), stream.receive_json())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(response["id"], id);
+    assert_eq!(response["result"]["serverInfo"]["name"], "mcpatch");
+
+    let initialized = json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    });
+    stream
+        .send_json(&serde_json::to_vec(&initialized).unwrap())
+        .await
+        .unwrap();
+    let list_id = id + 1;
+    let list = json!({"jsonrpc": "2.0", "id": list_id, "method": "tools/list", "params": {}});
+    stream
+        .send_json(&serde_json::to_vec(&list).unwrap())
+        .await
+        .unwrap();
+    let response: Value = serde_json::from_slice(
+        &timeout(Duration::from_secs(2), stream.receive_json())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(response["id"], list_id);
+    assert_eq!(response["result"]["tools"], json!([]));
+}
+
+async fn connect_local(runtime: &LocalRuntime, role: EndpointRole) -> LocalCoreConnection {
+    timeout(Duration::from_secs(2), async {
+        loop {
+            match runtime.connect(role).await {
+                Ok(connection) => return connection,
+                Err(error) if error.code() == LocalCoreConnectionErrorCode::Unavailable => {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                Err(error) => panic!("local connection failed: {:?}", error.code()),
+            }
+        }
+    })
+    .await
+    .expect("core endpoint must accept another bounded session")
 }
 
 async fn open_client(pipe_name: &str) -> NamedPipeClient {

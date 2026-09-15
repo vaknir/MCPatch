@@ -42,5 +42,8 @@ All notable MCPatch changes are documented here. The format follows
 - Native Messaging lifecycle wiring that authorizes before input or rendezvous,
   relays through the authenticated browser endpoint with capacity-one backpressure,
   and closes both boundaries on browser or local IPC failure.
+- Core-owned MCP sessions with a bounded newline-to-local-frame stdio adapter,
+  shared per-role session limits, partial-frame deadlines, and authenticated async
+  Unix and Windows relay lifecycles.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

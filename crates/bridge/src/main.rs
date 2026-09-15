@@ -198,7 +198,7 @@ async fn run_mcp_stdio() -> ExitCode {
     match mcp::run_stdio().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            tracing::error!(target: "mcpatch", event = "bridge_failed", code = error.code());
+            tracing::error!(target: "mcpatch", event = "mcp_stdio_failed", code = error.code());
             ExitCode::FAILURE
         }
     }
