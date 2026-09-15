@@ -710,6 +710,7 @@ dependencies = [
 name = "mcpatch-windows-kernel"
 version = "0.1.0"
 dependencies = [
+ "firehazard",
  "interprocess",
  "widestring",
  "windows-sys",

@@ -1,4 +1,4 @@
-use std::fmt::Write as _;
+use std::{fmt::Write as _, os::windows::io::BorrowedHandle};
 
 use firehazard::{
     get_current_process, get_current_thread, open_process_token, open_thread_token, token,
@@ -15,6 +15,15 @@ pub(super) fn current_process_logon_sid() -> Result<String, WindowsIpcError> {
 pub(super) fn current_thread_logon_sid() -> Result<String, WindowsIpcError> {
     let token = open_thread_token(get_current_thread(), token::QUERY, true)
         .map_err(|_| identity_unavailable())?;
+    token_logon_sid(&token)
+}
+
+pub(super) fn named_pipe_server_logon_sid(
+    pipe: BorrowedHandle<'_>,
+) -> Result<String, WindowsIpcError> {
+    let process = mcpatch_windows_kernel::named_pipe_server_process(pipe)
+        .map_err(|_| identity_unavailable())?;
+    let token = open_process_token(&process, token::QUERY).map_err(|_| identity_unavailable())?;
     token_logon_sid(&token)
 }
 

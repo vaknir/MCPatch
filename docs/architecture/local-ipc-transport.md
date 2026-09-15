@@ -15,6 +15,13 @@ This is intentionally independent from Chromium's native-endian Native Messaging
 framing and MCP's newline-delimited stdio framing. Adapters must translate at each
 boundary rather than forwarding raw transport frames.
 
+Public adapters use the platform-neutral `LocalRuntime` and `LocalCoreConnection`
+boundary. Runtime preparation and authentication of the selected fixed role endpoint
+happen before a connection is returned. The boundary exposes only bounded JSON-frame
+send and receive operations and classifies unavailable, unauthorized, unsafe-runtime,
+malformed-frame, and transport failures with stable payload-free codes. It does not
+queue application messages while disconnected.
+
 ## Unix implementation
 
 On Linux, the runtime base is `XDG_RUNTIME_DIR`. On macOS it is the process's
@@ -111,6 +118,9 @@ effective thread token's logon SID. The token must match the expected logon SID 
 the stream is returned or any frame is parsed. Reversion is checked immediately; an
 RAII guard remains in scope as a fallback during every error path. The authenticated
 blocking stream uses the same bounded little-endian JSON framing validators as Unix.
+Connecting adapters query the named-pipe server process ID, open only the limited
+process-query right needed for token inspection, and require its logon SID to match
+before sending or parsing a frame.
 The bridge core isolates polling accepts and nonblocking session reads on two accept
 workers and at most eight session workers per role, never on Tokio executor threads.
 Before each nonblocking read, a narrow `PeekNamedPipe` probe distinguishes a connected,
@@ -122,10 +132,12 @@ after five seconds. Worker shutdown is ordered before mutex release.
 ## Current scope and residual risk
 
 Unix and Windows now provide the internal bridge-core process and lifecycle
-primitive. Neither public adapter connects to the core yet; bounded adapter startup
-and rendezvous remain in
-[#50](https://github.com/vaknir/MCPatch/issues/50). Protocol negotiation and message
-handling are deliberately outside this lifecycle slice.
+primitive plus authenticated adapter-side connections. Neither public adapter uses
+the connection boundary yet; bounded core startup remains in
+[#55](https://github.com/vaknir/MCPatch/issues/55), followed by adapter wiring in
+[#56](https://github.com/vaknir/MCPatch/issues/56) and
+[#57](https://github.com/vaknir/MCPatch/issues/57). Protocol negotiation remains in
+[#38](https://github.com/vaknir/MCPatch/issues/38).
 
 No path-based design can distinguish a hostile process already running as the same
 interactive user. Private Unix directories and peer UIDs, protected Windows DACLs and

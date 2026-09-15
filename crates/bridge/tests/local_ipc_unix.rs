@@ -10,8 +10,8 @@ use std::{
 };
 
 use mcpatch_bridge::local_ipc::{
-    EndpointRole, InstallChannel, LocalFrameErrorCode, MAX_LOCAL_IPC_FRAME_BYTES, UnixIpcErrorCode,
-    UnixRuntime, read_json_frame, write_json_frame,
+    EndpointRole, InstallChannel, LocalCoreConnectionErrorCode, LocalFrameErrorCode, LocalRuntime,
+    MAX_LOCAL_IPC_FRAME_BYTES, UnixIpcErrorCode, UnixRuntime, read_json_frame, write_json_frame,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -156,6 +156,81 @@ async fn authenticates_same_user_peers_before_exchanging_frames() {
 
     drop(listener);
     assert!(!socket_path.exists());
+}
+
+#[tokio::test]
+async fn adapter_connection_exchanges_bounded_frames_with_the_selected_role() {
+    let fixture = TestDirectory::new(0o700);
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let listener = runtime
+        .bind_after_election(EndpointRole::Browser)
+        .await
+        .unwrap();
+    let adapter_runtime = LocalRuntime::from(runtime);
+
+    let (accepted, connection) = tokio::join!(
+        listener.accept_authenticated(),
+        adapter_runtime.connect(EndpointRole::Browser)
+    );
+    let mut accepted = accepted.unwrap();
+    let mut connection = connection.unwrap();
+
+    connection.send_json(br#"{"type":"hello"}"#).await.unwrap();
+    assert_eq!(
+        accepted.read_json().await.unwrap(),
+        Some(br#"{"type":"hello"}"#.to_vec())
+    );
+    accepted
+        .write_json(br#"{"type":"hello_ack"}"#)
+        .await
+        .unwrap();
+    assert_eq!(
+        connection.receive_json().await.unwrap(),
+        Some(br#"{"type":"hello_ack"}"#.to_vec())
+    );
+}
+
+#[tokio::test]
+async fn adapter_connection_classifies_unavailable_and_malformed_peers() {
+    let fixture = TestDirectory::new(0o700);
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+    let adapter_runtime = LocalRuntime::from(runtime.clone());
+
+    let unavailable = adapter_runtime
+        .connect(EndpointRole::Mcp)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        unavailable.code(),
+        LocalCoreConnectionErrorCode::Unavailable
+    );
+    assert_eq!(unavailable.code().as_str(), "local_core_unavailable");
+
+    let path = runtime.socket_path(EndpointRole::Mcp);
+    let listener = tokio::net::UnixListener::bind(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let (accepted, connection) = tokio::join!(
+        listener.accept(),
+        adapter_runtime.connect(EndpointRole::Mcp)
+    );
+    let (mut accepted, _) = accepted.unwrap();
+    let mut connection = connection.unwrap();
+    let duplicate = br#"{"value":1,"value":2}"#;
+    accepted
+        .write_all(&u32::try_from(duplicate.len()).unwrap().to_le_bytes())
+        .await
+        .unwrap();
+    accepted.write_all(duplicate).await.unwrap();
+
+    let malformed = connection.receive_json().await.unwrap_err();
+    assert_eq!(
+        malformed.code(),
+        LocalCoreConnectionErrorCode::MalformedFrame
+    );
 }
 
 #[tokio::test]

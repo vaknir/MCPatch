@@ -1,3 +1,4 @@
+mod connection;
 mod error;
 mod framing;
 mod role;
@@ -8,6 +9,7 @@ mod unix;
 #[cfg(windows)]
 mod windows;
 
+pub use connection::*;
 pub use error::*;
 pub use framing::*;
 pub use role::*;

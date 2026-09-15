@@ -44,8 +44,8 @@ The relay depends on the object-safe `LocalBrowserChannel` interface. Tests inje
 bounded fake and verify both directions. The executable currently injects a
 fail-closed unavailable implementation: clean browser EOF succeeds, malformed input
 is rejected at the framing boundary, and a valid message cannot proceed until issue
-[#45](https://github.com/vaknir/MCPatch/issues/45) wires the adapter to the local IPC
-primitive and bridge core.
+[#56](https://github.com/vaknir/MCPatch/issues/56) injects the authenticated local
+connection and bounded startup policy.
 
 This separation keeps Native Messaging's native-endian framing out of the local IPC
 implementation, which uses its own little-endian framing and peer-identity checks as

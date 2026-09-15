@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [target.'cfg(windows)'.dependencies]
+firehazard = "=0.0.0-2022-09-10"
 interprocess = "=2.4.4"
 widestring = "=1.2.1"
 windows-sys = { version = "=0.61.2", features = [
