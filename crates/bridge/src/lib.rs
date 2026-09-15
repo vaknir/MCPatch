@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Native MCPatch policy and routing boundary.
 
+pub mod bridge_core;
 pub mod browser;
 pub mod cli;
 pub mod local_ipc;
