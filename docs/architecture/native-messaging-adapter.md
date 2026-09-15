@@ -15,8 +15,9 @@ mcpatch native-host chrome-extension://<32-character-extension-id>/
 mcpatch native-host chrome-extension://<32-character-extension-id>/ --parent-window=42
 ```
 
-Before reading a frame, the process requires a canonical Chromium extension origin
-and authorizes it against one exact configured origin. The current pre-installer
+Before reading a frame or attempting local rendezvous, the process requires a
+canonical Chromium extension origin and authorizes it against one exact configured
+origin. The current pre-installer
 bootstrap reads that exact value from `MCPATCH_ALLOWED_EXTENSION_ORIGIN`; a missing,
 invalid, or different value fails closed. Packaging work must replace this bootstrap
 with installer-owned channel configuration and an exact `allowed_origins` entry in
@@ -38,15 +39,32 @@ Standard output is reserved for framed messages. Structured diagnostics contain
 only stable event and error codes on standard error; they never include origins,
 frames, arguments, results, page text, or raw I/O errors.
 
-## Local channel seam
+## Local channel lifecycle
 
-The relay depends on the object-safe `LocalBrowserChannel` interface. Tests inject a
-bounded fake and verify both directions. The executable currently injects a
-fail-closed unavailable implementation: clean browser EOF succeeds, malformed input
-is rejected at the framing boundary, and a valid message cannot proceed until issue
-[#56](https://github.com/vaknir/MCPatch/issues/56) injects the authenticated local
-connection and bounded startup policy.
+After origin authorization, the adapter reads and validates one Native Messaging
+frame. Clean EOF exits without starting the core, and malformed first input is
+rejected before any process or local-transport work. A valid first message triggers
+bounded connect-first rendezvous with the fixed browser-role endpoint. The message is
+then the first item relayed over that authenticated connection.
+
+The production `LocalBrowserChannel` owns one connection worker and capacity-one
+channels in each direction. The runtime awaits every send before reading another
+browser frame and does not reconnect or preserve messages after disconnect. This
+keeps Native Messaging's native-endian framing separate from local IPC's little-endian
+framing without adding an unbounded or disconnected queue. At both framing boundaries,
+a partially consumed read remains pinned while the opposite direction progresses so
+cancellation cannot desynchronize a subsequent frame. The authenticated local stream
+is split into independent read and write halves to support that lifecycle.
+
+Browser EOF or framing failure cancels and joins the worker, which drops the local
+connection before the host exits. Local EOF, transport failure, or malformed typed
+protocol data is reported to the relay as a stable payload-free error and terminates
+the Native Messaging session. Unix and Windows integration tests exercise the real
+authenticated local transport; injected tests cover authorization ordering, startup
+failure, bidirectional relay, browser failure, and IPC loss.
 
 This separation keeps Native Messaging's native-endian framing out of the local IPC
 implementation, which uses its own little-endian framing and peer-identity checks as
-specified by [ADR 0007](../adr/0007-local-ipc-and-core-lifecycle.md).
+specified by [ADR 0007](../adr/0007-local-ipc-and-core-lifecycle.md). Bridge-protocol
+hello/version state enforcement remains in
+[#38](https://github.com/vaknir/MCPatch/issues/38).

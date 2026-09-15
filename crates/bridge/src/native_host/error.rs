@@ -17,12 +17,7 @@ impl NativeHostError {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::CallerOrigin(error) => error.code(),
-            Self::LocalChannel(error) => match error.code() {
-                super::LocalBrowserChannelErrorCode::Backpressure => "local_ipc_backpressure",
-                super::LocalBrowserChannelErrorCode::Closed => "local_ipc_closed",
-                super::LocalBrowserChannelErrorCode::Transport => "local_ipc_transport_failed",
-                super::LocalBrowserChannelErrorCode::Unavailable => "local_ipc_unavailable",
-            },
+            Self::LocalChannel(error) => error.code().as_str(),
             Self::Message(error) => error.code().as_str(),
         }
     }

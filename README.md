@@ -41,7 +41,8 @@ adapters, a transport-independent browser connection boundary, and a determinist
 capability registry. A zero-permission MV3 extension scaffold is also present;
 private Unix and Windows local transports and bridge-core lifecycles are implemented,
 along with bounded connect-first rendezvous and isolated bridge-core process start.
-Adapter wiring, pairing, and live capabilities remain upcoming slices.
+The Native Messaging adapter now relays through the authenticated browser endpoint;
+MCP stdio core wiring, pairing, and live capabilities remain upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
@@ -64,8 +65,8 @@ an empty tool list until browser capabilities are connected in subsequent slices
 
 The internal bridge core can be started for development with
 `cargo run --bin mcpatch -- bridge-core --channel=development`. It currently owns
-the protected local endpoints and lifecycle. The reusable rendezvous policy is not
-yet enabled in the public adapters.
+the protected local endpoints and lifecycle. Native Messaging uses the reusable
+rendezvous policy; MCP stdio does not yet use its core endpoint.
 
 ## License
 

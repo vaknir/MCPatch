@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::{env, ffi::OsString, process::ExitCode, sync::Arc};
+use std::{env, ffi::OsString, process::ExitCode};
 
 use mcpatch_bridge::{
     PRODUCT_VERSION,
@@ -8,7 +8,7 @@ use mcpatch_bridge::{
     local_ipc::InstallChannel,
     logging, mcp,
     native_host::{
-        self, ALLOWED_EXTENSION_ORIGIN_ENV, ExactCallerOriginPolicy, UnavailableLocalBrowserChannel,
+        self, ALLOWED_EXTENSION_ORIGIN_ENV, CoreBrowserChannelFactory, ExactCallerOriginPolicy,
     },
 };
 
@@ -174,7 +174,7 @@ async fn run_native_host(caller_origin: OsString) -> ExitCode {
         tokio::io::stdin(),
         tokio::io::stdout(),
         origin_policy,
-        Arc::new(UnavailableLocalBrowserChannel),
+        CoreBrowserChannelFactory::new(InstallChannel::Production),
     )
     .await;
     match result {

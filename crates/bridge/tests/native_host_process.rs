@@ -1,7 +1,9 @@
 use std::{process::Stdio, time::Duration};
 
 use mcpatch_bridge::native_host::{ALLOWED_EXTENSION_ORIGIN_ENV, MAX_NATIVE_MESSAGE_BYTES};
-use serde_json::{Value, json};
+use serde_json::Value;
+#[cfg(target_os = "linux")]
+use serde_json::json;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     process::{Child, Command},
@@ -101,9 +103,12 @@ async fn oversized_prefix_is_rejected_without_reading_a_payload() {
     assert_json_lines(&stderr);
 }
 
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
-    let mut child = spawn_native_host(ALLOWED_ORIGIN, ALLOWED_ORIGIN);
+    let mut command = native_host_command(ALLOWED_ORIGIN, ALLOWED_ORIGIN);
+    command.env_remove("XDG_RUNTIME_DIR");
+    let mut child = command.spawn().expect("native host must spawn");
     let payload = serde_json::to_vec(&json!({
         "type": "heartbeat",
         "protocolVersion": 1,
@@ -124,13 +129,20 @@ async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
     let (status, stdout, stderr) = finish(child).await;
     assert!(!status.success());
     assert!(stdout.is_empty());
-    assert!(stderr.contains(r#""code":"local_ipc_unavailable""#));
+    assert!(stderr.contains(r#""code":"local_core_unavailable""#));
     assert!(!stderr.contains("private-heartbeat-marker"));
     assert_json_lines(&stderr);
 }
 
 fn spawn_native_host(caller: &str, allowed: &str) -> Child {
-    Command::new(env!("CARGO_BIN_EXE_mcpatch"))
+    native_host_command(caller, allowed)
+        .spawn()
+        .expect("native host must spawn")
+}
+
+fn native_host_command(caller: &str, allowed: &str) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_mcpatch"));
+    command
         .arg("native-host")
         .arg(caller)
         .env(ALLOWED_EXTENSION_ORIGIN_ENV, allowed)
@@ -139,9 +151,8 @@ fn spawn_native_host(caller: &str, allowed: &str) -> Child {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()
-        .expect("native host must spawn")
+        .kill_on_drop(true);
+    command
 }
 
 async fn finish(mut child: Child) -> (std::process::ExitStatus, Vec<u8>, String) {
