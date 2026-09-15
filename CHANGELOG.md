@@ -16,6 +16,9 @@ All notable MCPatch changes are documented here. The format follows
 - Explicit extension-action pack enablement with a closed trusted-storage record,
   exact optional-origin grants, deterministic isolated content registration, and
   fail-closed reconciliation across startup, corruption, permission, and disable.
+- Isolated native WebMCP draft adapter with same-origin no-option discovery,
+  explicit read-only metadata admission, opaque handle retention, bounded calls and
+  results, deterministic duplicate rejection, cancellation, and lifecycle refresh.
 - Initial architecture, trust boundaries, and roadmap.
 - Security policy and threat model.
 - ADRs for the monorepo, Rust bridge, Native Messaging transport, bridge protocol,

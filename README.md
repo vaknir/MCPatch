@@ -61,7 +61,9 @@ harness now preflights compatibility, permission ceilings, schemas, and fixtures
 then emits payload-free evidence for reviewed compiled packs. One synthetic pack is
 now integrated through a codegen-free extension runtime with exact matching,
 native-first resolution, typed dispatch, and lifecycle revocation. Real-site
-permissions and adapters remain future work.
+permissions are now explicit, and the isolated content runtime adapts the strict
+read-only same-origin subset of native `document.modelContext`. A reviewed real-site
+pack remains future work.
 
 ## Bridge development
 
