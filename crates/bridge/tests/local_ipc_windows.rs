@@ -12,6 +12,8 @@ use mcpatch_bridge::{
         EndpointRole, InstallChannel, LocalCoreConnectionErrorCode, LocalRuntime,
         WindowsIpcErrorCode, WindowsRuntime, write_json_frame,
     },
+    native_host::{CoreLocalBrowserChannel, LocalBrowserChannel, LocalBrowserChannelErrorCode},
+    protocol::{Heartbeat, Message, PROTOCOL_VERSION, parse_message},
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -162,6 +164,45 @@ async fn adapter_connection_authenticates_server_and_classifies_unavailable() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn native_browser_channel_relays_and_closes_on_core_eof() {
+    let runtime = WindowsRuntime::current(InstallChannel::Development).unwrap();
+    let adapter_runtime = LocalRuntime::from(runtime.clone());
+    let listener = runtime.bind_after_election(EndpointRole::Browser).unwrap();
+    let from_browser = heartbeat("from-browser");
+    let to_browser = heartbeat("to-browser");
+    let expected_from_browser = from_browser.clone();
+    let response = serde_json::to_vec(&to_browser).unwrap();
+    let server = thread::spawn(move || {
+        let mut stream = listener.accept_authenticated().unwrap();
+        let payload = stream.read_json().unwrap().unwrap();
+        assert_eq!(parse_message(&payload).unwrap(), expected_from_browser);
+        stream.write_json(&response).unwrap();
+    });
+
+    let connection = adapter_runtime
+        .connect(EndpointRole::Browser)
+        .await
+        .unwrap();
+    let channel = CoreLocalBrowserChannel::new(connection);
+    channel.send(from_browser).await.unwrap();
+    assert_eq!(
+        timeout(Duration::from_secs(2), channel.receive())
+            .await
+            .unwrap()
+            .unwrap(),
+        Some(to_browser)
+    );
+    server.join().unwrap();
+
+    let error = timeout(Duration::from_secs(2), channel.receive())
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.code(), LocalBrowserChannelErrorCode::Closed);
+    channel.close().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bridge_core_rejects_a_second_owner_and_restarts_with_a_fresh_epoch() {
     let runtime = WindowsRuntime::current(InstallChannel::Production).unwrap();
     let first = WindowsBridgeCore::start(runtime.clone()).unwrap();
@@ -302,4 +343,12 @@ async fn assert_peer_closed(client: &mut NamedPipeClient, within: Duration) {
         Ok(other) => panic!("expected closed pipe, got {other:?}"),
         Err(_) => panic!("pipe did not close within the deterministic bound"),
     }
+}
+
+fn heartbeat(id: &str) -> Message {
+    Message::Heartbeat(Heartbeat {
+        protocol_version: PROTOCOL_VERSION,
+        heartbeat_id: id.into(),
+        sent_at: "2026-09-15T00:00:00Z".into(),
+    })
 }

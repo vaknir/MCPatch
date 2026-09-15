@@ -30,6 +30,10 @@ impl AuthenticatedWindowsClientStream {
         Ok(Self { inner })
     }
 
+    pub(crate) fn into_inner(self) -> NamedPipeClient {
+        self.inner
+    }
+
     pub async fn read_json(&mut self) -> Result<Option<Vec<u8>>, LocalFrameError> {
         read_json_frame(&mut self.inner).await
     }

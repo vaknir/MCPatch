@@ -39,5 +39,8 @@ All notable MCPatch changes are documented here. The format follows
 - Authenticated cross-platform adapter connections, bounded connect-first core
   rendezvous, and isolated current-executable process start with no inherited adapter
   standard streams or Windows handles.
+- Native Messaging lifecycle wiring that authorizes before input or rendezvous,
+  relays through the authenticated browser endpoint with capacity-one backpressure,
+  and closes both boundaries on browser or local IPC failure.
 
 [Unreleased]: https://github.com/vaknir/MCPatch/compare/main...HEAD

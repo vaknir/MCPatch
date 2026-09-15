@@ -170,10 +170,10 @@ testable.
 
 Unix and Windows now provide the internal bridge-core process and lifecycle
 primitive, authenticated adapter-side connections, deterministic bounded rendezvous,
-and isolated production process start. Neither public adapter uses the connection
-boundary yet. Adapter wiring follows in
-[#56](https://github.com/vaknir/MCPatch/issues/56) and
-[#57](https://github.com/vaknir/MCPatch/issues/57). Protocol negotiation remains in
+and isolated production process start. The Native Messaging adapter now uses the
+browser endpoint; MCP stdio adapter wiring follows in
+[#57](https://github.com/vaknir/MCPatch/issues/57).
+Protocol negotiation remains in
 [#38](https://github.com/vaknir/MCPatch/issues/38).
 
 No path-based design can distinguish a hostile process already running as the same
