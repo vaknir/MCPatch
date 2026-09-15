@@ -22,6 +22,16 @@ send and receive operations and classifies unavailable, unauthorized, unsafe-run
 malformed-frame, and transport failures with stable payload-free codes. It does not
 queue application messages while disconnected.
 
+Adapter startup uses a transport-independent, connect-first rendezvous policy. It
+attempts the authenticated fixed endpoint before invoking a process starter, invokes
+that starter at most once, and retries only `local_core_unavailable`. Authorization,
+unsafe-runtime, malformed-frame, and transport failures are terminal. Retries use
+capped exponential backoff with integer jitter and share one two-second monotonic
+deadline with the initial connection and process start. Startup failures expose only
+stable payload-free classifications: `core_startup_entropy_unavailable`,
+`core_spawn_failed`, and `core_startup_timeout`. The policy neither accepts nor stores
+application frames, so there is no disconnected message queue.
+
 ## Unix implementation
 
 On Linux, the runtime base is `XDG_RUNTIME_DIR`. On macOS it is the process's
@@ -132,9 +142,10 @@ after five seconds. Worker shutdown is ordered before mutex release.
 ## Current scope and residual risk
 
 Unix and Windows now provide the internal bridge-core process and lifecycle
-primitive plus authenticated adapter-side connections. Neither public adapter uses
-the connection boundary yet; bounded core startup remains in
-[#55](https://github.com/vaknir/MCPatch/issues/55), followed by adapter wiring in
+primitive, authenticated adapter-side connections, and the deterministic bounded
+rendezvous policy. Production process creation and composition remain in
+[#60](https://github.com/vaknir/MCPatch/issues/60); neither public adapter uses the
+connection boundary yet. Adapter wiring follows in
 [#56](https://github.com/vaknir/MCPatch/issues/56) and
 [#57](https://github.com/vaknir/MCPatch/issues/57). Protocol negotiation remains in
 [#38](https://github.com/vaknir/MCPatch/issues/38).
