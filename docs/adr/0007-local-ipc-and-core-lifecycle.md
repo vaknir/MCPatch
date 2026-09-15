@@ -104,9 +104,13 @@ during graceful shutdown. It never recursively deletes the runtime directory.
 Windows named pipes have no persistent filesystem node; a failed singleton owner is
 handled by reconnect and bounded startup retry.
 
-Adapters use bounded exponential retry with jitter during startup. They do not buffer
-arbitrary frames while disconnected. If startup does not succeed within the fixed
-window, they return a stable unavailable error.
+Adapters use capped exponential retry with integer jitter during startup. The initial
+connection attempt, one permitted process-start attempt, retry sleeps, and subsequent
+connection attempts share one fixed two-second monotonic deadline. Only an unavailable
+endpoint is retried; authentication, unsafe-runtime, malformed-frame, and transport
+failures stop immediately. They do not buffer arbitrary frames while disconnected.
+Startup reports stable payload-free entropy, spawn, connection, or timeout error
+classifications.
 
 ### Framing and sessions
 
