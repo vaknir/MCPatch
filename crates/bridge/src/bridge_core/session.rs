@@ -2,11 +2,30 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    local_ipc::{EndpointRole, read_json_frame_with_partial_timeout},
-    mcp::{BridgeMcpServer, PARTIAL_LOCAL_FRAME_TIMEOUT, run_core_mcp_session},
+    browser::BrowserSessionManager,
+    local_ipc::EndpointRole,
+    mcp::{BridgeMcpServer, run_core_mcp_session},
 };
 
 pub(super) const MAX_SESSIONS_PER_ROLE: usize = 8;
+
+#[derive(Clone, Debug)]
+pub(super) struct CoreSessionServices {
+    mcp_server: BridgeMcpServer,
+    browser_sessions: BrowserSessionManager,
+}
+
+impl CoreSessionServices {
+    pub(super) fn new(
+        mcp_server: BridgeMcpServer,
+        browser_sessions: BrowserSessionManager,
+    ) -> Self {
+        Self {
+            mcp_server,
+            browser_sessions,
+        }
+    }
+}
 
 #[derive(Default)]
 pub(super) struct SessionCounts {
@@ -46,7 +65,7 @@ pub(super) async fn run_stream_session<R, W>(
     role: EndpointRole,
     reader: R,
     writer: W,
-    mcp_server: BridgeMcpServer,
+    services: CoreSessionServices,
     shutdown: CancellationToken,
 ) -> EndpointRole
 where
@@ -54,11 +73,24 @@ where
     W: AsyncWrite + Send + Unpin + 'static,
 {
     match role {
-        EndpointRole::Browser => drain_browser_session(reader, writer, shutdown).await,
+        EndpointRole::Browser => {
+            let session_shutdown = shutdown.child_token();
+            if let Err(error) = services
+                .browser_sessions
+                .run(reader, writer, session_shutdown)
+                .await
+            {
+                tracing::warn!(
+                    target: "mcpatch",
+                    event = "core_browser_session_failed",
+                    code = error.code().as_str()
+                );
+            }
+        }
         EndpointRole::Mcp => {
             let session_shutdown = shutdown.child_token();
             if let Err(error) =
-                run_core_mcp_session(mcp_server, reader, writer, session_shutdown).await
+                run_core_mcp_session(services.mcp_server, reader, writer, session_shutdown).await
             {
                 tracing::warn!(
                     target: "mcpatch",
@@ -69,23 +101,4 @@ where
         }
     }
     role
-}
-
-async fn drain_browser_session<R, W>(mut reader: R, _writer: W, shutdown: CancellationToken)
-where
-    R: AsyncRead + Unpin,
-{
-    loop {
-        let frame = tokio::select! {
-            biased;
-            () = shutdown.cancelled() => return,
-            frame = read_json_frame_with_partial_timeout(
-                &mut reader,
-                PARTIAL_LOCAL_FRAME_TIMEOUT,
-            ) => frame,
-        };
-        if !matches!(frame, Ok(Some(_))) {
-            return;
-        }
-    }
 }

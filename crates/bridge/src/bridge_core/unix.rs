@@ -5,13 +5,17 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     BridgeCoreError, BridgeEpoch, CoreStopReason,
-    session::{SessionCounts, run_stream_session},
+    session::{CoreSessionServices, SessionCounts, run_stream_session},
 };
-use crate::local_ipc::{
-    AuthenticatedUnixStream, EndpointRole, UnixCoreElection, UnixEndpointListener, UnixIpcError,
-    UnixIpcErrorCode, UnixRuntime,
+use crate::{
+    browser::BrowserSessionManager,
+    local_ipc::{
+        AuthenticatedUnixStream, EndpointRole, UnixCoreElection, UnixEndpointListener,
+        UnixIpcError, UnixIpcErrorCode, UnixRuntime,
+    },
+    mcp::BridgeMcpServer,
+    routing::shared_capability_registry,
 };
-use crate::mcp::BridgeMcpServer;
 
 /// Elected Unix bridge core holding both parser-role endpoints.
 #[derive(Debug)]
@@ -20,7 +24,7 @@ pub struct UnixBridgeCore {
     browser_listener: UnixEndpointListener,
     mcp_listener: UnixEndpointListener,
     epoch: BridgeEpoch,
-    mcp_server: BridgeMcpServer,
+    services: CoreSessionServices,
 }
 
 impl UnixBridgeCore {
@@ -33,13 +37,18 @@ impl UnixBridgeCore {
             .bind_after_election(&election, EndpointRole::Mcp)
             .await?;
         let epoch = BridgeEpoch::generate().map_err(BridgeCoreError::Epoch)?;
+        let browser_namespace = BridgeEpoch::generate().map_err(BridgeCoreError::Epoch)?;
+        let registry = shared_capability_registry();
 
         Ok(Self {
             _election: election,
             browser_listener,
             mcp_listener,
+            services: CoreSessionServices::new(
+                BridgeMcpServer::new(registry.clone()),
+                BrowserSessionManager::new(registry, browser_namespace.as_str()),
+            ),
             epoch,
-            mcp_server: BridgeMcpServer,
         })
     }
 
@@ -63,7 +72,7 @@ impl UnixBridgeCore {
                     accept_session(
                         result,
                         EndpointRole::Browser,
-                        &self.mcp_server,
+                        &self.services,
                         &shutdown,
                         &mut sessions,
                         &mut session_counts,
@@ -74,7 +83,7 @@ impl UnixBridgeCore {
                     accept_session(
                         result,
                         EndpointRole::Mcp,
-                        &self.mcp_server,
+                        &self.services,
                         &shutdown,
                         &mut sessions,
                         &mut session_counts,
@@ -109,7 +118,7 @@ impl UnixBridgeCore {
 fn accept_session(
     result: Result<AuthenticatedUnixStream, UnixIpcError>,
     role: EndpointRole,
-    mcp_server: &BridgeMcpServer,
+    services: &CoreSessionServices,
     shutdown: &CancellationToken,
     sessions: &mut JoinSet<EndpointRole>,
     session_counts: &mut SessionCounts,
@@ -126,7 +135,7 @@ fn accept_session(
                 role,
                 reader,
                 writer,
-                mcp_server.clone(),
+                services.clone(),
                 shutdown.clone(),
             ));
             *idle_deadline = None;

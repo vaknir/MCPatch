@@ -69,6 +69,10 @@ impl CapabilityRegistry {
         true
     }
 
+    pub fn connection_count(&self) -> usize {
+        self.connections.len()
+    }
+
     pub fn visible_capabilities(&self) -> Vec<Capability> {
         let mut candidates: BTreeMap<&str, Vec<&RegisteredCapability>> = BTreeMap::new();
         for state in self.connections.values() {

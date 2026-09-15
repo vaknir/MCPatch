@@ -8,18 +8,22 @@ use tokio_util::sync::CancellationToken;
 use self::workers::{WindowsCoreWorkers, WorkerEvent};
 use super::{
     BridgeCoreError, BridgeEpoch, CoreStopReason,
-    session::{SessionCounts, run_stream_session},
+    session::{CoreSessionServices, SessionCounts, run_stream_session},
 };
-use crate::local_ipc::{
-    EndpointRole, WindowsCoreElection, WindowsIpcError, WindowsIpcErrorCode, WindowsRuntime,
+use crate::{
+    browser::BrowserSessionManager,
+    local_ipc::{
+        EndpointRole, WindowsCoreElection, WindowsIpcError, WindowsIpcErrorCode, WindowsRuntime,
+    },
+    mcp::BridgeMcpServer,
+    routing::shared_capability_registry,
 };
-use crate::mcp::BridgeMcpServer;
 
 pub struct WindowsBridgeCore {
     election: Option<WindowsCoreElection>,
     workers: Option<WindowsCoreWorkers>,
     epoch: BridgeEpoch,
-    mcp_server: BridgeMcpServer,
+    services: CoreSessionServices,
 }
 
 impl fmt::Debug for WindowsBridgeCore {
@@ -45,13 +49,18 @@ impl WindowsBridgeCore {
         let browser_listener = runtime.bind_core_endpoint(EndpointRole::Browser)?;
         let mcp_listener = runtime.bind_core_endpoint(EndpointRole::Mcp)?;
         let epoch = BridgeEpoch::generate().map_err(BridgeCoreError::Epoch)?;
+        let browser_namespace = BridgeEpoch::generate().map_err(BridgeCoreError::Epoch)?;
         let workers = WindowsCoreWorkers::start(browser_listener, mcp_listener)?;
+        let registry = shared_capability_registry();
 
         Ok(Self {
             election: Some(election),
             workers: Some(workers),
+            services: CoreSessionServices::new(
+                BridgeMcpServer::new(registry.clone()),
+                BrowserSessionManager::new(registry, browser_namespace.as_str()),
+            ),
             epoch,
-            mcp_server: BridgeMcpServer,
         })
     }
 
@@ -84,7 +93,7 @@ impl WindowsBridgeCore {
                                 role,
                                 reader,
                                 writer,
-                                self.mcp_server.clone(),
+                                self.services.clone(),
                                 shutdown.clone(),
                             ));
                             idle_deadline = None;

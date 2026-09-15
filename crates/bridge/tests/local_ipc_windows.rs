@@ -13,7 +13,7 @@ use mcpatch_bridge::{
         LocalRuntime, WindowsIpcErrorCode, WindowsRuntime, write_json_frame,
     },
     native_host::{CoreLocalBrowserChannel, LocalBrowserChannel, LocalBrowserChannelErrorCode},
-    protocol::{Heartbeat, Message, PROTOCOL_VERSION, parse_message},
+    protocol::{Heartbeat, Hello, Implementation, Message, PROTOCOL_VERSION, Role, parse_message},
 };
 use serde_json::{Value, json};
 use tokio::{
@@ -349,6 +349,44 @@ async fn bridge_core_owns_multiple_mcp_sessions() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn browser_endpoint_negotiates_before_serving_the_session() {
+    let runtime = WindowsRuntime::current(InstallChannel::Development).unwrap();
+    let adapter_runtime = LocalRuntime::from(runtime.clone());
+    let core = WindowsBridgeCore::start(runtime).unwrap();
+    let private_epoch = core.epoch().as_str().to_owned();
+    let shutdown = CancellationToken::new();
+    let core_task = tokio::spawn(core.run(Duration::from_secs(60), shutdown.clone()));
+    let mut browser = connect_local(&adapter_runtime, EndpointRole::Browser).await;
+
+    browser
+        .send_json(&serde_json::to_vec(&browser_hello()).unwrap())
+        .await
+        .unwrap();
+    let payload = timeout(Duration::from_secs(2), browser.receive_json())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let Message::HelloAck(acknowledgement) = parse_message(&payload).unwrap() else {
+        panic!("browser session must return hello_ack");
+    };
+    assert_eq!(acknowledgement.selected_protocol_version, PROTOCOL_VERSION);
+    assert!(acknowledgement.connection_id.starts_with("browser."));
+    assert!(!acknowledgement.connection_id.contains(&private_epoch));
+
+    drop(browser);
+    shutdown.cancel();
+    assert_eq!(
+        timeout(Duration::from_secs(2), core_task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+        CoreStopReason::Shutdown
+    );
+}
+
 async fn initialize_and_list_tools(stream: &mut LocalCoreConnection, id: u64) {
     let initialize = json!({
         "jsonrpc": "2.0",
@@ -446,5 +484,17 @@ fn heartbeat(id: &str) -> Message {
         protocol_version: PROTOCOL_VERSION,
         heartbeat_id: id.into(),
         sent_at: "2026-09-15T00:00:00Z".into(),
+    })
+}
+
+fn browser_hello() -> Message {
+    Message::Hello(Hello {
+        protocol_version: PROTOCOL_VERSION,
+        role: Role::Extension,
+        supported_protocol_versions: vec![PROTOCOL_VERSION],
+        implementation: Implementation {
+            name: "mcpatch-extension".to_owned(),
+            version: "0.1.0".to_owned(),
+        },
     })
 }

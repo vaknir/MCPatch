@@ -1,18 +1,43 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 use rmcp::{
     ServerHandler,
     model::{Implementation, ProtocolVersion, ServerCapabilities, ServerInfo},
 };
 
-use crate::PRODUCT_VERSION;
+use crate::{
+    PRODUCT_VERSION,
+    routing::{SharedCapabilityRegistry, shared_capability_registry},
+};
 
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
     &[ProtocolVersion::V_2025_11_25, ProtocolVersion::V_2026_07_28];
 
-/// Core-owned MCP handler. Browser capabilities will be injected in later slices.
-#[derive(Clone, Debug, Default)]
-pub struct BridgeMcpServer;
+/// Core-owned MCP handler sharing the browser capability registry.
+#[derive(Clone)]
+pub struct BridgeMcpServer {
+    _registry: SharedCapabilityRegistry,
+}
+
+impl BridgeMcpServer {
+    pub fn new(registry: SharedCapabilityRegistry) -> Self {
+        Self {
+            _registry: registry,
+        }
+    }
+}
+
+impl Default for BridgeMcpServer {
+    fn default() -> Self {
+        Self::new(shared_capability_registry())
+    }
+}
+
+impl fmt::Debug for BridgeMcpServer {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("BridgeMcpServer")
+    }
+}
 
 impl ServerHandler for BridgeMcpServer {
     fn get_info(&self) -> ServerInfo {
@@ -42,7 +67,7 @@ mod tests {
 
     #[test]
     fn advertises_tools_without_placeholder_tools() {
-        let server = BridgeMcpServer;
+        let server = BridgeMcpServer::default();
         let info = server.get_info();
         assert!(info.capabilities.tools.is_some());
         assert_eq!(info.server_info.name, "mcpatch");
