@@ -1,0 +1,19 @@
+[package]
+name = "mcpatch-windows-kernel"
+description = "Narrow Win32 kernel-object boundary for MCPatch"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[target.'cfg(windows)'.dependencies]
+interprocess = "=2.4.4"
+widestring = "=1.2.1"
+windows-sys = { version = "=0.61.2", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Pipes",
+  "Win32_System_Threading",
+] }

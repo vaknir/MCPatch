@@ -88,12 +88,15 @@ impl UnixIpcError {
 #[cfg(windows)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WindowsIpcErrorCode {
+    CoreAlreadyRunning,
     EndpointInUse,
     IdentityUnavailable,
     Io,
+    MutexUnavailable,
     PeerUnauthorized,
     RevertFailed,
     SecurityDescriptorUnavailable,
+    WorkerFailed,
 }
 
 /// A pipe-name- and identity-free Windows IPC failure safe for structured logs.

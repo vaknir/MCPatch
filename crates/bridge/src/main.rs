@@ -87,7 +87,49 @@ async fn run_bridge_core(channel: InstallChannel) -> ExitCode {
         }
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        use mcpatch_bridge::{
+            bridge_core::{DEFAULT_IDLE_TIMEOUT, WindowsBridgeCore},
+            local_ipc::WindowsRuntime,
+        };
+        use tokio_util::sync::CancellationToken;
+
+        let runtime = match WindowsRuntime::current(channel) {
+            Ok(runtime) => runtime,
+            Err(_) => {
+                tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = "core_transport_failed");
+                return ExitCode::FAILURE;
+            }
+        };
+        let core = match WindowsBridgeCore::start(runtime) {
+            Ok(core) => core,
+            Err(error) => {
+                tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = error.code());
+                return ExitCode::FAILURE;
+            }
+        };
+        let shutdown = CancellationToken::new();
+        let shutdown_task = tokio::spawn(cancel_core_on_shutdown_signal(shutdown.clone()));
+
+        tracing::info!(target: "mcpatch", event = "bridge_core_started");
+        let result = core.run(DEFAULT_IDLE_TIMEOUT, shutdown).await;
+        shutdown_task.abort();
+        let _ = shutdown_task.await;
+
+        match result {
+            Ok(reason) => {
+                tracing::info!(target: "mcpatch", event = "bridge_core_stopped", reason = ?reason);
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = error.code());
+                ExitCode::FAILURE
+            }
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = channel;
         tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = "core_transport_unavailable");
@@ -95,7 +137,6 @@ async fn run_bridge_core(channel: InstallChannel) -> ExitCode {
     }
 }
 
-#[cfg(unix)]
 async fn cancel_core_on_shutdown_signal(shutdown: tokio_util::sync::CancellationToken) {
     match tokio::signal::ctrl_c().await {
         Ok(()) => {

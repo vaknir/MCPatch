@@ -6,8 +6,17 @@ use crate::local_ipc::{WindowsIpcError, WindowsIpcErrorCode};
 pub(super) fn security_descriptor_for(
     logon_sid: &str,
 ) -> Result<SecurityDescriptor, WindowsIpcError> {
-    let sddl = security_descriptor_sddl(logon_sid);
-    let wide = U16CString::from_str(&sddl).map_err(|_| descriptor_unavailable())?;
+    deserialize(&security_descriptor_sddl(logon_sid))
+}
+
+pub(super) fn mutex_security_descriptor_for(
+    logon_sid: &str,
+) -> Result<SecurityDescriptor, WindowsIpcError> {
+    deserialize(&mutex_security_descriptor_sddl(logon_sid))
+}
+
+fn deserialize(sddl: &str) -> Result<SecurityDescriptor, WindowsIpcError> {
+    let wide = U16CString::from_str(sddl).map_err(|_| descriptor_unavailable())?;
     SecurityDescriptor::deserialize(&wide).map_err(|error| {
         WindowsIpcError::with_source(WindowsIpcErrorCode::SecurityDescriptorUnavailable, error)
     })
@@ -16,6 +25,11 @@ pub(super) fn security_descriptor_for(
 fn security_descriptor_sddl(logon_sid: &str) -> String {
     // Protected DACL: exactly one allow ACE for duplex read/write by this logon.
     format!("D:P(A;;GRGW;;;{logon_sid})")
+}
+
+fn mutex_security_descriptor_sddl(logon_sid: &str) -> String {
+    // Protected DACL: synchronize + mutex-modify-state for this logon only.
+    format!("D:P(A;;0x00100001;;;{logon_sid})")
 }
 
 const fn descriptor_unavailable() -> WindowsIpcError {
@@ -37,6 +51,22 @@ mod tests {
         assert_eq!(expected, format!("D:P(A;;GRGW;;;{sid})"));
 
         let descriptor = security_descriptor_for(&sid).unwrap();
+        let serialized = descriptor
+            .serialize(DACL_SECURITY_INFORMATION, |value| value.to_string_lossy())
+            .unwrap();
+
+        assert_eq!(serialized.matches("(A;").count(), 1);
+        assert_eq!(serialized.matches(&sid).count(), 1);
+        assert!(!serialized.contains(";;;WD)"));
+        assert!(!serialized.contains(";;;AN)"));
+    }
+    #[test]
+    fn mutex_dacl_grants_only_required_rights_to_the_logon_sid() {
+        let sid = current_process_logon_sid().unwrap();
+        let expected = mutex_security_descriptor_sddl(&sid);
+        assert_eq!(expected, format!("D:P(A;;0x00100001;;;{sid})"));
+
+        let descriptor = mutex_security_descriptor_for(&sid).unwrap();
         let serialized = descriptor
             .serialize(DACL_SECURITY_INFORMATION, |value| value.to_string_lossy())
             .unwrap();

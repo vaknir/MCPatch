@@ -79,6 +79,27 @@ Windows uses fixed, channel- and role-separated byte-mode named pipes:
 \\.\pipe\MCPatch-production-mcp-v1
 ```
 
+Before binding either role, the core acquires an initially owned, session-local
+named mutex for its install channel:
+
+```text
+Local\MCPatch-development-core-v1
+Local\MCPatch-production-core-v1
+```
+
+The mutex is created non-inheritable with a protected DACL containing one allow ACE
+for the current logon SID. That ACE grants only synchronization and mutex state
+rights (`0x00100001`). A dedicated election thread owns and releases the mutex,
+because Win32 mutex ownership is thread-bound. A second creator exits without
+touching the first core's pipes; after clean release or process termination, a new
+core can acquire the same name.
+
+The bridge crate remains free of unsafe code. The small `mcpatch-windows-kernel`
+crate contains the missing raw named-mutex calls and the `PeekNamedPipe` availability
+probe; all other code in that crate denies unsafe operations. Its mutex guard is
+deliberately not `Send`. This keeps the thread-affine kernel contract and pipe probe
+explicit instead of hiding them behind an unrestricted utility layer.
+
 The bridge reads its process-token logon SID and creates an explicit protected DACL
 with one allow ACE granting only generic read and write to that SID. It does not add
 Everyone, anonymous, administrator, or broad system ACEs. Handles are non-inheritable,
@@ -90,15 +111,19 @@ effective thread token's logon SID. The token must match the expected logon SID 
 the stream is returned or any frame is parsed. Reversion is checked immediately; an
 RAII guard remains in scope as a fallback during every error path. The authenticated
 blocking stream uses the same bounded little-endian JSON framing validators as Unix.
-Issue #45 will isolate blocking Windows accepts and streams on bounded bridge-core
-worker threads rather than blocking Tokio executor threads.
+The bridge core isolates polling accepts and nonblocking session reads on two accept
+workers and at most eight session workers per role, never on Tokio executor threads.
+Before each nonblocking read, a narrow `PeekNamedPipe` probe distinguishes a connected,
+empty pipe from a disconnected peer; `PIPE_NOWAIT` reads alone do not preserve that
+distinction reliably through all library wrappers.
+Partial frames are retained only up to the shared 1 MiB limit and are disconnected
+after five seconds. Worker shutdown is ordered before mutex release.
 
 ## Current scope and residual risk
 
-Unix now provides the internal bridge-core process and lifecycle primitive. Windows
-core election and bounded worker lifecycle are tracked in
-[#51](https://github.com/vaknir/MCPatch/issues/51). Neither public adapter connects
-to the core yet; bounded adapter startup and rendezvous remain in
+Unix and Windows now provide the internal bridge-core process and lifecycle
+primitive. Neither public adapter connects to the core yet; bounded adapter startup
+and rendezvous remain in
 [#50](https://github.com/vaknir/MCPatch/issues/50). Protocol negotiation and message
 handling are deliberately outside this lifecycle slice.
 

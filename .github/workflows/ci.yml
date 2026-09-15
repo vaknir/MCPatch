@@ -86,6 +86,8 @@ jobs:
         run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::framing::tests
       - name: Test Windows endpoint names
         run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::windows::endpoint::tests
+      - name: Test Windows election names
+        run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::windows::election::tests
       - name: Test Windows identity rejection
         run: cargo test --package mcpatch-bridge --lib --all-features --locked local_ipc::windows::stream::tests
       - name: Test Windows protected DACL
@@ -94,6 +96,20 @@ jobs:
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked first_pipe_instance_prevents_a_second_listener -- --exact --nocapture
       - name: Test Windows client authentication
         run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked authenticates_the_client_before_reading_a_bounded_frame -- --exact --nocapture
+      - name: Test Windows protected core election
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked protected_mutex_elects_one_core_and_releases_cleanly -- --exact --nocapture
+      - name: Test Windows simultaneous core election
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked protected_mutex_allows_exactly_one_racing_core -- --exact --nocapture
+      - name: Test Windows core restart
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_rejects_a_second_owner_and_restarts_with_a_fresh_epoch -- --exact --nocapture
+      - name: Test Windows core peer lifecycle
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_counts_peers_and_rejects_malformed_frames -- --exact --nocapture
+      - name: Test Windows partial-frame timeout
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_times_out_a_stalled_partial_frame -- --exact --nocapture
+      - name: Test Windows bounded workers
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_rejects_sessions_beyond_the_per_role_worker_bound -- --exact --nocapture
+      - name: Test Windows core shutdown
+        run: cargo test --package mcpatch-bridge --test local_ipc_windows --all-features --locked bridge_core_shutdown_stops_workers_and_releases_election -- --exact --nocapture
 
   typescript:
     name: TypeScript

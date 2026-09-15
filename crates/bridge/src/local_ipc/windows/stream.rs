@@ -1,3 +1,8 @@
+use std::{
+    io::{self, Read},
+    os::windows::io::AsHandle,
+};
+
 use interprocess::os::windows::named_pipe::{DuplexPipeStream, pipe_mode};
 
 use super::identity::current_thread_logon_sid;
@@ -42,6 +47,17 @@ impl AuthenticatedWindowsStream {
 
     pub fn write_json(&mut self, payload: &[u8]) -> Result<(), LocalFrameError> {
         write_json_frame_blocking(&mut self.inner, payload)
+    }
+
+    pub(crate) fn read_some(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let available = mcpatch_windows_kernel::named_pipe_available(self.inner.as_handle())?;
+        if available == 0 {
+            return Err(io::Error::from(io::ErrorKind::WouldBlock));
+        }
+
+        let available = usize::try_from(available).unwrap_or(usize::MAX);
+        let read_length = buffer.len().min(available);
+        self.inner.read(&mut buffer[..read_length])
     }
 }
 

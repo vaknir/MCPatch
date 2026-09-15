@@ -1,40 +1,13 @@
 use std::time::Duration;
 
-use thiserror::Error;
 use tokio::{task::JoinSet, time::Instant};
 use tokio_util::sync::CancellationToken;
 
-use super::BridgeEpoch;
+use super::{BridgeCoreError, BridgeEpoch, CoreStopReason};
 use crate::local_ipc::{
     AuthenticatedUnixStream, EndpointRole, UnixCoreElection, UnixEndpointListener, UnixIpcError,
     UnixIpcErrorCode, UnixRuntime,
 };
-
-#[derive(Debug, Error)]
-pub enum BridgeCoreError {
-    #[error("runtime epoch generation failed")]
-    Epoch(getrandom::Error),
-    #[error("local transport failed")]
-    Transport(#[from] UnixIpcError),
-}
-
-impl BridgeCoreError {
-    pub const fn code(&self) -> &'static str {
-        match self {
-            Self::Epoch(_) => "core_epoch_failed",
-            Self::Transport(error) => match error.code() {
-                UnixIpcErrorCode::CoreAlreadyRunning => "core_already_running",
-                _ => "core_transport_failed",
-            },
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CoreStopReason {
-    Idle,
-    Shutdown,
-}
 
 /// Elected Unix bridge core holding both parser-role endpoints.
 #[derive(Debug)]

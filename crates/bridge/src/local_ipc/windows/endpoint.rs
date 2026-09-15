@@ -14,8 +14,8 @@ type BytePipeListener = PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 /// Windows endpoint configuration scoped to one install channel and logon.
 #[derive(Clone, Debug)]
 pub struct WindowsRuntime {
-    channel: InstallChannel,
-    expected_logon_sid: String,
+    pub(super) channel: InstallChannel,
+    pub(super) expected_logon_sid: String,
 }
 
 /// Bound first-instance named pipe with an explicit protected DACL.
@@ -43,12 +43,28 @@ impl WindowsRuntime {
         &self,
         role: EndpointRole,
     ) -> Result<WindowsEndpointListener, WindowsIpcError> {
+        self.bind(role, false)
+    }
+
+    pub(crate) fn bind_core_endpoint(
+        &self,
+        role: EndpointRole,
+    ) -> Result<WindowsEndpointListener, WindowsIpcError> {
+        self.bind(role, true)
+    }
+
+    fn bind(
+        &self,
+        role: EndpointRole,
+        nonblocking: bool,
+    ) -> Result<WindowsEndpointListener, WindowsIpcError> {
         let descriptor = security_descriptor_for(&self.expected_logon_sid)?;
         let path = self.pipe_name(role);
         let listener = PipeListenerOptions::new()
             .path(Path::new(&path))
             .accept_remote(false)
             .inheritable(false)
+            .nonblocking(nonblocking)
             .security_descriptor(Some(descriptor))
             .create_duplex::<pipe_mode::Bytes>()
             .map_err(listener_error)?;
@@ -68,6 +84,18 @@ impl WindowsEndpointListener {
             .accept()
             .map_err(|error| WindowsIpcError::with_source(WindowsIpcErrorCode::Io, error))?;
         AuthenticatedWindowsStream::authenticate(stream, &self.expected_logon_sid)
+    }
+
+    pub(crate) fn try_accept_authenticated(
+        &self,
+    ) -> Result<Option<AuthenticatedWindowsStream>, WindowsIpcError> {
+        match self.listener.accept() {
+            Ok(stream) => {
+                AuthenticatedWindowsStream::authenticate(stream, &self.expected_logon_sid).map(Some)
+            }
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
+            Err(error) => Err(WindowsIpcError::with_source(WindowsIpcErrorCode::Io, error)),
+        }
     }
 }
 
