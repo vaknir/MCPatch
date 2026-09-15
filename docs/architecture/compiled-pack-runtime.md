@@ -2,8 +2,8 @@
 
 The Manifest V3 service worker has a generic runtime for reviewed packs compiled
 into the extension release. It replaces the earlier hand-written demo dispatcher;
-the synthetic demo now uses the same `definePack` and `defineTool` boundary intended
-for future repository-built adapters.
+the synthetic demo now uses the same FastMCP-style `MCPatch` authoring facade and
+strict definition boundary intended for future repository-built adapters.
 
 ## Definition admission
 

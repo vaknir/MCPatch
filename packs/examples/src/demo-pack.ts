@@ -1,35 +1,11 @@
-import { definePack, defineTool } from "@mcpatch/sdk/runtime";
+import { MCPatch } from "@mcpatch/sdk/runtime";
 
 export const DEMO_CONTEXT_ID = "mcpatch.demo";
 export const DEMO_ORIGIN = "https://demo.mcpatch.invalid";
 export const DEMO_URL = `${DEMO_ORIGIN}/`;
 export const DEMO_TOOL_NAME = "mcpatch.demo.status";
 
-const status = defineTool({
-  name: DEMO_TOOL_NAME,
-  title: "MCPatch demo status",
-  description: "Return deterministic MCPatch demo runtime status.",
-  risk: "read",
-  permissions: ["READ"],
-  inputSchema: {
-    type: "object",
-    additionalProperties: false,
-    maxProperties: 0,
-    properties: {},
-  },
-  outputSchema: {
-    type: "object",
-    additionalProperties: false,
-    required: ["status"],
-    properties: { status: { const: "ready", type: "string" } },
-  },
-  execute(context) {
-    context.signal.throwIfAborted();
-    return { status: "ready" as const };
-  },
-});
-
-export const demoPack = definePack({
+const mcp = new MCPatch({
   manifestVersion: 1,
   publisher: "mcpatch",
   id: "builtin-demo",
@@ -51,7 +27,35 @@ export const demoPack = definePack({
     },
   ],
   networkPolicy: { extensionRequests: "none" },
-  tools: [status],
+});
+
+mcp.tool(
+  {
+    name: DEMO_TOOL_NAME,
+    title: "MCPatch demo status",
+    description: "Return deterministic MCPatch demo runtime status.",
+    risk: "read",
+    permissions: ["READ"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 0,
+      properties: {},
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["status"],
+      properties: { status: { const: "ready", type: "string" } },
+    },
+  },
+  (_input, context) => {
+    context.signal.throwIfAborted();
+    return { status: "ready" as const };
+  },
+);
+
+export const demoPack = mcp.build({
   fixtures: [
     {
       id: "ready",

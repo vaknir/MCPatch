@@ -1,6 +1,6 @@
 {
   "name": "@mcpatch/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Safe MCPatch pack contracts and authoring SDK",
   "type": "module",

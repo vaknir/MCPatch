@@ -1,4 +1,5 @@
 export { definePack, defineTool } from "./authoring.js";
+export { MCPatch } from "./mcpatch.js";
 export { PackToolExecutionError } from "./fixture-harness-types.js";
 export { canonicalizePageLocation, packMatchesLocation } from "./location.js";
 export {
@@ -15,6 +16,13 @@ export type {
   PackToolDefinition,
   PackToolHandler,
 } from "./authoring.js";
+export type {
+  MCPatchBuildOptions,
+  MCPatchDefinition,
+  MCPatchOptions,
+  MCPatchToolHandler,
+  MCPatchToolOptions,
+} from "./mcpatch.js";
 export type {
   InferJsonSchema,
   InferPackInput,

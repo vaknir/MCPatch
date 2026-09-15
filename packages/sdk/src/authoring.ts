@@ -12,7 +12,12 @@ import type {
   PackToolManifest,
 } from "./types.js";
 import { parsePackManifest } from "./validation/manifest.js";
-import { cloneAndFreeze, isRecord, issue } from "./validation/primitives.js";
+import {
+  cloneAndFreeze,
+  isRecord,
+  issue,
+  validateJsonBounds,
+} from "./validation/primitives.js";
 import { validateTools } from "./validation/tools.js";
 
 const TOOL_FIELDS = [
@@ -143,6 +148,8 @@ export function defineTool<
     typeof manifestCandidate.name === "string"
       ? (manifestCandidate.name.split(".")[0] ?? "")
       : "";
+  const boundsIssue = validateJsonBounds(manifestCandidate);
+  if (boundsIssue !== undefined) reject(remapToolIssue(boundsIssue));
   const validation = validateTools([manifestCandidate], publisher);
   if ("issue" in validation) reject(remapToolIssue(validation.issue));
 

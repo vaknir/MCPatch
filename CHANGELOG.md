@@ -8,6 +8,9 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A FastMCP-style `MCPatch` pack-authoring facade with typed `.tool(...)`
+  registration, directly testable handlers, immutable single-use finalization,
+  registration-time identity checks, and explicit runtime JSON Schemas.
 - A typed `flights.search` ACTION for one-adult economy round trips between exact
   airport codes and bounded future dates. It generates one fixed same-origin search
   URL, lets Google use the tab's browser session, and acknowledges before navigation
