@@ -4,6 +4,7 @@ packages:
   - "packs/*"
 
 allowBuilds:
+  "@parcel/watcher": false
   esbuild: true
 
 minimumReleaseAge: 1440

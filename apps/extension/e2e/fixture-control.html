@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCPatch Chromium fixture control</title>
+    <link rel="stylesheet" href="fixture.css" />
+  </head>
+  <body class="bg-base-200 min-h-screen p-8">
+    <main class="card bg-base-100 mx-auto max-w-lg shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title">MCPatch Chromium fixture</h1>
+        <p>
+          Test-only control for an isolated synthetic origin. No production site
+          or account is used.
+        </p>
+        <div class="flex items-center gap-2">
+          <span class="status status-info" aria-hidden="true"></span>
+          <output id="fixture-status" data-state="loading">loading</output>
+        </div>
+        <div class="card-actions justify-end">
+          <button id="fixture-disable" class="btn btn-ghost" type="button">
+            Disable
+          </button>
+          <button id="fixture-enable" class="btn btn-primary" type="button">
+            Enable
+          </button>
+        </div>
+      </div>
+    </main>
+    <script src="fixture-control.js" type="module"></script>
+  </body>
+</html>

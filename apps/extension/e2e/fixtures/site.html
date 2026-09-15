@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCPatch synthetic website fixture</title>
+    <link rel="stylesheet" href="/fixture.css" />
+  </head>
+  <body class="bg-base-200 min-h-screen p-8">
+    <main class="card bg-base-100 mx-auto max-w-lg shadow-sm">
+      <div class="card-body">
+        <h1 class="card-title">Synthetic website state</h1>
+        <p id="fixture-value" data-revision="1">initial</p>
+        <div class="card-actions justify-end">
+          <button id="fixture-update" class="btn btn-primary" type="button">
+            Update visible state
+          </button>
+        </div>
+      </div>
+    </main>
+    <script>
+      document
+        .querySelector("#fixture-update")
+        .addEventListener("click", () => {
+          const state = document.querySelector("#fixture-value");
+          state.dataset.revision = "2";
+          state.textContent = "updated";
+        });
+    </script>
+  </body>
+</html>

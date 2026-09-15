@@ -14,13 +14,18 @@
     "lint": "eslint .",
     "package:local": "node scripts/package-local.mjs",
     "test": "pnpm -r --if-present test && node --test scripts/*.test.mjs",
+    "test:browser": "pnpm --filter @mcpatch/extension test:browser",
     "verify:packs": "pnpm --filter @mcpatch/sdk test:fixtures && pnpm --filter './packs/**' test",
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/cli": "4.3.3",
+    "daisyui": "5.7.37",
     "eslint": "10.10.0",
     "prettier": "3.9.6",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.0",
     "vitest": "5.0.0"

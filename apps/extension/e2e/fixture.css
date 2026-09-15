@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@plugin "daisyui";
+@source "./fixture-control.html";
+@source "./fixtures/site.html";
