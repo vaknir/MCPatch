@@ -1,8 +1,15 @@
+import { execFile } from "node:child_process";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
+import { promisify } from "node:util";
 
 import { build } from "esbuild";
+
+const executeFile = promisify(execFile);
+const require = createRequire(import.meta.url);
 
 const extensionDirectory = new URL("../", import.meta.url);
 const distributionDirectory = new URL("dist/", extensionDirectory);
@@ -32,6 +39,10 @@ await copyFile(
   new URL("manifest.json", extensionDirectory),
   new URL("manifest.json", distributionDirectory),
 );
+await copyFile(
+  new URL("approval.html", extensionDirectory),
+  new URL("approval.html", distributionDirectory),
+);
 await writeFile(
   new URL("build-metadata.json", distributionDirectory),
   `${JSON.stringify(
@@ -55,6 +66,9 @@ await build({
   },
   bundle: true,
   entryPoints: {
+    "approval-page": fileURLToPath(
+      new URL("src/approval-page.ts", extensionDirectory),
+    ),
     "content-script": fileURLToPath(
       new URL("src/content-script.ts", extensionDirectory),
     ),
@@ -70,7 +84,28 @@ await build({
   target: "chrome106",
 });
 
-for (const artifact of ["content-script.js", "service-worker.js"]) {
+const tailwindPackage = require.resolve("@tailwindcss/cli/package.json");
+await executeFile(
+  process.execPath,
+  [
+    resolve(dirname(tailwindPackage), "dist/index.mjs"),
+    "--input",
+    fileURLToPath(new URL("src/approval.css", extensionDirectory)),
+    "--output",
+    fileURLToPath(new URL("approval.css", distributionDirectory)),
+    "--minify",
+  ],
+  {
+    cwd: fileURLToPath(extensionDirectory),
+    env: { ...process.env, NO_COLOR: "1" },
+  },
+);
+
+for (const artifact of [
+  "approval-page.js",
+  "content-script.js",
+  "service-worker.js",
+]) {
   const source = await readFile(
     new URL(artifact, distributionDirectory),
     "utf8",

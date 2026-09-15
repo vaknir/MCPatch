@@ -38,12 +38,22 @@ request and route identity, tool, canonical argument hash, and expiry. Raw argum
 results, credentials, pack objects, browser objects, and exception payloads are not
 approval-message fields and are not logged.
 
-The trusted approval frontend is intentionally not implemented in this slice. The
-pack runtime cannot handle an approval request; the extension returns a deterministic
-denial while no trusted extension-controlled UI is installed. A future UI needs a
-separate bounded bridge-owned presentation contract and must return the exact opaque
-ID over the authenticated extension session. Website DOM and model text are not an
-approval surface.
+The extension opens its own `chrome-extension://` approval page for a maximum of
+eight concurrent prompts. The service worker binds each page to the exact browser
+tab it created and accepts a decision only from the extension's own ID, exact page
+URL, top frame, and internal `mcpatch.approval.v1` port. A website frame, content
+script, MCP client, or page opened in another tab cannot answer the prompt.
+
+The page receives only the tool, canonical HTTPS origin, argument hash, expiry, and
+opaque approval ID. It uses closed message shapes and renders values with
+`textContent`; raw arguments, results, request/context identifiers, credentials,
+and website text never enter the presentation channel. The user can approve or deny
+once. Tab closure, port disconnect, malformed traffic, UI creation failure, timeout,
+duplicate IDs, overflow, bridge cancellation, and bridge disconnect all fail closed.
+
+If the trusted surface is unavailable, the extension retains the earlier
+deterministic-denial fallback. Website DOM and model text are never an approval
+surface.
 
 ## Atomic consumption
 
@@ -62,8 +72,9 @@ wire token is returned to the MCP client.
 Navigation, capability replacement, context closure, browser disconnect, explicit
 MCP cancellation, approval timeout, and bridge restart revoke pending approval
 records. Cancellation sends the same bounded request cancellation used for an active
-tool call so a future UI can close stale prompts. Concurrent decisions have one
-mutex-serialized winner; every later decision is an unknown replay.
+tool call and closes the matching extension prompt without emitting a stale decision.
+Concurrent decisions have one mutex-serialized winner; every later decision is an
+unknown replay.
 
 ## Dependencies
 

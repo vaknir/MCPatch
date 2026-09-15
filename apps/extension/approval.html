@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" data-theme="business">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCPatch approval</title>
+    <link rel="stylesheet" href="approval.css" />
+  </head>
+  <body class="bg-base-200 min-h-screen p-6">
+    <main class="mx-auto max-w-2xl">
+      <section class="card bg-base-100 shadow-xl" aria-labelledby="title">
+        <div class="card-body gap-5">
+          <div class="flex items-center gap-3">
+            <span class="badge badge-warning">Action</span>
+            <h1 id="title" class="card-title">Approve this action once?</h1>
+          </div>
+
+          <div role="alert" class="alert alert-warning">
+            <span>
+              Approving permits exactly this tool, website, and argument hash
+              until the displayed expiry. It cannot be reused.
+            </span>
+          </div>
+
+          <dl class="grid gap-4 sm:grid-cols-[8rem_1fr]">
+            <dt class="font-semibold">Tool</dt>
+            <dd id="tool" class="break-all">Loading…</dd>
+            <dt class="font-semibold">Website</dt>
+            <dd id="origin" class="break-all">Loading…</dd>
+            <dt class="font-semibold">Arguments hash</dt>
+            <dd id="args-hash" class="font-mono text-xs break-all">Loading…</dd>
+            <dt class="font-semibold">Expires</dt>
+            <dd id="expires-at">Loading…</dd>
+          </dl>
+
+          <p class="text-base-content/70 text-sm">
+            MCPatch never shows this page inside the website and does not expose
+            cookies or browser credentials to the requesting agent.
+          </p>
+
+          <div class="card-actions justify-end">
+            <button id="deny" class="btn" type="button" disabled>Deny</button>
+            <button id="approve" class="btn btn-primary" type="button" disabled>
+              Approve once
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="approval-page.js"></script>
+  </body>
+</html>

@@ -29,8 +29,9 @@ complete snapshot. Duplicate names inside one snapshot are invalid protocol data
 
 Capabilities with permissions that are always denied are not advertised. Action or
 sensitive capabilities may be advertised, but dispatch requires a bridge-owned,
-argument-bound one-time approval. Without the separately trusted approval UI, the
-extension deterministically denies that request.
+argument-bound one-time approval presented by the extension-owned, tab-bound UI.
+If that trusted surface cannot present the request, the extension deterministically
+denies it.
 
 ## Call routing
 

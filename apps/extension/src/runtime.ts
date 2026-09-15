@@ -9,6 +9,7 @@ import type {
 } from "./compiled-pack-validation.js";
 import type { ChromeRuntimeLifecycleApi } from "./lifecycle.js";
 import { registerLifecycleListeners } from "./lifecycle.js";
+import type { ApprovalSurface } from "./approval-model.js";
 import {
   NativeSessionSupervisor,
   type ChromeNativeRuntimeApi,
@@ -34,6 +35,7 @@ export interface ExtensionRuntimeOptions
   extends NativeSessionOptions, PageContextOwnerHooks {
   readonly compiledPacks?: readonly CompiledPackSubject[];
   readonly compiledPackRuntimeOptions?: CompiledPackRuntimeOptions;
+  readonly approvalSurface?: ApprovalSurface;
   readonly pageAuthority?: PageAuthority;
   readonly pageCallTimeoutMs?: number;
   readonly pageHandshakeTimeoutMs?: number;
@@ -95,19 +97,35 @@ export function startExtensionRuntime(
   const supervisorOptions: NativeSessionOptions = {
     ...options,
     onMessage(message) {
+      if (
+        message.type === "cancel" &&
+        options.approvalSurface?.cancel(message.requestId)
+      ) {
+        return;
+      }
       if (packs.handle(message)) return;
       if (message.type === "approval_required") {
-        if (!(
+        let pending = true;
+        const sendDecision = (decision: "approved" | "denied") => {
+          if (!pending) return;
+          pending = false;
           session.supervisor?.send({
             protocolVersion: message.protocolVersion,
             type: "approval_result",
             approvalId: message.approvalId,
             requestId: message.requestId,
-            decision: "denied",
-          }) ?? false
-        )) {
-          throw new Error("approval denial could not be delivered");
+            decision,
+          });
+        };
+        let accepted: boolean;
+        try {
+          accepted =
+            options.approvalSurface?.request(message, sendDecision) ?? false;
+        } catch {
+          sendDecision("denied");
+          return;
         }
+        if (!accepted) sendDecision("denied");
         return;
       }
       if (options.onMessage === undefined) {
@@ -117,6 +135,7 @@ export function startExtensionRuntime(
     },
     onDisconnected() {
       bridgeReady = false;
+      options.approvalSurface?.closeAll();
       packs.disconnect();
       pageContexts.closeAll("disconnected");
       options.onDisconnected?.();
@@ -135,6 +154,7 @@ export function startExtensionRuntime(
     },
     onStopping() {
       bridgeReady = false;
+      options.approvalSurface?.closeAll();
       packs.closeAll("disconnected");
       pageContexts.closeAll("disconnected");
       options.onStopping?.();

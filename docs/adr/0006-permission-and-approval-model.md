@@ -78,16 +78,19 @@ field plus current context/origin state. The call is denied if:
 Pending approvals are memory-only in version 1 and expire on bridge restart. Error
 messages reveal only an opaque request ID and stable error code.
 
-The first approval-runtime slice intentionally omits the trusted user interface. The
-extension denies every approval request until an extension-controlled frontend with
-a separate bounded presentation contract exists; packs and website DOM cannot fill
-that role.
+The trusted frontend is an extension-owned page opened and tracked by the service
+worker. Its internal protocol is deliberately smaller than the bridge protocol and
+contains no raw arguments or results. The worker binds a pending prompt to its exact
+extension ID, URL, top frame, and created tab before accepting a one-time decision.
+Malformed traffic, closure, cancellation, timeout, overflow, or presentation failure
+denies or discards the request. When this surface is unavailable, the runtime denies
+the approval deterministically; packs and website DOM cannot fill that role.
 
 ## Consequences
 
 - A user decision cannot authorize a modified or replayed call.
 - Approval state requires atomic storage and race tests.
-- Every site write waits for trusted MCPatch UI in version 1.
+- Every site write waits for an exact decision in trusted MCPatch UI in version 1.
 - Broader user policies, if added later, must be at least as specific and require a
   new ADR.
 - Canonicalization is security-sensitive and must use one tested implementation
