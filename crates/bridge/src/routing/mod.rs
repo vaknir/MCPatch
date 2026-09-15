@@ -15,7 +15,8 @@ pub use error::{RegistryError, RegistryErrorCode};
 pub use policy::{PermissionDecision, permission_decision};
 pub use registry::CapabilityRegistry;
 pub use types::{
-    BrowserToolResponse, RegistryChange, RoutedCall, RoutedCancellation, ToolInvocation,
+    BrowserToolResponse, RegistryChange, RoutedCall, RoutedCallCompletionError, RoutedCancellation,
+    ToolInvocation,
 };
 
 pub type SharedCapabilityRegistry = Arc<Mutex<CapabilityRegistry>>;

@@ -40,7 +40,7 @@ For each call, the registry:
 3. applies the fixed permission policy;
 4. validates arguments against the registered JSON Schema;
 5. creates a tool call containing the registered context, revision, and origin; and
-6. records a revocation token before dispatch.
+6. records a revocation token and one-shot completion channel before dispatch.
 
 JSON Schema draft 2020-12 validators are compiled when a snapshot is accepted.
 Schema depth and node counts are bounded. HTTP and file resolver features are not
@@ -49,7 +49,15 @@ or filesystem reads.
 
 Responses are accepted only from the original connection with the exact request,
 context, revision, and origin. Declared output schemas are enforced. A valid result,
-tool error, invalid result, or cancellation consumes the pending request once.
+tool error, invalid result, cancellation, context replacement, or disconnect consumes
+the pending request once. Completion data is delivered directly to the reserving
+call; no polling or shared response buffer is used.
+
+MCP request IDs are not forwarded across the browser boundary. The core creates an
+opaque request ID for each routed call and uses it only for exact correlation. MCP
+cancellation and the fixed call deadline atomically remove the pending request before
+sending a best-effort cancellation to the browser. Late responses therefore fail as
+unknown requests and cannot be attached to another call.
 
 ## Initial bounds
 

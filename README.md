@@ -43,8 +43,9 @@ private Unix and Windows local transports and bridge-core lifecycles are impleme
 along with bounded connect-first rendezvous and isolated bridge-core process start.
 Both public adapters now use their distinct authenticated bridge-core endpoints;
 browser negotiation and lifecycle ingestion are live, with one synthetic read-only
-demo capability proving extension-to-registry publication and MCP discovery.
-User-facing pairing, MCP invocation, and real-site packs remain upcoming slices.
+demo capability proving extension-to-registry publication, MCP discovery, and exact
+validated tool-call completion. User-facing pairing and real-site packs remain
+upcoming slices.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
@@ -63,7 +64,8 @@ Dependency logging is disabled at the bridge boundary so untrusted request conte
 is not emitted by upstream libraries.
 
 The bridge currently negotiates MCP `2025-11-25` and `2026-07-28`. It advertises
-an empty tool list until browser capabilities are connected in subsequent slices.
+only live, policy-visible browser capabilities and routes calls through the exact
+registered browser context with argument and result-schema validation.
 
 The internal bridge core can be started for development with
 `cargo run --bin mcpatch -- bridge-core --channel=development`. It currently owns

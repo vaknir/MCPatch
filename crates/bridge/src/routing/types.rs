@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -54,6 +55,7 @@ impl BrowserToolResponse {
 
 pub struct RoutedCall {
     connection: Arc<dyn BrowserConnection>,
+    completion: oneshot::Receiver<Result<BrowserToolResponse, RoutedCallCompletionError>>,
     message: ToolCall,
     revocation: CancellationToken,
 }
@@ -61,11 +63,13 @@ pub struct RoutedCall {
 impl RoutedCall {
     pub(crate) fn new(
         connection: Arc<dyn BrowserConnection>,
+        completion: oneshot::Receiver<Result<BrowserToolResponse, RoutedCallCompletionError>>,
         message: ToolCall,
         revocation: CancellationToken,
     ) -> Self {
         Self {
             connection,
+            completion,
             message,
             revocation,
         }
@@ -77,6 +81,12 @@ impl RoutedCall {
 
     pub fn revocation(&self) -> CancellationToken {
         self.revocation.clone()
+    }
+
+    pub async fn completion(self) -> Result<BrowserToolResponse, RoutedCallCompletionError> {
+        self.completion
+            .await
+            .unwrap_or(Err(RoutedCallCompletionError::Revoked))
     }
 
     /// Send the route unless its context or connection has already been revoked.
@@ -94,6 +104,12 @@ impl RoutedCall {
             result = self.connection.send(Message::ToolCall(self.message.clone())) => result,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RoutedCallCompletionError {
+    ResultInvalid,
+    Revoked,
 }
 
 impl fmt::Debug for RoutedCall {
@@ -151,6 +167,7 @@ pub struct RegistryChange {
 }
 
 pub(super) struct ActiveRequest {
+    pub completion: oneshot::Sender<Result<BrowserToolResponse, RoutedCallCompletionError>>,
     pub connection_id: BrowserConnectionId,
     pub context_id: String,
     pub context_revision: u64,

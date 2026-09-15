@@ -3,8 +3,9 @@ use std::{borrow::Cow, fmt, sync::Arc};
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     model::{
-        Implementation, ListToolsResult, PaginatedRequestParams, ProtocolVersion,
-        ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
+        CallToolRequestParams, CallToolResponse, Implementation, ListToolsResult,
+        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
+        ToolAnnotations,
     },
     service::RequestContext,
 };
@@ -15,18 +16,24 @@ use crate::{
     routing::{SharedCapabilityRegistry, shared_capability_registry},
 };
 
+use super::calls::McpCallRuntime;
+
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
     &[ProtocolVersion::V_2025_11_25, ProtocolVersion::V_2026_07_28];
 
 /// Core-owned MCP handler sharing the browser capability registry.
 #[derive(Clone)]
 pub struct BridgeMcpServer {
+    calls: McpCallRuntime,
     registry: SharedCapabilityRegistry,
 }
 
 impl BridgeMcpServer {
     pub fn new(registry: SharedCapabilityRegistry) -> Self {
-        Self { registry }
+        Self {
+            calls: McpCallRuntime::new(registry.clone()),
+            registry,
+        }
     }
 }
 
@@ -79,6 +86,14 @@ impl ServerHandler for BridgeMcpServer {
         };
         let tools = capabilities.into_iter().map(project_capability).collect();
         Ok(ListToolsResult::with_all_items(tools))
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, McpError> {
+        self.calls.execute(request, context.ct).await
     }
 }
 

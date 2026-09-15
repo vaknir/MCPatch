@@ -9,7 +9,10 @@ use mcpatch_bridge::{
         Capability, CapabilitySnapshot, CapabilitySource, ContextClosed, ContextClosedReason,
         JsonObject, Message, PROTOCOL_VERSION, Permission, Risk, ToolError, ToolResult,
     },
-    routing::{BrowserToolResponse, CapabilityRegistry, RegistryErrorCode, ToolInvocation},
+    routing::{
+        BrowserToolResponse, CapabilityRegistry, RegistryErrorCode, RoutedCallCompletionError,
+        ToolInvocation,
+    },
 };
 use serde_json::{Value, json};
 
@@ -356,8 +359,8 @@ async fn replacing_or_closing_a_context_revokes_its_in_flight_calls() {
     assert!(registry.visible_capabilities().is_empty());
 }
 
-#[test]
-fn disconnect_removes_contexts_and_revokes_calls() {
+#[tokio::test]
+async fn disconnect_removes_contexts_and_revokes_calls() {
     let (mut registry, id, _browser) = registry_with_connection("connection-a");
     registry
         .replace_snapshot(
@@ -375,6 +378,10 @@ fn disconnect_removes_contexts_and_revokes_calls() {
 
     assert!(registry.remove_connection(&id));
     assert!(routed.revocation().is_cancelled());
+    assert_eq!(
+        routed.completion().await.unwrap_err(),
+        RoutedCallCompletionError::Revoked
+    );
     assert!(registry.visible_capabilities().is_empty());
     assert!(!registry.remove_connection(&id));
 }
@@ -424,11 +431,15 @@ async fn duplicate_requests_fail_and_cancellation_is_idempotent() {
             .expect("fake browser receive must succeed"),
         Some(Message::Cancel(cancellation.message().clone()))
     );
+    assert_eq!(
+        routed.completion().await.unwrap_err(),
+        RoutedCallCompletionError::Revoked
+    );
     assert!(registry.cancel_request("request-1").is_none());
 }
 
-#[test]
-fn accepts_only_results_bound_to_the_original_route() {
+#[tokio::test]
+async fn accepts_only_results_bound_to_the_original_route() {
     let (mut registry, id, _browser) = registry_with_connection("connection-a");
     let (other_connection, _other_browser) = connection("connection-b");
     let other_id = other_connection.id().clone();
@@ -441,7 +452,7 @@ fn accepts_only_results_bound_to_the_original_route() {
             snapshot("tab-7", 3, vec![read_capability("demo.read")]),
         )
         .expect("snapshot must register");
-    registry
+    let routed = registry
         .route_call(invocation(
             "request-1",
             "demo.read",
@@ -505,10 +516,11 @@ fn accepts_only_results_bound_to_the_original_route() {
         origin: "https://example.com".to_owned(),
         result: json!({"ok": true}),
     };
+    registry
+        .accept_response(&id, BrowserToolResponse::Result(result.clone()))
+        .expect("exact result route must be accepted");
     assert_eq!(
-        registry
-            .accept_response(&id, BrowserToolResponse::Result(result.clone()))
-            .expect("exact result route must be accepted"),
+        routed.completion().await.unwrap(),
         BrowserToolResponse::Result(result)
     );
     assert_eq!(
@@ -532,8 +544,8 @@ fn accepts_only_results_bound_to_the_original_route() {
     );
 }
 
-#[test]
-fn validates_and_consumes_browser_results() {
+#[tokio::test]
+async fn validates_and_consumes_browser_results() {
     let (mut registry, id, _browser) = registry_with_connection("connection-a");
     let mut capability = read_capability("demo.read");
     capability.output_schema = Some(object(json!({
@@ -546,7 +558,7 @@ fn validates_and_consumes_browser_results() {
     registry
         .replace_snapshot(&id, snapshot("tab-7", 1, vec![capability]))
         .expect("snapshot must register");
-    registry
+    let routed = registry
         .route_call(invocation(
             "request-1",
             "demo.read",
@@ -568,6 +580,10 @@ fn validates_and_consumes_browser_results() {
             .expect_err("invalid result must fail")
             .code(),
         RegistryErrorCode::ResultInvalid
+    );
+    assert_eq!(
+        routed.completion().await.unwrap_err(),
+        RoutedCallCompletionError::ResultInvalid
     );
 
     let valid_but_consumed = ToolResult {

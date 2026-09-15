@@ -1,10 +1,12 @@
 use serde_json::Value;
+use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
 use super::{
     BrowserToolResponse, PermissionDecision, RegistryError, RegistryErrorCode, RoutedCall,
-    RoutedCancellation, ToolInvocation, permission_decision, registry::CapabilityRegistry,
-    types::ActiveRequest,
+    RoutedCancellation, ToolInvocation, permission_decision,
+    registry::CapabilityRegistry,
+    types::{ActiveRequest, RoutedCallCompletionError},
 };
 use crate::{
     browser::BrowserConnectionId,
@@ -55,9 +57,11 @@ impl CapabilityRegistry {
             .map_err(|_| RegistryError::new(RegistryErrorCode::InvalidArguments))?;
 
         let revocation = CancellationToken::new();
+        let (completion_sender, completion_receiver) = oneshot::channel();
         self.active_requests.insert(
             invocation.request_id,
             ActiveRequest {
+                completion: completion_sender,
                 connection_id: resolved.connection.id().clone(),
                 context_id: resolved.context_id,
                 context_revision: resolved.context_revision,
@@ -67,7 +71,12 @@ impl CapabilityRegistry {
             },
         );
 
-        Ok(RoutedCall::new(resolved.connection, message, revocation))
+        Ok(RoutedCall::new(
+            resolved.connection,
+            completion_receiver,
+            message,
+            revocation,
+        ))
     }
 
     pub fn cancel_request(&mut self, request_id: &str) -> Option<RoutedCancellation> {
@@ -91,12 +100,12 @@ impl CapabilityRegistry {
         &mut self,
         connection_id: &BrowserConnectionId,
         response: BrowserToolResponse,
-    ) -> Result<BrowserToolResponse, RegistryError> {
+    ) -> Result<(), RegistryError> {
         validate_response(&response)?;
-        let request_id = response.request_id();
+        let request_id = response.request_id().to_owned();
         let active = self
             .active_requests
-            .get(request_id)
+            .get(&request_id)
             .ok_or_else(|| RegistryError::new(RegistryErrorCode::RequestNotFound))?;
         if &active.connection_id != connection_id {
             return Err(RegistryError::new(RegistryErrorCode::Unauthorized));
@@ -114,12 +123,22 @@ impl CapabilityRegistry {
             (&active.output_validator, &response)
             && !validator.is_valid(&result.result)
         {
-            self.active_requests.remove(request_id);
+            let active = self
+                .active_requests
+                .remove(&request_id)
+                .expect("validated active request must still exist");
+            let _ = active
+                .completion
+                .send(Err(RoutedCallCompletionError::ResultInvalid));
             return Err(RegistryError::new(RegistryErrorCode::ResultInvalid));
         }
 
-        self.active_requests.remove(request_id);
-        Ok(response)
+        let active = self
+            .active_requests
+            .remove(&request_id)
+            .expect("validated active request must still exist");
+        let _ = active.completion.send(Ok(response));
+        Ok(())
     }
 }
 
