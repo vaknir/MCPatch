@@ -10,37 +10,12 @@ import type {
   PackPermission,
   PackToolManifest,
 } from "./types.js";
-import { compareStableVersions } from "./validation/primitives.js";
 
 const addFormats = addFormatsModule as unknown as FormatsPlugin;
 
 export interface ToolSchemaValidators {
   readonly input: ValidateFunction;
   readonly output: ValidateFunction;
-}
-
-export function runtimeIsCompatible(
-  manifest: PackManifest,
-  runtimeVersion: string,
-): boolean {
-  return (
-    compareStableVersions(
-      runtimeVersion,
-      manifest.compatibility.runtime.minimum,
-    ) >= 0 &&
-    compareStableVersions(
-      runtimeVersion,
-      manifest.compatibility.runtime.maximumExclusive,
-    ) < 0
-  );
-}
-
-export function bridgeProtocolIsCompatible(
-  manifest: PackManifest,
-  version: number,
-): boolean {
-  const range = manifest.compatibility.bridgeProtocol;
-  return version >= range.minimum && version <= range.maximum;
 }
 
 export function permissionsAreAllowed(

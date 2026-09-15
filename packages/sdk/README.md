@@ -4,6 +4,10 @@ This package owns the separately versioned MCPatch pack contract and authoring A
 Pack Manifest version 1 is available as TypeScript types, deterministic object-level
 validation, and JSON Schema.
 
+Browser runtimes should import the codegen-free `@mcpatch/sdk/runtime` entrypoint.
+The package root additionally exports the Node.js fixture harness and its Ajv
+compiler, and must not be bundled into a Manifest V3 service worker.
+
 ```ts
 import { parsePackManifest } from "@mcpatch/sdk";
 

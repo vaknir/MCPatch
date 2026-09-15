@@ -16,12 +16,14 @@ import {
   type ValidatedVerificationOptions,
 } from "./fixture-harness-input.js";
 import {
-  bridgeProtocolIsCompatible,
   compileToolSchemas,
   permissionsAreAllowed,
-  runtimeIsCompatible,
   type ToolSchemaValidators,
 } from "./fixture-harness-validation.js";
+import {
+  packSupportsBridgeProtocol,
+  packSupportsRuntime,
+} from "./pack-compatibility.js";
 import type { PackFixture, PackManifest } from "./types.js";
 import { cloneAndFreeze } from "./validation/primitives.js";
 
@@ -90,10 +92,10 @@ function initialChecks(
   invalidSchemaCount: number,
 ): MutableChecks {
   return {
-    runtime: runtimeIsCompatible(manifest, options.runtimeVersion)
+    runtime: packSupportsRuntime(manifest, options.runtimeVersion)
       ? PASSED
       : failed("RUNTIME_INCOMPATIBLE"),
-    bridgeProtocol: bridgeProtocolIsCompatible(
+    bridgeProtocol: packSupportsBridgeProtocol(
       manifest,
       options.bridgeProtocolVersion,
     )

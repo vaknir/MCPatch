@@ -1,0 +1,27 @@
+{
+  "name": "@mcpatch/example-packs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reviewed synthetic MCPatch packs for local integration",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcpatch/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4"
+  }
+}

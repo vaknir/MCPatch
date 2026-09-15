@@ -5,6 +5,10 @@ export {
   PackToolExecutionError,
 } from "./fixture-harness-types.js";
 export { canonicalizePageLocation, packMatchesLocation } from "./location.js";
+export {
+  packSupportsBridgeProtocol,
+  packSupportsRuntime,
+} from "./pack-compatibility.js";
 export { resolveContextCapabilities } from "./resolution.js";
 export type {
   PackAuthoringInput,

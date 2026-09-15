@@ -1,9 +1,9 @@
 {
   "manifestVersion": 1,
   "publisher": "mcpatch",
-  "id": "demo-pack",
+  "id": "builtin-demo",
   "name": "MCPatch demo pack",
-  "description": "A deterministic bundled pack used for local contract tests.",
+  "description": "A deterministic bundled pack used for local integration tests.",
   "version": "0.1.0",
   "digest": "sha256:879486d0000d36f06d47958b5285dec823c7805112a4bd086962c20e1d54fb78",
   "compatibility": {
