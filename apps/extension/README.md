@@ -11,20 +11,23 @@ heartbeat every 15 seconds while connected.
 pnpm --filter @mcpatch/extension build
 ```
 
-The build bundles the shared protocol validator into a single local service-worker
-module and copies the manifest. Load `apps/extension/dist` with **Load unpacked** on
+The build bundles the shared protocol validator, the codegen-free pack runtime, and
+reviewed example pack into one local service-worker module, then copies the
+manifest. It fails if dynamic `eval` or `Function` code generation enters the
+bundle. Load `apps/extension/dist` with **Load unpacked** on
 `chrome://extensions` for local development. The native-host manifest must allow
-the resulting extension ID. There is no toolbar UI or real-site capability in this
-slice.
+the resulting extension ID. There is no toolbar UI or real-site capability.
 
 The runtime requires Chromium 105 or newer. That is the first release where an
 open Native Messaging port keeps an extension service worker alive. A failed
 handshake is closed after five seconds; reconnect delays increase from 250 ms to a
 five-second ceiling. Messages are not queued or replayed across connections.
 
-## Built-in demo capability
+## Reviewed synthetic pack
 
-After negotiation, the extension publishes one bundled read-only tool,
+After negotiation, the extension runs the `packs/examples` definition through the
+generic compiled-pack admission, exact matching, and native-first resolution path.
+It publishes one bundled read-only tool,
 `mcpatch.demo.status`, under the reserved synthetic origin
 `https://demo.mcpatch.invalid`. Calling it with an empty object returns the fixed
 result `{ "status": "ready" }`. The runtime binds calls to that exact context,
@@ -33,7 +36,12 @@ snapshot after reconnect and closes the context before an explicit runtime stop.
 
 This capability is a transport and routing proof point. It does not inspect an open
 tab or website, and its bundled-pack digest is a stable demo identity rather than a
-marketplace signature.
+marketplace signature. Calls pass the declared input and output schemas in the
+codegen-free runtime before and after the narrow handler. Navigation, disable,
+definition replacement, disconnect, and cancellation all revoke bound work.
+
+See [Compiled pack extension runtime](../../docs/architecture/compiled-pack-runtime.md)
+for admission, native precedence, lifecycle, and remaining real-site work.
 
 The cross-platform automated workflow that exercises this contract through the real
 Native Messaging and MCP stdio processes is documented in

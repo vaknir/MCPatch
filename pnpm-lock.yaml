@@ -187,9 +187,15 @@ importers:
 
   apps/extension:
     dependencies:
+      '@mcpatch/example-packs':
+        specifier: workspace:*
+        version: link:../../packs/examples
       '@mcpatch/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@mcpatch/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
     devDependencies:
       '@types/node':
         specifier: 24.13.4
@@ -218,6 +224,16 @@ importers:
       ajv-formats:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.20.0)
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.4
+        version: 24.13.4
+
+  packs/examples:
+    dependencies:
+      '@mcpatch/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
     devDependencies:
       '@types/node':
         specifier: 24.13.4

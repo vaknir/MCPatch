@@ -45,6 +45,7 @@ export class NativeSessionSupervisor {
   readonly #config: SessionConfig;
   readonly #onMessage:
     ((message: BridgeApplicationMessage) => void) | undefined;
+  readonly #onDisconnected: (() => void) | undefined;
   readonly #onReady: (() => void) | undefined;
   readonly #onStopping: (() => void) | undefined;
   #active: ActivePort | undefined;
@@ -64,6 +65,7 @@ export class NativeSessionSupervisor {
     this.#runtime = runtime;
     this.#scheduler = options.scheduler ?? systemScheduler;
     this.#onMessage = options.onMessage;
+    this.#onDisconnected = options.onDisconnected;
     this.#onReady = options.onReady;
     this.#onStopping = options.onStopping;
     this.#config = createSessionConfig(options);
@@ -269,10 +271,18 @@ export class NativeSessionSupervisor {
 
   #detachCurrent(disconnect: boolean): void {
     const active = this.#active;
+    const wasReady = this.#state.phase === "ready";
     this.#active = undefined;
     this.#clearHandshakeTimer();
     this.#clearHeartbeatTimer();
     if (disconnect) disconnectQuietly(active?.port);
+    if (wasReady) {
+      try {
+        this.#onDisconnected?.();
+      } catch {
+        // Connection cleanup and retry do not depend on an application hook.
+      }
+    }
   }
 
   #scheduleRetry(): void {

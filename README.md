@@ -58,8 +58,10 @@ Strict `definePack` and `defineTool` authoring primitives keep serializable meta
 separate from reviewed compiled handlers. Pure exact URL matching and deterministic
 native-first capability resolution are also implemented. A deterministic fixture
 harness now preflights compatibility, permission ceilings, schemas, and fixtures,
-then emits payload-free evidence for reviewed compiled packs. Runtime integration
-and real-site adapters remain Phase 5 work.
+then emits payload-free evidence for reviewed compiled packs. One synthetic pack is
+now integrated through a codegen-free extension runtime with exact matching,
+native-first resolution, typed dispatch, and lifecycle revocation. Real-site
+permissions and adapters remain future work.
 
 ## Bridge development
 

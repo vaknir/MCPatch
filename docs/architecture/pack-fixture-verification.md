@@ -69,6 +69,7 @@ Run the harness contract suite with the repository-pinned Node and pnpm versions
 pnpm verify:packs
 ```
 
-Pack packages can call `verifyPackFixtures` from Vitest and fail their test when the
-returned top-level result is invalid or `evidence.passed` is false. Phase 5's
-reviewed example pack will be added to this command once it is integrated.
+Pack packages call `verifyPackFixtures` from Vitest and fail their test when the
+returned top-level result is invalid or `evidence.passed` is false. The command now
+verifies both the harness contract and every test in `packs/*`, including the
+reviewed synthetic pack compiled into the extension.

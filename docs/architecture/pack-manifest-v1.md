@@ -73,6 +73,11 @@ not runtime authority. The
 preflights every fixture, and executes reviewed local handlers without placing
 inputs or results in its deterministic evidence.
 
+The Manifest V3 [compiled-pack runtime](compiled-pack-runtime.md) additionally
+requires schemas to fit its smaller codegen-free interpretation subset. A schema
+that passes Draft 2020-12 validation but uses an unsupported runtime keyword cannot
+be activated by that runtime.
+
 ## Validation and compatibility policy
 
 JSON Schema rejects structural violations. `validatePackManifest` additionally

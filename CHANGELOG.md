@@ -84,6 +84,9 @@ All notable MCPatch changes are documented here. The format follows
 - Deterministic compiled-pack fixture verification with whole-pack preflight,
   runtime and bridge compatibility checks, explicit permission ceilings, typed
   error cases, result-schema validation, deadlines, and payload-free evidence.
+- Reviewed synthetic pack workspace and codegen-free MV3 compiled-pack runtime with
+  exact SDK matching, native WebMCP precedence, bounded schema interpretation,
+  typed calls, result validation, cancellation, and lifecycle revocation.
 
 ### Fixed
 

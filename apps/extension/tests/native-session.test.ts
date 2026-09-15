@@ -201,6 +201,16 @@ describe("native session supervisor", () => {
     expect(runtime.ports).toHaveLength(1);
   });
 
+  it("notifies application state when a ready connection is lost", () => {
+    const onDisconnected = vi.fn();
+    const { runtime } = setup({ onDisconnected });
+    runtime.latestPort.emitMessage(helloAck());
+
+    runtime.latestPort.emitDisconnect();
+
+    expect(onDisconnected).toHaveBeenCalledOnce();
+  });
+
   it("fails closed around application lifecycle hook errors", () => {
     const failedReady = setup({
       onReady() {

@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcpatch/protocol": "workspace:*"
+    "@mcpatch/example-packs": "workspace:*",
+    "@mcpatch/protocol": "workspace:*",
+    "@mcpatch/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.13.4",

@@ -3,7 +3,9 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@mcpatch/protocol": ["../../packages/protocol/src/index.ts"]
+      "@mcpatch/example-packs": ["../../packs/examples/src/index.ts"],
+      "@mcpatch/protocol": ["../../packages/protocol/src/index.ts"],
+      "@mcpatch/sdk/runtime": ["../../packages/sdk/src/runtime.ts"]
     },
     "types": ["node", "vitest/globals"]
   },

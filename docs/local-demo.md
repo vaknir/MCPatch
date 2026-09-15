@@ -1,7 +1,7 @@
 # Local demo workflow
 
 MCPatch includes one deterministic transport proof, `mcpatch.demo.status`. It is a
-bundled read-only capability under the synthetic origin
+reviewed compiled pack under the synthetic origin
 `https://demo.mcpatch.invalid`; it neither reads a website nor uses browser
 credentials.
 
@@ -42,8 +42,9 @@ The unpacked extension can be built with:
 pnpm --filter @mcpatch/extension build
 ```
 
-The output is `apps/extension/dist`. Its service worker implements the same demo
-contract used by the process test.
+The output is `apps/extension/dist`. Its service worker admits the reviewed pack,
+applies exact matching and native-first resolution, and implements the same demo
+contract used by the process test. The build rejects dynamic code generation.
 
 This is not yet a complete Chrome installation flow. MCPatch does not currently
 install a Native Messaging manifest, provision a stable extension ID, bind the
