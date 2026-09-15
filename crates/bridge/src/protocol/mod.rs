@@ -8,6 +8,8 @@ pub use error::{ParseMessageError, ValidationCode, ValidationError};
 pub use negotiation::*;
 pub use types::*;
 
+pub(crate) use strict_json::parse_value as parse_strict_json_value;
+
 /// Maximum encoded protocol frame accepted before JSON parsing.
 pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
 /// The bridge protocol version implemented by these types.
@@ -32,7 +34,7 @@ pub fn parse_message(input: &[u8]) -> Result<Message, ParseMessageError> {
         });
     }
 
-    let strict_json::StrictJson(value) = serde_json::from_slice(input)?;
+    let value = strict_json::parse_value(input)?;
     let message: Message = serde_json::from_value(value)?;
     message.validate()?;
     Ok(message)

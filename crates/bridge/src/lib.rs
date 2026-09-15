@@ -3,6 +3,7 @@
 
 pub mod browser;
 pub mod cli;
+pub mod local_ipc;
 pub mod logging;
 pub mod mcp;
 pub mod native_host;

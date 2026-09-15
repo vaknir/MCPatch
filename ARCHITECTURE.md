@@ -48,6 +48,8 @@ provide a general network/filesystem proxy.
 The Chromium-facing process is a bounded framing adapter; its caller checks,
 wire-format rules, and local IPC seam are documented in
 [Native Messaging adapter](docs/architecture/native-messaging-adapter.md).
+The implemented Unix rendezvous primitive is documented in
+[Local IPC transport](docs/architecture/local-ipc-transport.md).
 
 ### Browser extension
 
