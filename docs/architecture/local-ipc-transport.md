@@ -95,10 +95,10 @@ touching the first core's pipes; after clean release or process termination, a n
 core can acquire the same name.
 
 The bridge crate remains free of unsafe code. The small `mcpatch-windows-kernel`
-crate contains the missing raw `CreateMutexExW`, last-error, `ReleaseMutex`, and
-owned-handle conversion boundary; its safe guard is deliberately not `Send`, and
-all other code in that crate denies unsafe operations. This keeps the thread-affine
-kernel contract explicit instead of hiding it behind an unrestricted utility layer.
+crate contains the missing raw named-mutex calls and the `PeekNamedPipe` availability
+probe; all other code in that crate denies unsafe operations. Its mutex guard is
+deliberately not `Send`. This keeps the thread-affine kernel contract and pipe probe
+explicit instead of hiding them behind an unrestricted utility layer.
 
 The bridge reads its process-token logon SID and creates an explicit protected DACL
 with one allow ACE granting only generic read and write to that SID. It does not add
@@ -113,6 +113,9 @@ RAII guard remains in scope as a fallback during every error path. The authentic
 blocking stream uses the same bounded little-endian JSON framing validators as Unix.
 The bridge core isolates polling accepts and nonblocking session reads on two accept
 workers and at most eight session workers per role, never on Tokio executor threads.
+Before each nonblocking read, a narrow `PeekNamedPipe` probe distinguishes a connected,
+empty pipe from a disconnected peer; `PIPE_NOWAIT` reads alone do not preserve that
+distinction reliably through all library wrappers.
 Partial frames are retained only up to the shared 1 MiB limit and are disconnected
 after five seconds. Worker shutdown is ordered before mutex release.
 

@@ -1,6 +1,8 @@
-use std::io::{self, Read};
+use std::{
+    io::{self, Read},
+    os::windows::io::AsHandle,
+};
 
-use firehazard::winapi::shared::winerror::ERROR_NO_DATA;
 use interprocess::os::windows::named_pipe::{DuplexPipeStream, pipe_mode};
 
 use super::identity::current_thread_logon_sid;
@@ -48,13 +50,14 @@ impl AuthenticatedWindowsStream {
     }
 
     pub(crate) fn read_some(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buffer).map_err(|error| {
-            if error.raw_os_error() == Some(ERROR_NO_DATA as i32) {
-                io::Error::from(io::ErrorKind::WouldBlock)
-            } else {
-                error
-            }
-        })
+        let available = mcpatch_windows_kernel::named_pipe_available(self.inner.as_handle())?;
+        if available == 0 {
+            return Err(io::Error::from(io::ErrorKind::WouldBlock));
+        }
+
+        let available = usize::try_from(available).unwrap_or(usize::MAX);
+        let read_length = buffer.len().min(available);
+        self.inner.read(&mut buffer[..read_length])
     }
 }
 
