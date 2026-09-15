@@ -31,12 +31,20 @@ stable payload-free lifecycle and error events go to standard error.
 
 The bridge core creates the `rmcp` server for every authenticated MCP connection.
 Initialization, protocol-version negotiation, request handling, tool discovery, and
-future access to shared capability/policy state therefore remain in the elected core,
-not in adapters. Unix and Windows enforce eight concurrent sessions per parser role.
+access to shared capability/policy state therefore remain in the elected core, not
+in adapters. Unix and Windows enforce eight concurrent sessions per parser role.
 Each accepted stream has an idle-safe five-second deadline that begins only after the
 first byte of an incomplete local frame arrives.
 
-Tests cover real process initialization and empty discovery, multiple core-owned
-sessions, per-role limits, malformed and oversized stdio, local loss, stdio EOF, and
-the authenticated Unix and Windows transport paths. No TCP, HTTP, or browser-facing
-surface is introduced.
+`tools/list` snapshots the registry's currently visible capabilities, releases the
+registry lock, and projects only the public typed contract: name, title, description,
+input schema, optional output schema, and conservative MCP annotations. Internal
+connection/context identifiers, origins, pack identities, and permission records are
+not exposed as tool metadata. Ordering follows the registry's stable tool-name order.
+The bounded version-1 registry fits in one response, so cursors are rejected and each
+new list request observes the latest snapshot, context closure, and disconnect state.
+
+Tests cover real process initialization, empty and live/revoked discovery, multiple
+core-owned sessions, per-role limits, malformed and oversized stdio, local loss,
+stdio EOF, and the authenticated Unix and Windows transport paths. No TCP, HTTP, or
+browser-facing surface is introduced.
