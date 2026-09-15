@@ -1,1 +1,0 @@
-{"pageProtocolVersion":1,"type":"page_hello","type":"page_hello","supportedPageProtocolVersions":[1],"implementation":{"name":"mcpatch-content","version":"0.1.0"}}

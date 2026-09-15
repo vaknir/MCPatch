@@ -1,6 +1,6 @@
 import type { JsonObject, JsonValue } from "@mcpatch/protocol";
 
-export const PAGE_PROTOCOL_VERSION = 1 as const;
+export const PAGE_PROTOCOL_VERSION = 2 as const;
 export const MAX_PAGE_FRAME_BYTES = 256 * 1024;
 export const MAX_PAGE_CAPABILITIES = 128;
 
@@ -32,6 +32,7 @@ export interface PageHelloAck extends PageBinding {
   readonly type: "page_hello_ack";
   readonly selectedPageProtocolVersion: typeof PAGE_PROTOCOL_VERSION;
   readonly implementation: PageImplementation;
+  readonly authorizedPackTools: readonly string[];
 }
 
 export interface PagePackCapability {

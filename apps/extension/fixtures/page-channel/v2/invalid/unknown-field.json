@@ -1,7 +1,7 @@
 {
-  "pageProtocolVersion": 1,
+  "pageProtocolVersion": 2,
   "type": "page_hello",
-  "supportedPageProtocolVersions": [1],
+  "supportedPageProtocolVersions": [2],
   "implementation": { "name": "mcpatch-content", "version": "0.1.0" },
   "unexpected": true
 }

@@ -2,18 +2,19 @@
 
 ## Version domains
 
-MCPatch has four independent compatibility domains.
+MCPatch has five independent compatibility domains.
 
 | Domain                | Format           | Initial value | Changes when                                                       |
 | --------------------- | ---------------- | ------------- | ------------------------------------------------------------------ |
 | Product release       | SemVer           | `0.1.0`       | Installable MCPatch behavior is released                           |
 | Rust/npm package      | SemVer           | `0.1.0`       | A package API or implementation is released                        |
 | Bridge protocol       | Positive integer | `1`           | Bridge↔extension wire compatibility changes                        |
+| Page protocol         | Positive integer | `2`           | Service worker↔content-runtime compatibility changes               |
 | Pack manifest         | Positive integer | `1`           | Pack manifest interpretation changes incompatibly                  |
 | External MCP revision | Date string      | `2026-07-28`  | The upstream MCP specification publishes and MCPatch adopts a date |
 
 Product and package SemVer may align for early releases but are not required to.
-Bridge protocol and pack manifest numbers never derive from package versions.
+Bridge, page, and pack-manifest protocol numbers never derive from package versions.
 
 ## SemVer during pre-1.0 development
 
@@ -44,6 +45,12 @@ A protocol change must include:
 
 Support for a protocol version cannot be removed without at least one product minor
 release of deprecation notice during pre-1.0 development.
+
+The internal page protocol uses the same closed-schema discipline but ships both
+peers inside one extension artifact. Page protocol 2 replaced unreleased page
+protocol 1 so the service worker can provide a trusted, sorted pack-tool allowlist
+to the content runtime. No product release accepted page protocol 1, so it has no
+deprecation window.
 
 ## Pack manifest compatibility
 

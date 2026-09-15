@@ -1,12 +1,12 @@
 [
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_hello",
-    "supportedPageProtocolVersions": [1],
+    "supportedPageProtocolVersions": [2],
     "implementation": { "name": "mcpatch-content", "version": "0.1.0" }
   },
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_capability_snapshot",
     "channelId": "channel-1",
     "contextId": "page-7",
@@ -36,7 +36,7 @@
     ]
   },
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_tool_result",
     "channelId": "channel-1",
     "contextId": "page-7",
@@ -49,7 +49,7 @@
     "result": { "status": "ready" }
   },
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_tool_error",
     "channelId": "channel-1",
     "contextId": "page-7",
@@ -62,7 +62,7 @@
     "code": "EXECUTION_FAILED"
   },
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_context_closed",
     "channelId": "channel-1",
     "contextId": "page-7",

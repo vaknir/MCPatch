@@ -34,7 +34,8 @@ const CAPABILITY: PageCapability = {
 
 describe("page content runtime", () => {
   it("negotiates a fixed port and publishes a validated snapshot", async () => {
-    const adapter = createAdapter();
+    const authorizePackTools = vi.fn();
+    const adapter = createAdapter({ authorizePackTools });
     const state = setup(adapter);
     state.content.wake();
     const port = state.runtime.latestPort;
@@ -42,11 +43,13 @@ describe("page content runtime", () => {
     expect(port.name).toBe(MCPATCH_PAGE_PORT_NAME);
     expect(posted(port, 0)).toMatchObject({
       type: "page_hello",
-      supportedPageProtocolVersions: [1],
+      supportedPageProtocolVersions: [PAGE_PROTOCOL_VERSION],
     });
 
     acknowledge(port);
     await settle();
+
+    expect(authorizePackTools).toHaveBeenCalledWith([CAPABILITY.name]);
 
     expect(posted(port, 1)).toEqual({
       pageProtocolVersion: PAGE_PROTOCOL_VERSION,
@@ -74,6 +77,7 @@ describe("page content runtime", () => {
         type: "page_hello_ack",
         selectedPageProtocolVersion: PAGE_PROTOCOL_VERSION,
         implementation: { name: "mcpatch-extension", version: "0.1.0" },
+        authorizedPackTools: [CAPABILITY.name],
         ...BINDING,
         origin: "https://attacker.example",
       }),
@@ -195,7 +199,7 @@ describe("page content runtime", () => {
     });
     const lifecycle = new FakePageLifecycle();
     const state = setup(adapter, lifecycle);
-    const port = ready(state);
+    const port = ready(state, [CAPABILITY.name, "flights.results"]);
     await settle();
 
     capabilities.push({ source: "pack", name: "flights.results" });
@@ -240,6 +244,17 @@ describe("page content runtime", () => {
     const invalidPort = ready(invalid);
     await settle();
     expect(invalidPort.disconnected).toBe(true);
+
+    const unauthorized = setup(
+      createAdapter({
+        async capabilities() {
+          return [{ source: "pack", name: "flights.results" }];
+        },
+      }),
+    );
+    const unauthorizedPort = ready(unauthorized);
+    await settle();
+    expect(unauthorizedPort.disconnected).toBe(true);
   });
 });
 
@@ -256,20 +271,27 @@ function setup(adapter: PageAdapter, lifecycle?: FakePageLifecycle) {
   return { content, runtime, scheduler };
 }
 
-function ready(state: ReturnType<typeof setup>): FakePagePort {
+function ready(
+  state: ReturnType<typeof setup>,
+  authorizedPackTools: readonly string[] = [CAPABILITY.name],
+): FakePagePort {
   state.content.wake();
   const port = state.runtime.latestPort;
-  acknowledge(port);
+  acknowledge(port, authorizedPackTools);
   return port;
 }
 
-function acknowledge(port: FakePagePort): void {
+function acknowledge(
+  port: FakePagePort,
+  authorizedPackTools: readonly string[] = [CAPABILITY.name],
+): void {
   port.emitMessage(
     encodeWorkerToPageMessage({
       pageProtocolVersion: PAGE_PROTOCOL_VERSION,
       type: "page_hello_ack",
       selectedPageProtocolVersion: PAGE_PROTOCOL_VERSION,
       implementation: { name: "mcpatch-extension", version: "0.1.0" },
+      authorizedPackTools,
       ...BINDING,
     }),
   );

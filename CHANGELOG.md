@@ -18,8 +18,11 @@ All notable MCPatch changes are documented here. The format follows
   per-file SHA-256 digests, plus deterministic public extension identity and
   user-level Native Messaging install, dry-run, idempotent update, receipt-bound
   recoverable uninstall, and cross-platform registration-plan tests.
-- Internal extension page-channel protocol version 1 with bounded duplicate-aware
-  JSON parsing, direction validation, exact document bindings, and golden fixtures.
+- Internal extension page-channel protocol version 2 with bounded duplicate-aware
+  JSON parsing, direction validation, exact document bindings, worker-authorized
+  pack-tool selection, and golden fixtures.
+- A static reviewed document-adapter router that constructs only matching authorized
+  bundled adapters and preserves native WebMCP precedence.
 - Top-level document context ownership through browser-attested content ports with
   deny-by-default origin authority, navigation replacement, bounded discovery and
   calls, exact cancellation, and an inert isolated-world content runtime bundle.

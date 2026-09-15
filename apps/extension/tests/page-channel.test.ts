@@ -13,7 +13,7 @@ import {
   type WorkerToPageMessage,
 } from "../src/page-channel.js";
 
-const fixtureRoot = new URL("../fixtures/page-channel/v1/", import.meta.url);
+const fixtureRoot = new URL("../fixtures/page-channel/v2/", import.meta.url);
 const pageToWorker = readJson("valid/page-to-worker.json") as unknown[];
 const workerToPage = readJson("valid/worker-to-page.json") as unknown[];
 const invalidCases = readJson("invalid/cases.json") as Array<{

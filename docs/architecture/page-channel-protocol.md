@@ -1,8 +1,8 @@
-# Extension page-channel protocol version 1
+# Extension page-channel protocol version 2
 
 The page channel is the internal boundary between MCPatch's Manifest V3 service
 worker and a top-level isolated-world content runtime. It is not the bridge protocol,
-not MCP, and not a pack API. Version `1` is independently negotiated so browser-side
+not MCP, and not a pack API. Version `2` is independently negotiated so browser-side
 changes do not silently alter either stable boundary.
 
 ## Wire and resource limits
@@ -28,7 +28,12 @@ sender metadata, then returns `page_hello_ack` with an immutable binding:
 - random channel ID;
 - opaque MCPatch context ID and monotonic revision;
 - Chromium tab and document IDs; and
-- canonical HTTPS origin.
+- canonical HTTPS origin; and
+- a sorted allowlist of pack tools currently authorized for that document.
+
+Version 2 adds the trusted `authorizedPackTools` allowlist needed for content-side
+adapter selection. Unreleased version 1 had no such selection input and is not
+accepted by the Phase 7 runtime.
 
 Every later message repeats the complete binding. It must equal both the accepted
 port state and its current authority. Sender identity and enablement are deliberately
@@ -66,7 +71,7 @@ owns its immutable manifest and refuses names not declared by the enabled matchi
 pack.
 
 A native WebMCP candidate may additionally report a bounded title, description,
-input schema, and normalized annotations. Version 1 admits only metadata explicitly
+input schema, and normalized annotations. Version 2 admits only metadata explicitly
 marked read-only, non-consequential, and untrusted-content. The native adapter keeps
 the browser's opaque registered-tool handle inside the document; it never crosses
 this channel.
@@ -82,10 +87,11 @@ calls. The service worker re-evaluates origin-scoped pack authority before every
 snapshot, result, and invocation; removing an authority revokes the whole document
 port and its pending work.
 
-The content bundle currently carries an empty adapter and is not statically or
-dynamically registered. The service worker authority defaults to deny. Optional host
-permission and reviewed-pack enablement are a separate slice, so landing this owner
-does not expand site access.
+A reviewed adapter factory is selected only from extension-bundled definitions whose
+validated pack manifest matches the exact current origin/path and whose complete
+declared tool set appears in `authorizedPackTools`. Factories are not called before
+authorization. A partial allowlist, duplicate route, undeclared capability, or
+factory failure closes the page context without forwarding exception details.
 
 ## Explicit absences
 
@@ -95,5 +101,5 @@ approval. Adding a new message type requires a protocol-version decision, threat
 model review, golden fixtures, and direction tests.
 
 Golden frames live under
-`apps/extension/fixtures/page-channel/v1`. Runtime validation is implemented without
+`apps/extension/fixtures/page-channel/v2`. Runtime validation is implemented without
 dynamic code generation in `apps/extension/src/page-channel-*`.

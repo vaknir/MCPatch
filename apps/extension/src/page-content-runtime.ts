@@ -5,6 +5,7 @@ import {
   parseWorkerToPageFrame,
   type PageBinding,
   type PageCapability,
+  type PageHelloAck,
 } from "./page-channel.js";
 import { PageCallExecutor } from "./page-content-executor.js";
 import {
@@ -33,6 +34,7 @@ export class PageContentRuntime {
   readonly #handshakeTimeoutMs: number;
   readonly #retryDelaysMs: readonly number[];
   #binding: PageBinding | undefined;
+  #authorizedPackTools = new Set<string>();
   #discovery: AbortController | undefined;
   #executor: PageCallExecutor | undefined;
   #generation = 0;
@@ -161,7 +163,7 @@ export class PageContentRuntime {
     this.#executor?.execute(message);
   }
 
-  #ready(generation: number, binding: PageBinding): void {
+  #ready(generation: number, binding: PageHelloAck): void {
     if (binding.origin !== this.#expectedOrigin) {
       this.#fail(this.#generation);
       return;
@@ -175,6 +177,7 @@ export class PageContentRuntime {
       documentId: binding.documentId,
       origin: binding.origin,
     });
+    this.#authorizedPackTools = new Set(binding.authorizedPackTools);
     this.#executor = new PageCallExecutor(
       this.#adapter,
       (frame) => this.#postFrame(generation, frame),
@@ -182,6 +185,7 @@ export class PageContentRuntime {
     );
     this.#retryAttempt = 0;
     try {
+      this.#adapter.authorizePackTools?.(binding.authorizedPackTools);
       this.#unsubscribe = this.#adapter.subscribe?.(() => this.refresh());
     } catch {
       this.#adapterFailed();
@@ -222,6 +226,15 @@ export class PageContentRuntime {
             const parsed = parsePageToWorkerFrame(frame);
             if (parsed.type !== "page_capability_snapshot") {
               throw new Error("snapshot invariant failed");
+            }
+            if (
+              parsed.capabilities.some(
+                (capability) =>
+                  capability.source === "pack" &&
+                  !this.#authorizedPackTools.has(capability.name),
+              )
+            ) {
+              throw new Error("adapter reported an unauthorized pack tool");
             }
             const port = this.#port;
             if (port === undefined) throw new Error("page port unavailable");
@@ -292,6 +305,7 @@ export class PageContentRuntime {
     const port = this.#port;
     this.#port = undefined;
     this.#binding = undefined;
+    this.#authorizedPackTools.clear();
     this.#executor?.close();
     this.#executor = undefined;
     this.#clearHandshake();

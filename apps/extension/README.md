@@ -73,7 +73,7 @@ Reviewed scripts will be registered dynamically in the isolated world, and their
 top-level document ports—not `tabs` or `webNavigation`—will own context lifecycle.
 
 The closed, bounded JSON contract for those ports is implemented as page-channel
-protocol version 1 and documented in
+protocol version 2 and documented in
 [Extension page-channel protocol](../../docs/architecture/page-channel-protocol.md).
 It contains only handshake, capability refresh, exact call/result/error,
 cancellation, and lifecycle messages. The service worker now owns top-level
@@ -84,6 +84,11 @@ are bounded; crossed traffic or revoked pack authority closes the context. Runti
 authority still defaults to deny, remains unavailable until bridge negotiation is
 ready, and is revoked with all page state if that bridge session is lost. Content
 scripts are never registered statically.
+
+The version 2 acknowledgement carries a worker-derived sorted allowlist of pack
+tools. The content runtime uses it to construct only exact matching static reviewed
+adapters, rejects undeclared output independently, and routes native WebMCP first on
+name collisions.
 
 The extension action now reconciles reviewed pack enablement. It requests only the
 matching compiled pack's exact declared origin, stores a bounded v1 identity record

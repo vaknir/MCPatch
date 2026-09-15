@@ -13,6 +13,7 @@ import {
   wrongDirection,
 } from "./page-channel-primitives.js";
 import {
+  MAX_PAGE_CAPABILITIES,
   PAGE_PROTOCOL_VERSION,
   PageProtocolValidationError,
 } from "./page-channel-types.js";
@@ -83,6 +84,7 @@ function validateHelloAck(message: Record<string, unknown>): void {
     "type",
     "selectedPageProtocolVersion",
     "implementation",
+    "authorizedPackTools",
     ...BINDING_FIELDS,
   ]);
   if (message.selectedPageProtocolVersion !== PAGE_PROTOCOL_VERSION) {
@@ -92,7 +94,26 @@ function validateHelloAck(message: Record<string, unknown>): void {
     );
   }
   validateImplementation(message.implementation);
+  validateAuthorizedPackTools(message.authorizedPackTools);
   validateBinding(message);
+}
+
+function validateAuthorizedPackTools(value: unknown): void {
+  if (!Array.isArray(value)) invalidType("authorizedPackTools");
+  if (value.length > MAX_PAGE_CAPABILITIES) {
+    throw new PageProtocolValidationError(
+      "LIMIT_EXCEEDED",
+      "authorizedPackTools",
+    );
+  }
+  let previous: string | undefined;
+  for (const [index, valueTool] of value.entries()) {
+    toolName(valueTool, `authorizedPackTools[${index}]`);
+    if (previous !== undefined && previous >= valueTool) {
+      invalidValue(`authorizedPackTools[${index}]`);
+    }
+    previous = valueTool;
+  }
 }
 
 function validateSnapshot(message: Record<string, unknown>): void {

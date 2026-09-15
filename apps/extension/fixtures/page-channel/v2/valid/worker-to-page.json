@@ -1,9 +1,10 @@
 [
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_hello_ack",
-    "selectedPageProtocolVersion": 1,
+    "selectedPageProtocolVersion": 2,
     "implementation": { "name": "mcpatch-extension", "version": "0.1.0" },
+    "authorizedPackTools": ["example.read"],
     "channelId": "channel-1",
     "contextId": "page-7",
     "contextRevision": 1,
@@ -12,7 +13,7 @@
     "origin": "https://example.com"
   },
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_tool_call",
     "channelId": "channel-1",
     "contextId": "page-7",
@@ -25,7 +26,7 @@
     "args": {}
   },
   {
-    "pageProtocolVersion": 1,
+    "pageProtocolVersion": 2,
     "type": "page_cancel",
     "channelId": "channel-1",
     "contextId": "page-7",
