@@ -1,5 +1,6 @@
 import {
   type JsonObject as PackJsonObject,
+  type PackToolHandler,
   type ResolvedCapability,
 } from "@mcpatch/sdk/runtime";
 import {
@@ -95,6 +96,7 @@ export function createRoutes(
     NativeRuntimeTool,
     ValidatedCompiledPack
   >[],
+  pageHandlers?: ReadonlyMap<string, PackToolHandler>,
 ): ReadonlyMap<string, RuntimeRoute> {
   const routes = new Map<string, RuntimeRoute>();
   for (const capability of capabilities) {
@@ -102,7 +104,9 @@ export function createRoutes(
       capability.source === "pack" ? capability.tool : capability.value.tool;
     const execute =
       capability.source === "pack"
-        ? capability.value.handlers[capability.name]
+        ? pageHandlers === undefined
+          ? capability.value.handlers[capability.name]
+          : pageHandlers.get(capability.name)
         : capability.value.execute;
     if (execute === undefined)
       throw new Error("resolved handler invariant failed");

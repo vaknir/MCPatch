@@ -1,4 +1,8 @@
-import { definePack, defineTool } from "@mcpatch/sdk/runtime";
+import {
+  PackToolExecutionError,
+  definePack,
+  defineTool,
+} from "@mcpatch/sdk/runtime";
 
 import {
   FIXTURE_ORIGIN,
@@ -31,7 +35,7 @@ const fallbackState = defineTool({
   inputSchema: emptyInput,
   outputSchema: stateOutput,
   execute() {
-    return { revision: 0, value: "fixture-fallback" };
+    throw new PackToolExecutionError("TOOL_NOT_FOUND");
   },
 });
 
@@ -47,9 +51,8 @@ const fallbackWait = defineTool({
     required: ["completed"],
     properties: { completed: { type: "boolean" } },
   },
-  execute(context) {
-    context.signal.throwIfAborted();
-    return { completed: true };
+  execute() {
+    throw new PackToolExecutionError("TOOL_NOT_FOUND");
   },
 });
 
@@ -61,7 +64,7 @@ export const fixturePack = definePack({
   description: "A test-only authority declaration for synthetic browser pages.",
   version: "0.1.0",
   digest:
-    "sha256:335f10d87f5c173184287ace34f1d999f40652c6135db94ec7ed1a9e087790e2",
+    "sha256:92aff532b5c12b6a7648251cd7ca3a57cc149d4a2470a726e808b8f2f2e1c3f4",
   compatibility: {
     runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
     bridgeProtocol: { minimum: 1, maximum: 1 },
@@ -80,16 +83,13 @@ export const fixturePack = definePack({
       id: "state-fallback",
       tool: FIXTURE_STATE_TOOL,
       input: {},
-      expect: {
-        kind: "result",
-        result: { revision: 0, value: "fixture-fallback" },
-      },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
     {
       id: "wait-fallback",
       tool: FIXTURE_WAIT_TOOL,
       input: {},
-      expect: { kind: "result", result: { completed: true } },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
   ],
 });

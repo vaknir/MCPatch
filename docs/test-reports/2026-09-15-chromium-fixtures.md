@@ -18,6 +18,8 @@ Evidence:
 - Native Messaging used the real `mcpatch` executable and authenticated local IPC;
 - MCP initialization, discovery, calls, and cancellation used newline-delimited
   stdio through the real bridge core;
+- both fixture tools were reported as pack capabilities and executed in the bound
+  document; their service-worker fallback handlers were fail-closed;
 - `fixture.current_state` returned only synthetic values `initial` and `updated`;
 - `fixture.wait` observed cancellation in the isolated page adapter;
 - refresh, malformed page input, cross-origin navigation, and disable each removed

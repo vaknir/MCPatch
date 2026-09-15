@@ -12,13 +12,14 @@ pnpm --filter @mcpatch/extension build
 ```
 
 The build bundles the shared protocol validator, codegen-free pack runtime, reviewed
-example pack, service worker, and isolated-world content runtime, then copies the
-manifest. It fails if dynamic `eval` or `Function` code generation enters either
-executable bundle. The content artifact is never registered statically; the
-enablement controller registers it only for user-approved reviewed origins. Load
+example and Google Flights packs, service worker, and isolated-world content
+runtime, then copies the manifest. It fails if dynamic `eval` or `Function` code
+generation enters either executable bundle. The content artifact is never
+registered statically; the enablement controller registers it only for user-approved
+reviewed origins. Load
 `apps/extension/dist` with **Load unpacked** on `chrome://extensions` for local
 development. The native-host manifest must allow the resulting extension ID. The
-toolbar enablement flow is active, while a real-site capability arrives in Phase 7.
+toolbar enablement flow is active for the bundled Google Flights reference pack.
 
 The committed public `key` fixes unpacked builds to extension ID
 `imbnpameklobbabbkfkalcfcggpjacdi`; it is public identity material, not a signing
@@ -50,7 +51,23 @@ codegen-free runtime before and after the narrow handler. Navigation, disable,
 definition replacement, disconnect, and cancellation all revoke bound work.
 
 See [Compiled pack extension runtime](../../docs/architecture/compiled-pack-runtime.md)
-for admission, native precedence, lifecycle, and remaining real-site work.
+for admission, page routing, native precedence, and lifecycle.
+
+## Reviewed Google Flights pack
+
+The private pre-alpha build includes `packs/google-flights` for the exact origin
+`https://www.google.com` and exact paths `/travel/flights` and
+`/travel/flights/search`. Its three tools read current search state, visible result
+summaries, and a short price insight. They are READ-only, have closed empty inputs,
+make no extension network requests, and publish website strings as bounded untrusted
+content.
+
+The content adapter is a static build dependency constructed only after the service
+worker authorizes its complete declared tool set. A page snapshot limits the pack
+manifest to tools actually available in that document, and every selected route is
+sent back to that exact document for execution. The manifest's service-worker
+handlers intentionally fail closed. Native WebMCP keeps precedence on a name
+collision.
 
 The cross-platform automated workflow that exercises this contract through the real
 Native Messaging and MCP stdio processes is documented in
@@ -63,9 +80,9 @@ own native host.
 The baseline permissions are `nativeMessaging`, `storage`, `scripting`, and
 `activeTab`. `activeTab` is used only by the toolbar click that identifies the
 selected page. The manifest has no permanent `host_permissions`, static content
-scripts, or externally connectable surface. Google is listed as dormant optional
-host authority for the Phase 7 reference pack; no current reviewed site pack can
-request it yet.
+scripts, or externally connectable surface. Google is the only optional host
+authority and can be requested only from a toolbar click on one of the two matching
+Google Flights paths.
 
 ADR 0008 fixes the Phase 6 direction: `storage`, `scripting`, and `activeTab` may be
 added as baseline permissions, while each site remains an optional HTTPS host grant.

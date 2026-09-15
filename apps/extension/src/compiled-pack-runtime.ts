@@ -6,6 +6,10 @@ import {
 } from "@mcpatch/protocol";
 
 import { CompiledPackCallDispatcher } from "./compiled-pack-calls.js";
+import {
+  pageProjectionMatchesResolution,
+  projectRuntimePacks,
+} from "./compiled-page-routes.js";
 import type {
   ActiveContext,
   ContextActivationResult,
@@ -31,6 +35,7 @@ import type { BridgeApplicationMessage } from "./native-session-model.js";
 export type {
   ContextActivationResult,
   NativeRuntimeTool,
+  PageRuntimeTool,
   PackRuntimeContext,
 } from "./compiled-pack-model.js";
 
@@ -73,21 +78,35 @@ export class CompiledPackRuntime {
     if (native === undefined) {
       return Object.freeze({ ok: false, code: "RESOLUTION_REJECTED" });
     }
+    const projection = projectRuntimePacks(this.#packs, context.page);
+    if (projection === undefined) {
+      return Object.freeze({ ok: false, code: "RESOLUTION_REJECTED" });
+    }
     const result = resolveContextCapabilities({
       contextId: context.contextId,
       contextRevision,
       url: context.url,
       native: native.map((value) => ({ name: value.tool.name, value })),
-      packs: this.#packs.map((value) => ({ manifest: value.manifest, value })),
+      packs: projection.candidates,
     });
-    if (!result.ok) {
+    if (
+      !result.ok ||
+      !pageProjectionMatchesResolution(
+        projection,
+        result.resolution.capabilities,
+        result.resolution.collisions,
+      )
+    ) {
       return Object.freeze({ ok: false, code: "RESOLUTION_REJECTED" });
     }
     if (result.resolution.capabilities.length === 0) {
       return Object.freeze({ ok: true, published: false, contextRevision });
     }
 
-    const routes = createRoutes(result.resolution.capabilities);
+    const routes = createRoutes(
+      result.resolution.capabilities,
+      projection.pageHandlers,
+    );
     const snapshot: CapabilitySnapshot = {
       protocolVersion: PROTOCOL_VERSION,
       type: "capability_snapshot",

@@ -15,6 +15,9 @@ const sdkRuntimeEntry = fileURLToPath(
 const examplePacksEntry = fileURLToPath(
   new URL("../../../packs/examples/src/index.ts", import.meta.url),
 );
+const googleFlightsPackEntry = fileURLToPath(
+  new URL("../../../packs/google-flights/src/index.ts", import.meta.url),
+);
 const manifest = JSON.parse(
   await readFile(new URL("manifest.json", extensionDirectory), "utf8"),
 );
@@ -46,6 +49,7 @@ await writeFile(
 await build({
   alias: {
     "@mcpatch/example-packs": examplePacksEntry,
+    "@mcpatch/google-flights-pack": googleFlightsPackEntry,
     "@mcpatch/protocol": protocolEntry,
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,
   },

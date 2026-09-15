@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mcpatch/example-packs": "workspace:*",
+    "@mcpatch/google-flights-pack": "workspace:*",
     "@mcpatch/protocol": "workspace:*",
     "@mcpatch/sdk": "workspace:*"
   },

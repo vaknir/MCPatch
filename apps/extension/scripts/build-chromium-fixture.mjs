@@ -27,6 +27,9 @@ const sdkRuntimeEntry = fileURLToPath(
 const examplePacksEntry = fileURLToPath(
   new URL("packs/examples/src/index.ts", repositoryDirectory),
 );
+const googleFlightsPackEntry = fileURLToPath(
+  new URL("packs/google-flights/src/index.ts", repositoryDirectory),
+);
 const marker = "MCPATCH_CHROMIUM_FIXTURE_ONLY";
 const fixtureOrigin = "https://fixture.mcpatch.test";
 
@@ -50,6 +53,7 @@ await writeFile(
 await build({
   alias: {
     "@mcpatch/example-packs": examplePacksEntry,
+    "@mcpatch/google-flights-pack": googleFlightsPackEntry,
     "@mcpatch/protocol": protocolEntry,
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,
   },

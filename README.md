@@ -47,7 +47,9 @@ demo capability proving extension-to-registry publication, MCP discovery, and ex
 validated tool-call completion. Local packages now bind a deterministic public
 extension identity to platform-correct user-level Native Messaging registration and
 source-commit digests. Deterministic real-Chromium fixtures now prove the complete
-synthetic browser-to-MCP path; the first real-site pack remains the next slice.
+page-backed pack-to-MCP path. The first reviewed real-site pack implements bounded,
+read-only Google Flights extraction and is bundled behind exact optional-origin
+enablement; a signed-out field smoke remains before calling that adapter verified.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
@@ -69,8 +71,9 @@ then emits payload-free evidence for reviewed compiled packs. One synthetic pack
 now integrated through a codegen-free extension runtime with exact matching,
 native-first resolution, typed dispatch, and lifecycle revocation. Real-site
 permissions are now explicit, and the isolated content runtime adapts the strict
-read-only same-origin subset of native `document.modelContext`. A reviewed real-site
-pack remains future work.
+read-only same-origin subset of native `document.modelContext`. It also runs the
+reviewed Google Flights pack through the authorized page channel; service-worker
+fallback handlers cannot produce real-site results.
 
 The bridge now owns argument-bound, expiring, single-use approval state for action
 and sensitive tools. No trusted approval UI ships yet, so the extension denies those

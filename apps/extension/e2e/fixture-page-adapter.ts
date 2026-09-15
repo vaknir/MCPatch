@@ -11,33 +11,14 @@ import {
   FIXTURE_WAIT_TOOL,
 } from "./fixture-constants.js";
 
-const emptyInput = Object.freeze({
-  type: "object",
-  additionalProperties: false,
-  maxProperties: 0,
-  properties: {},
-});
-const annotations = Object.freeze({
-  readOnlyHint: true as const,
-  consequentialHint: false as const,
-  untrustedContentHint: true as const,
-});
 const capabilities: readonly PageCapability[] = Object.freeze([
   Object.freeze({
-    source: "native_webmcp" as const,
+    source: "pack" as const,
     name: FIXTURE_STATE_TOOL,
-    title: "Current fixture state",
-    description: "Read bounded visible state from the synthetic fixture page.",
-    inputSchema: emptyInput,
-    annotations,
   }),
   Object.freeze({
-    source: "native_webmcp" as const,
+    source: "pack" as const,
     name: FIXTURE_WAIT_TOOL,
-    title: "Wait for cancellation",
-    description: "Wait until the MCP client cancels this synthetic call.",
-    inputSchema: emptyInput,
-    annotations,
   }),
 ]);
 
