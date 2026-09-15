@@ -1,8 +1,8 @@
 #![cfg(unix)]
 
 use std::{
-    fs::{self, DirBuilder},
-    os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, PermissionsExt},
+    fs::{self, DirBuilder, OpenOptions},
+    os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process,
     sync::atomic::{AtomicU64, Ordering},
@@ -217,6 +217,56 @@ async fn refuses_unsafe_endpoint_and_preserves_replacement_on_cleanup() {
     fs::write(&path, b"replacement").unwrap();
     drop(listener);
     assert_eq!(fs::read(&path).unwrap(), b"replacement");
+}
+
+#[tokio::test]
+async fn core_election_is_private_exclusive_and_recovers_after_release() {
+    let fixture = TestDirectory::new(0o700);
+    let runtime = UnixRuntime::prepare_at(fixture.path(), InstallChannel::Development)
+        .await
+        .unwrap();
+
+    let election = runtime.try_elect_core().unwrap();
+    let metadata = fs::symlink_metadata(runtime.core_lock_path()).unwrap();
+    assert!(metadata.file_type().is_file());
+    assert_eq!(metadata.mode() & 0o777, 0o600);
+    assert_eq!(metadata.uid(), runtime.expected_uid());
+    assert_eq!(metadata.nlink(), 1);
+
+    let error = runtime.try_elect_core().unwrap_err();
+    assert_eq!(error.code(), UnixIpcErrorCode::CoreAlreadyRunning);
+
+    drop(election);
+    runtime.try_elect_core().unwrap();
+}
+
+#[tokio::test]
+async fn core_election_rejects_unsafe_lock_nodes() {
+    let permissive_fixture = TestDirectory::new(0o700);
+    let permissive_runtime =
+        UnixRuntime::prepare_at(permissive_fixture.path(), InstallChannel::Development)
+            .await
+            .unwrap();
+    OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .mode(0o644)
+        .open(permissive_runtime.core_lock_path())
+        .unwrap();
+    let error = permissive_runtime.try_elect_core().unwrap_err();
+    assert_eq!(error.code(), UnixIpcErrorCode::UnsafeLock);
+
+    let symlink_fixture = TestDirectory::new(0o700);
+    let symlink_runtime =
+        UnixRuntime::prepare_at(symlink_fixture.path(), InstallChannel::Development)
+            .await
+            .unwrap();
+    let target = symlink_fixture.path().join("target");
+    fs::write(&target, b"preserve me").unwrap();
+    std::os::unix::fs::symlink(&target, symlink_runtime.core_lock_path()).unwrap();
+    let error = symlink_runtime.try_elect_core().unwrap_err();
+    assert_eq!(error.code(), UnixIpcErrorCode::UnsafeLock);
+    assert_eq!(fs::read(target).unwrap(), b"preserve me");
 }
 
 async fn assert_frame_error(frame: &[u8], expected: LocalFrameErrorCode) {

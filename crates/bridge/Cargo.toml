@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+getrandom = "=0.3.4"
 jsonschema = { version = "=0.56.0", default-features = false }
 rmcp = { version = "=3.3.0", default-features = false, features = ["server", "transport-io"] }
 semver = "=1.0.28"
@@ -25,6 +26,9 @@ tokio-util = { version = "=0.7.19", features = ["codec", "rt"] }
 tracing = "=0.1.44"
 tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "json"] }
 url = "=2.5.8"
+
+[target.'cfg(unix)'.dependencies]
+libc = "=0.2.189"
 
 [target.'cfg(windows)'.dependencies]
 firehazard = "=0.0.0-2022-09-10"

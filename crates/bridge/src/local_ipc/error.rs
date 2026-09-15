@@ -44,6 +44,7 @@ impl LocalFrameError {
 #[cfg(unix)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnixIpcErrorCode {
+    CoreAlreadyRunning,
     EndpointInUse,
     EndpointUnavailable,
     Io,
@@ -51,6 +52,7 @@ pub enum UnixIpcErrorCode {
     PeerUnauthorized,
     RuntimeUnavailable,
     UnsafeEndpoint,
+    UnsafeLock,
     UnsafeRuntimeDirectory,
 }
 

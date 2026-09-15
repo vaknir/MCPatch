@@ -37,22 +37,36 @@ browser-v1.sock
 mcp-v1.sock
 ```
 
+Each channel also has a persistent `core-v1.lock` regular file with mode `0600`.
+The core opens it with close-on-exec and no-follow flags, then verifies the opened
+file and visible path have the expected owner, mode, link count, device, and inode.
+It takes a non-blocking exclusive advisory lock before binding either endpoint. A
+contending core exits deterministically; an unlocked file left by a crash is reused
+after the same checks, so recovery never depends on deleting a guessed PID file.
+
 Socket nodes must be Unix sockets owned by the expected UID with mode `0600`.
 Both accepted clients and connecting adapters read kernel peer credentials and
 require the peer UID to match before returning an authenticated stream. The expected
 UID is obtained through peer credentials on an in-process Unix socket pair, avoiding
 an ambient username or environment-variable identity claim.
 
-After the future bridge core wins protected singleton election, it may call the
-explicit `bind_after_election` primitive. Binding probes a pre-existing safe socket
-for at most 250 ms. A successful or indeterminate probe is treated as a live owner;
-only a failed probe of the same device/inode is reclaimed as stale. Regular files,
-symlinks, wrong owners, permissive modes, and identities changed during inspection
-are preserved and rejected.
+After the bridge core wins protected singleton election, it binds both role
+endpoints through the explicit `bind_after_election` primitive. Binding probes a
+pre-existing safe socket for at most 250 ms. A successful or indeterminate probe is
+treated as a live owner; only a failed probe of the same device/inode is reclaimed
+as stale. Regular files, symlinks, wrong owners, permissive modes, and identities
+changed during inspection are preserved and rejected.
 
 The listener records the device/inode it created. On drop it removes only a socket
 with that same identity and owner, so it cannot delete a replacement path. The
 private runtime directory is never recursively removed by production code.
+
+Every elected core creates a fresh random 128-bit runtime epoch in memory. Runtime
+authority will be scoped to that epoch; it is intentionally neither persisted nor
+logged. The current core accepts authenticated sessions and drains bounded strict
+JSON frames without acting on them. It exits after 30 seconds with no attached peers,
+or on a shutdown signal, then drops both identity-tracked listeners and the election
+guard.
 
 ## Windows implementation
 
@@ -81,10 +95,12 @@ worker threads rather than blocking Tokio executor threads.
 
 ## Current scope and residual risk
 
-These slices provide platform transport primitives only. They do not start a bridge
-core or connect either adapter; protected process election, bounded startup, adapter
-rendezvous, and lifecycle are tracked in
-[#45](https://github.com/vaknir/MCPatch/issues/45).
+Unix now provides the internal bridge-core process and lifecycle primitive. Windows
+core election and bounded worker lifecycle are tracked in
+[#51](https://github.com/vaknir/MCPatch/issues/51). Neither public adapter connects
+to the core yet; bounded adapter startup and rendezvous remain in
+[#50](https://github.com/vaknir/MCPatch/issues/50). Protocol negotiation and message
+handling are deliberately outside this lifecycle slice.
 
 No path-based design can distinguish a hostile process already running as the same
 interactive user. Private Unix directories and peer UIDs, protected Windows DACLs and

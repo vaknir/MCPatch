@@ -1,7 +1,10 @@
 use std::ffi::OsString;
 
+use crate::local_ipc::InstallChannel;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
+    BridgeCore { channel: InstallChannel },
     Help,
     McpStdio,
     NativeHost { caller_origin: OsString },
@@ -15,6 +18,19 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliErr
     let args = args.into_iter().collect::<Vec<_>>();
     match args.as_slice() {
         [] => Ok(Command::McpStdio),
+        [value] if value == "bridge-core" => Ok(Command::BridgeCore {
+            channel: InstallChannel::Production,
+        }),
+        [value, channel] if value == "bridge-core" && channel == "--channel=development" => {
+            Ok(Command::BridgeCore {
+                channel: InstallChannel::Development,
+            })
+        }
+        [value, channel] if value == "bridge-core" && channel == "--channel=production" => {
+            Ok(Command::BridgeCore {
+                channel: InstallChannel::Production,
+            })
+        }
         [value] if value == "mcp-stdio" => Ok(Command::McpStdio),
         [value, caller_origin] if value == "native-host" => Ok(Command::NativeHost {
             caller_origin: caller_origin.clone(),
@@ -45,7 +61,7 @@ fn valid_parent_window(value: &OsString) -> bool {
 mod tests {
     use std::ffi::OsString;
 
-    use super::{Command, parse};
+    use super::{Command, InstallChannel, parse};
 
     #[test]
     fn defaults_to_mcp_stdio() {
@@ -53,6 +69,32 @@ mod tests {
         assert_eq!(
             parse(vec![OsString::from("mcp-stdio")]),
             Ok(Command::McpStdio)
+        );
+    }
+
+    #[test]
+    fn parses_internal_bridge_core_channel() {
+        assert_eq!(
+            parse(vec![OsString::from("bridge-core")]),
+            Ok(Command::BridgeCore {
+                channel: InstallChannel::Production,
+            })
+        );
+        assert_eq!(
+            parse(vec![
+                OsString::from("bridge-core"),
+                OsString::from("--channel=development"),
+            ]),
+            Ok(Command::BridgeCore {
+                channel: InstallChannel::Development,
+            })
+        );
+        assert!(
+            parse(vec![
+                OsString::from("bridge-core"),
+                OsString::from("--channel=preview"),
+            ])
+            .is_err()
         );
     }
 
