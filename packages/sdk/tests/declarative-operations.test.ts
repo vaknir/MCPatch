@@ -410,6 +410,19 @@ describe("Declarative Operations v1 golden contract", () => {
         tool({ outputSchema: { anyOf: [{ type: "string" }] } }),
       ]),
     ).toMatchObject({ code: "INVALID_SCHEMA" });
+    for (const outputSchema of [
+      { type: ["string", 42] },
+      { type: "array", minItems: -1 },
+      { type: "string", maxLength: -1 },
+      { type: "object", minProperties: -1 },
+    ]) {
+      expect(
+        validateDeclarativeOperations(
+          program({ projection: { kind: "text" } }),
+          [tool({ outputSchema })],
+        ),
+      ).toMatchObject({ code: "INVALID_SCHEMA" });
+    }
     const rootList = {
       kind: "list",
       locator: { kind: "role", role: "list" },

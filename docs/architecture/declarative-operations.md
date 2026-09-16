@@ -25,8 +25,10 @@ expressions.
 
 Scalar parsing is strict and locale-free: `number` accepts only a canonical
 ASCII decimal with an optional leading minus and fractional part (no exponent or
-whitespace), `percentage` accepts the same non-negative form in the inclusive
-range 0 through 100 with one optional trailing `%`, and `boolean` accepts only
+whitespace), produces a finite value whose magnitude is at most
+`Number.MAX_SAFE_INTEGER`, and may be fractional. `percentage` accepts the same
+non-negative form in the inclusive range 0 through 100 with one optional trailing
+`%`, and `boolean` accepts only
 the lowercase literals `true` and `false`. An `optional` projection returns JSON
 `null` when its read is absent, so a declared output schema must allow `null` at
 that position. It does not turn an absent required object field into an arbitrary

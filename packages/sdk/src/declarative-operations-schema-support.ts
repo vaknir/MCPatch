@@ -307,11 +307,19 @@ function supportedSchema(value: unknown): value is Record<string, unknown> {
   if (Object.keys(value).some((key) => !SUPPORTED_SCHEMA_FIELDS.has(key)))
     return false;
   const types = schemaTypes(value.type);
-  if (
-    Object.hasOwn(value, "type") &&
-    (types.length === 0 || types.some((type) => !JSON_TYPES.has(type)))
-  )
-    return false;
+  if (Object.hasOwn(value, "type")) {
+    if (typeof value.type === "string") {
+      if (!JSON_TYPES.has(value.type)) return false;
+    } else if (
+      !Array.isArray(value.type) ||
+      value.type.length === 0 ||
+      value.type.some(
+        (type) => typeof type !== "string" || !JSON_TYPES.has(type),
+      )
+    ) {
+      return false;
+    }
+  }
   if (types.length !== new Set(types).size) return false;
   if (
     Object.hasOwn(value, "additionalProperties") &&
@@ -351,6 +359,21 @@ function supportedSchema(value: unknown): value is Record<string, unknown> {
     "maximum",
   ]) {
     if (Object.hasOwn(value, key) && !Number.isSafeInteger(value[key]))
+      return false;
+  }
+  for (const key of [
+    "minItems",
+    "maxItems",
+    "minLength",
+    "maxLength",
+    "minProperties",
+    "maxProperties",
+  ]) {
+    if (
+      Object.hasOwn(value, key) &&
+      typeof value[key] === "number" &&
+      value[key] < 0
+    )
       return false;
   }
   return (
