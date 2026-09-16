@@ -180,6 +180,15 @@ All notable MCPatch changes are documented here. The format follows
   Flights reads are classified by that rule, the review checklist cites it, and
   the bundled permission ceiling is unchanged.
 
+- Progress notifications during the approval wait: when the MCP client supplies
+  a progress token, the bridge sends `notifications/progress` with a fixed,
+  argument-free message on dispatch and every ten seconds until the user
+  decides. The approval wait is configurable with `MCPATCH_APPROVAL_TIMEOUT_SECS`
+  (5–300 seconds; invalid values are ignored and logged). When the client stops
+  waiting while a prompt is on screen, the extension keeps the prompt visible
+  for eight seconds with a notice that nothing was approved instead of closing
+  it under the user's cursor.
+
 ### Changed
 
 - Pack Manifest v1 now requires closed output schemas as well as closed input

@@ -1,11 +1,12 @@
 use std::{borrow::Cow, fmt, sync::Arc};
 
+use futures_util::future::BoxFuture;
 use rmcp::{
-    ErrorData as McpError, RoleServer, ServerHandler,
+    ErrorData as McpError, Peer, RoleServer, ServerHandler,
     model::{
         CallToolRequestParams, CallToolResponse, Implementation, ListToolsResult,
-        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
-        ToolAnnotations,
+        PaginatedRequestParams, ProgressNotification, ProgressNotificationParam, ProgressToken,
+        ProtocolVersion, ServerCapabilities, ServerInfo, ServerNotification, Tool, ToolAnnotations,
     },
     service::RequestContext,
 };
@@ -16,7 +17,10 @@ use crate::{
     routing::{SharedCapabilityRegistry, shared_capability_registry},
 };
 
-use super::calls::McpCallRuntime;
+use super::calls::{
+    APPROVAL_TIMEOUT_ENV, APPROVAL_WAIT_MESSAGE, ApprovalProgress, McpCallRuntime,
+    approval_timeout_from,
+};
 
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
     &[ProtocolVersion::V_2025_11_25, ProtocolVersion::V_2026_07_28];
@@ -30,10 +34,43 @@ pub struct BridgeMcpServer {
 
 impl BridgeMcpServer {
     pub fn new(registry: SharedCapabilityRegistry) -> Self {
-        Self {
-            calls: McpCallRuntime::new(registry.clone()),
-            registry,
-        }
+        let approval_timeout = match approval_timeout_from(
+            std::env::var_os(APPROVAL_TIMEOUT_ENV).as_deref(),
+        ) {
+            Ok(timeout) => Some(timeout),
+            Err(error) => {
+                tracing::warn!(target: "mcpatch", event = "approval_timeout_ignored", code = error.code());
+                None
+            }
+        };
+        let calls = match approval_timeout {
+            Some(timeout) => McpCallRuntime::with_approval_timeout(registry.clone(), timeout),
+            None => McpCallRuntime::new(registry.clone()),
+        };
+        Self { calls, registry }
+    }
+}
+
+/// Reports approval-wait progress to the requesting client over its own peer,
+/// using the token that client supplied, so notifications route to the right
+/// session and carry nothing but a sequence number and a fixed sentence.
+struct PeerApprovalProgress {
+    peer: Peer<RoleServer>,
+    token: ProgressToken,
+}
+
+impl ApprovalProgress for PeerApprovalProgress {
+    fn report(&self, sequence: u32) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            let params = ProgressNotificationParam::new(self.token.clone(), f64::from(sequence))
+                .with_message(APPROVAL_WAIT_MESSAGE.to_owned());
+            let _ = self
+                .peer
+                .send_notification(ServerNotification::ProgressNotification(
+                    ProgressNotification::new(params),
+                ))
+                .await;
+        })
     }
 }
 
@@ -93,7 +130,13 @@ impl ServerHandler for BridgeMcpServer {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
-        self.calls.execute(request, context.ct).await
+        let progress = context.meta.get_progress_token().map(|token| {
+            Arc::new(PeerApprovalProgress {
+                peer: context.peer.clone(),
+                token,
+            }) as Arc<dyn ApprovalProgress>
+        });
+        self.calls.execute(request, context.ct, progress).await
     }
 }
 

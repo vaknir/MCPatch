@@ -98,6 +98,15 @@ fixed sentence; MCPatch never writes paths, user names, or environment values.
 The last row is what a filesystem without Unix-socket support produces; point the
 override at a local filesystem such as `/run/user/<uid>` or a `tmpfs`.
 
+## MCP client timeouts
+
+An action or sensitive tool call blocks inside `tools/call` while the user decides
+in the browser prompt: up to 60 seconds by default, then up to 30 seconds for the
+browser call itself. Configure the client's per-call timeout above that sum, or
+shorten the approval wait with `MCPATCH_APPROVAL_TIMEOUT_SECS` (5–300; anything
+else is ignored and logged as `approval_timeout_ignored`). Clients that send a
+progress token receive `notifications/progress` every ten seconds during the wait.
+
 ## Enable the Google Flights pack
 
 Use only a disposable or signed-out profile during pre-alpha testing. Open either

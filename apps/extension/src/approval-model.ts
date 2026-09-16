@@ -66,6 +66,16 @@ export interface ApprovalDecisionMessage {
   readonly decision: ApprovalDecision;
 }
 
+/**
+ * Sent to a presented prompt when the requesting MCP client stopped waiting.
+ * The pending record is already discarded, so no decision can follow; the
+ * page only explains why the prompt is closing.
+ */
+export interface ApprovalWithdrawn {
+  readonly type: "approval_withdrawn";
+  readonly approvalId: string;
+}
+
 export interface ApprovalPresentation {
   readonly type: "approval_present";
   readonly approvalId: string;

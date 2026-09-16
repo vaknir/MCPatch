@@ -105,6 +105,45 @@ describe("trusted approval controller", () => {
     expect(state.tabs.createdActive).toEqual([true, false, true]);
   });
 
+  it("tells a presented prompt when the caller gives up and closes it after a grace period", async () => {
+    const state = setup();
+    const resolved = vi.fn<(decision: ApprovalDecision) => void>();
+    state.controller.request(approvalRequired(), resolved);
+    await flushPromises();
+    const port = state.connectApproval();
+    port.emitMessage({ type: "approval_ready", approvalId: APPROVAL_ID });
+    expect(port.posted).toHaveLength(1);
+
+    expect(state.controller.cancel("request-approval")).toBe(true);
+    expect(port.posted[1]).toEqual({
+      type: "approval_withdrawn",
+      approvalId: APPROVAL_ID,
+    });
+    expect(port.disconnected).toBe(true);
+    expect(state.tabs.removed).toEqual([]);
+
+    // A late decision has no record to land on.
+    port.emitMessage({
+      type: "approval_decision",
+      approvalId: APPROVAL_ID,
+      decision: "approved",
+    });
+    expect(resolved).not.toHaveBeenCalled();
+
+    state.scheduler.advanceBy(7_999);
+    expect(state.tabs.removed).toEqual([]);
+    state.scheduler.advanceBy(1);
+    expect(state.tabs.removed).toEqual([17]);
+  });
+
+  it("closes an unpresented prompt immediately when the caller gives up", async () => {
+    const state = setup();
+    state.controller.request(approvalRequired(), vi.fn());
+    await flushPromises();
+    expect(state.controller.cancel("request-approval")).toBe(true);
+    expect(state.tabs.removed).toEqual([17]);
+  });
+
   it("rejects website, wrong-frame, and wrong-tab senders", async () => {
     const state = setup();
     const resolved = vi.fn<(decision: ApprovalDecision) => void>();

@@ -75,6 +75,30 @@ If the trusted surface is unavailable, the extension retains the earlier
 deterministic-denial fallback. Website DOM and model text are never an approval
 surface.
 
+## Waiting for the decision
+
+The approval wait happens inside the MCP `tools/call` request. MCPatch does not
+use MCP tool-call continuation state or elicitation for the decision, because the
+decision must never travel through the MCP client: model text and client-supplied
+input are untrusted, and the only approval surface is the extension-owned prompt.
+The cost is that the client sees a request that has not returned yet.
+
+To keep that wait legible:
+
+- When the client supplied a progress token, the bridge sends
+  `notifications/progress` with a fixed, argument-free message as soon as the
+  prompt is dispatched and every ten seconds while it waits, so a client can show
+  "waiting for the user" rather than "hung" and reset its own inactivity timers.
+- The approval wait is 60 seconds by default and configurable through
+  `MCPATCH_APPROVAL_TIMEOUT_SECS`, bounded to 5–300 seconds; values outside the
+  range or unparseable are ignored with a logged code. Operators should set the
+  client's tool-call timeout above the approval wait plus the 30-second browser
+  call timeout.
+- If the client stops waiting while the prompt is on screen, the extension keeps
+  the prompt visible for eight seconds with a notice that nothing was approved,
+  then closes it. The pending record is discarded first, so a decision made during
+  the grace period has nowhere to land.
+
 ## Atomic consumption
 
 An approval result is accepted only from the pending record's exact authenticated

@@ -4,6 +4,7 @@ import {
   type ApprovalPort,
   type ApprovalPresentation,
   type ApprovalReady,
+  type ApprovalWithdrawn,
 } from "./approval-model.js";
 
 declare const chrome: {
@@ -19,12 +20,19 @@ const tool = requiredElement("tool");
 const origin = requiredElement("origin");
 const hash = requiredElement("args-hash");
 const expires = requiredElement("expires-at");
+const withdrawn = requiredElement("withdrawn");
 const approve = requiredButton("approve");
 const deny = requiredButton("deny");
 let presented = false;
 let decided = false;
 
 port.onMessage.addListener((value) => {
+  const withdrawal = parseWithdrawal(value);
+  if (withdrawal !== undefined) {
+    if (withdrawal.approvalId === approvalId) withdraw();
+    port.disconnect();
+    return;
+  }
   const presentation = parsePresentation(value);
   if (presentation === undefined || presentation.approvalId !== approvalId) {
     port.disconnect();
@@ -55,6 +63,31 @@ function decide(decision: "approved" | "denied"): void {
     decision,
   };
   port.postMessage(message);
+}
+
+/** The caller gave up: nothing was approved, and no decision can be sent. */
+function withdraw(): void {
+  decided = true;
+  approve.disabled = true;
+  deny.disabled = true;
+  withdrawn.hidden = false;
+}
+
+function parseWithdrawal(value: unknown): ApprovalWithdrawn | undefined {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== 2 ||
+    !["type", "approvalId"].every((key) => Object.hasOwn(value, key))
+  ) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  return record["type"] === "approval_withdrawn" &&
+    typeof record["approvalId"] === "string"
+    ? (value as ApprovalWithdrawn)
+    : undefined;
 }
 
 function requiredApprovalId(href: string): string {
