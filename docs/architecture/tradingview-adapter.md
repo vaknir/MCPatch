@@ -1,21 +1,25 @@
 # TradingView rendered-page adapter
 
 The second reviewed MCPatch real-site pack exposes a narrow chart workflow from
-TradingView. It reads the active chart and visible watchlist and can navigate the
-active tab to one caller-supplied canonical symbol. The implementation follows the
+TradingView. It reads the active chart and visible watchlist, resolves bounded
+company/ticker queries, and can navigate the active tab to one caller-supplied
+canonical symbol. The implementation follows the
 bounded observations in
 [TradingView public-page reconnaissance](../research/tradingview-2026-09-16.md).
 
 ## Authority and activation
 
-Version 1 accepts only `https://www.tradingview.com` paths under `/chart/`. The
-extension requests the exact optional host pattern `https://www.tradingview.com/*`;
-the pack matcher and extractor independently recheck origin and path. Other
-TradingView pages publish no pack tools.
+Version 1 activates only on `https://www.tradingview.com` paths under `/chart/`.
+The extension atomically requests the exact optional host patterns
+`https://www.tradingview.com/*` and
+`https://symbol-search.tradingview.com/*`; the pack matcher and extractor
+independently recheck the page origin and path. The second origin is network
+authority only and never receives a content script. Other TradingView pages publish
+no pack tools.
 
 The reviewed code is bundled with the extension. It has no downloaded pack code,
 main-world injection, caller-provided selector, generic DOM command, browser
-automation, captured-request replay, or extension-originated network request. A
+automation or captured-request replay. A
 document source collects a bounded semantic snapshot and pure extractors validate
 it. Service-worker fallbacks always return `TOOL_NOT_FOUND`, so real results can
 only originate in an authorized matching page.
@@ -78,6 +82,20 @@ before dispatch. Changing the symbol, route, context, pack, expiry, or approval 
 invalidates authorization. The pack cannot accept a URL, selector, script, network
 endpoint, market guess, or free-form search instruction.
 
+### `tradingview.search_symbols`
+
+This `READ + EXTERNAL_NETWORK` accepts exactly a trimmed `query` of one to 64
+characters and an optional result limit from one to ten. It constructs one fixed
+GET to TradingView's public `/symbol_search/v3/` operation, omits credentials,
+rejects redirects, enforces an eight-second lifetime, and caps the response at 256
+KiB and 64 source records.
+
+The response projection returns only the fingerprint, original query, and unique
+canonical candidates with `symbol`, `ticker`, `exchange`, display `label`, explicit
+asset type, and optional country/currency. Malformed candidates are omitted;
+malformed envelopes and oversized responses fail the call. No URL, request option,
+header, body, cookie, token, raw response, or opaque provider field crosses MCP.
+
 ## Resource and lifecycle bounds
 
 Collection admits at most four chart regions, examines at most 4,096 chart `div`
@@ -99,20 +117,16 @@ disconnect revokes the context through the common lifecycle.
 
 The opt-in signed-out smoke in `apps/extension/e2e/tradingview-field.spec.ts` uses
 a disposable Chromium profile. The harness only launches the browser and performs
-the required extension-enable gesture; chart and watchlist reads are invoked through
-MCP. The 2026-09-16 run discovered all three tools, validated both read outputs,
-verified unsupported-path revocation, and deleted the profile without retaining
-prices or page data. See the
+the required extension-enable and trusted one-time approval gestures; every pack
+operation is invoked through MCP. The 2026-09-16 run discovered all four tools,
+validated both page reads, resolved `NYSE:IBM` through symbol search, approved and
+executed the exact symbol change, verified fresh-context readback and
+unsupported-path revocation, and deleted the profile without retaining prices or
+page data. See the
 [TradingView MCP field report](../test-reports/2026-09-16-tradingview-field.md).
-
-The final field smoke did not approve and execute `change_symbol`. That action is
-covered by URL, page-adapter, manifest, approval-policy, lifecycle, and bridge
-contract tests; a future field pass should add live approval evidence without
-weakening or bypassing the trusted approval surface.
 
 ## Explicit non-goals
 
-- global symbol search or quote lookup through a separate TradingView host;
 - creating, deleting, or changing watchlist entries;
 - creating or changing alerts;
 - chart-image transport;
@@ -128,5 +142,6 @@ network or browser-control escape hatch.
 - [ADR 0005: pack execution](../adr/0005-pack-execution.md)
 - [ADR 0006: permissions and approvals](../adr/0006-permission-and-approval-model.md)
 - [ADR 0008: origin-scoped content runtime](../adr/0008-origin-scoped-content-runtime.md)
+- [ADR 0009: reviewed read-network authority](../adr/0009-reviewed-read-network-authority.md)
 - [Pack resolution and native precedence](pack-resolution.md)
 - [Extension page-channel protocol](page-channel-protocol.md)

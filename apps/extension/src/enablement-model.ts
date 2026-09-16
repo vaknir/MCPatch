@@ -13,6 +13,7 @@ export interface ReviewedPackSite {
   readonly manifest: PackManifest;
   readonly origin: string;
   readonly permissionPattern: string;
+  readonly permissionPatterns: readonly string[];
   readonly registrationId: string;
   readonly tools: ReadonlySet<string>;
 }

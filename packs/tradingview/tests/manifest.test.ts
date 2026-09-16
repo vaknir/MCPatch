@@ -6,6 +6,8 @@ import {
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_SEARCH_SYMBOLS,
+  TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   tradingViewPack,
 } from "../src/index.js";
 
@@ -18,10 +20,18 @@ describe("TradingView reviewed pack manifest", () => {
       },
     ]);
     expect(tradingViewPack.manifest.networkPolicy).toEqual({
-      extensionRequests: "none",
+      extensionRequests: {
+        origins: [TRADINGVIEW_SYMBOL_SEARCH_ORIGIN],
+        methods: ["GET"],
+      },
     });
     expect(tradingViewPack.manifest.tools).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          name: TRADINGVIEW_SEARCH_SYMBOLS,
+          risk: "read",
+          permissions: ["READ", "EXTERNAL_NETWORK"],
+        }),
         expect.objectContaining({
           name: TRADINGVIEW_CURRENT_CHART,
           risk: "read",
@@ -45,15 +55,15 @@ describe("TradingView reviewed pack manifest", () => {
     const result = await verifyPackFixtures(tradingViewPack, {
       runtimeVersion: "0.1.0",
       bridgeProtocolVersion: 1,
-      allowedPermissions: ["READ", "ACTION"],
+      allowedPermissions: ["READ", "ACTION", "EXTERNAL_NETWORK"],
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.evidence.passed).toBe(true);
     expect(result.evidence.summary).toEqual({
-      total: 3,
-      passed: 3,
+      total: 4,
+      passed: 4,
       failed: 0,
       skipped: 0,
     });

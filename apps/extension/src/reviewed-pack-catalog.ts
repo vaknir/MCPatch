@@ -1,6 +1,7 @@
 import {
   canonicalizePageLocation,
   packMatchesLocation,
+  type PackManifest,
 } from "@mcpatch/sdk/runtime";
 
 import type {
@@ -36,6 +37,14 @@ export function createReviewedPackCatalog(
   const sites: ReviewedPackSite[] = [];
   const keys = new Set<string>();
   for (const pack of packs) {
+    const requestOrigins = networkRequestOrigins(pack.manifest);
+    for (const origin of requestOrigins) {
+      if (!origins.has(origin)) {
+        throw new TypeError(
+          "reviewed pack network origin is not declared optional authority",
+        );
+      }
+    }
     const packOrigins = new Set(
       pack.manifest.matches.map((match) => match.origin),
     );
@@ -55,6 +64,12 @@ export function createReviewedPackCatalog(
           manifest: pack.manifest,
           origin,
           permissionPattern: `${origin}/*`,
+          permissionPatterns: Object.freeze(
+            [origin, ...requestOrigins]
+              .filter((value, index, values) => values.indexOf(value) === index)
+              .sort()
+              .map((value) => `${value}/*`),
+          ),
           registrationId: registrationId(origin),
           tools: Object.freeze(
             new Set(pack.manifest.tools.map((tool) => tool.name)),
@@ -87,6 +102,11 @@ export function createReviewedPackCatalog(
       );
     },
   });
+}
+
+function networkRequestOrigins(manifest: PackManifest): readonly string[] {
+  const policy = manifest.networkPolicy.extensionRequests;
+  return policy === "none" ? [] : policy.origins;
 }
 
 export function recordForSite(site: ReviewedPackSite): EnabledPackRecord {

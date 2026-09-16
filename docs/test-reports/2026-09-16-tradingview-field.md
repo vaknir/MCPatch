@@ -1,6 +1,6 @@
 # TradingView MCP field report — 2026-09-16
 
-Status: **read and approved action paths passed locally**
+Status: **read, constrained symbol search, and approved action paths passed locally**
 
 Environment:
 
@@ -13,17 +13,21 @@ Typed tools discovered through MCP:
 
 - `tradingview.current_chart`
 - `tradingview.current_watchlist`
+- `tradingview.search_symbols`
 - `tradingview.change_symbol`
 
 Evidence:
 
-- the user enabled only the exact optional `https://www.tradingview.com/*`
-  permission in the disposable profile;
-- the MCP client discovered all three capabilities from the compatible live chart;
+- the user enabled only the exact optional `https://www.tradingview.com/*` and
+  `https://symbol-search.tradingview.com/*` permissions in the disposable profile;
+- the MCP client discovered all four capabilities from the compatible live chart;
 - `tradingview.current_chart` returned a schema-valid canonical chart identity,
   interval, finite OHLC/current-price fields, and the expected fingerprint;
 - `tradingview.current_watchlist` returned between one and 64 schema-valid visible
   rows with canonical exchange-qualified symbols and finite quote fields;
+- `tradingview.search_symbols` resolved a company-name query through MCP and
+  returned `NYSE:IBM` with an explicit stock asset type inside the requested
+  five-result bound;
 - navigation to an unsupported TradingView path removed all TradingView tools while
   preserving the synthetic bridge-status tool; and
 - the browser context closed and the temporary profile was deleted with retry-safe
@@ -36,8 +40,9 @@ page-channel, and reviewed pack path.
 
 Security limits:
 
-- no cookies, tokens, headers, browser storage, request traffic, HAR data, or private
-  endpoints were read or transported;
+- no cookies, tokens, captured headers, browser storage, HAR data, or private
+  endpoints were read or transported; the search request used a fixed public
+  first-party GET with `credentials: "omit"`;
 - no live prices, watchlist contents, screenshots, raw tool outputs, request logs,
   or browser profile were retained; and
 - the pack exposed no generic browser, DOM, JavaScript, fetch, screenshot, or

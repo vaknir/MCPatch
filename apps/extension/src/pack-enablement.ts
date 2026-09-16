@@ -134,7 +134,7 @@ export class PackEnablementController implements PackEnablementRuntime {
       // This call must remain in the synchronous action-listener turn so Chromium
       // can attribute the exact origin request to the user's gesture.
       permission = this.#api.permissions.request({
-        origins: [site.permissionPattern],
+        origins: site.permissionPatterns,
       });
     } catch {
       this.#pendingSites.delete(site.key);
@@ -206,14 +206,14 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#writeState(createEnablementState(records));
     await this.#reconcile();
 
-    if (
-      ![...this.#requested.values()].some(
-        (record) => record.origin === site.origin,
-      )
-    ) {
+    const needed = this.#neededPermissionPatterns();
+    const removable = site.permissionPatterns.filter(
+      (pattern) => !needed.has(pattern),
+    );
+    if (removable.length > 0) {
       try {
         await this.#api.permissions.remove({
-          origins: [site.permissionPattern],
+          origins: removable,
         });
       } catch {
         // Local state and script authority are already revoked. Permission cleanup
@@ -269,19 +269,33 @@ export class PackEnablementController implements PackEnablementRuntime {
   async #grantedSites(
     candidates: readonly ReviewedPackSite[],
   ): Promise<readonly ReviewedPackSite[]> {
-    const origins = new Map<string, boolean>();
+    const grants = new Map<string, boolean>();
     for (const site of candidates) {
-      let granted = origins.get(site.origin);
+      const key = site.permissionPatterns.join("\u0000");
+      let granted = grants.get(key);
       if (granted === undefined) {
         granted = await this.#api.permissions.contains({
-          origins: [site.permissionPattern],
+          origins: site.permissionPatterns,
         });
-        origins.set(site.origin, granted);
+        grants.set(key, granted);
       }
     }
     return Object.freeze(
-      candidates.filter((site) => origins.get(site.origin) === true),
+      candidates.filter(
+        (site) => grants.get(site.permissionPatterns.join("\u0000")) === true,
+      ),
     );
+  }
+
+  #neededPermissionPatterns(): ReadonlySet<string> {
+    const patterns = new Set<string>();
+    for (const record of this.#requested.values()) {
+      const site = this.#catalog.resolve(record);
+      if (site !== undefined) {
+        for (const pattern of site.permissionPatterns) patterns.add(pattern);
+      }
+    }
+    return patterns;
   }
 
   async #reconcileScripts(sites: readonly ReviewedPackSite[]): Promise<void> {

@@ -10,6 +10,8 @@ import {
   recordForSite,
 } from "../src/reviewed-pack-catalog.js";
 import {
+  NETWORK_ORIGIN,
+  networkSitePack,
   runtimeOptions,
   SITE_ORIGIN,
   testCatalog,
@@ -41,6 +43,29 @@ describe("reviewed pack site catalog", () => {
   it("excludes the synthetic .invalid pack from site authority", () => {
     const catalog = createReviewedPackCatalog([demoPack], runtimeOptions(), []);
     expect(catalog.sites).toEqual([]);
+  });
+
+  it("binds reviewed network authority to the same one-click site grant", () => {
+    const catalog = createReviewedPackCatalog(
+      [networkSitePack],
+      { ...runtimeOptions(), allowedPermissions: ["READ", "EXTERNAL_NETWORK"] },
+      [SITE_ORIGIN, NETWORK_ORIGIN],
+    );
+
+    expect(catalog.sites[0]?.permissionPatterns).toEqual([
+      `${SITE_ORIGIN}/*`,
+      `${NETWORK_ORIGIN}/*`,
+    ]);
+    expect(() =>
+      createReviewedPackCatalog(
+        [networkSitePack],
+        {
+          ...runtimeOptions(),
+          allowedPermissions: ["READ", "EXTERNAL_NETWORK"],
+        },
+        [SITE_ORIGIN],
+      ),
+    ).toThrow("network origin is not declared");
   });
 });
 

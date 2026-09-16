@@ -42,8 +42,13 @@ export interface PackMatch {
   readonly paths: readonly PackPathRule[];
 }
 
+export interface PackNetworkRequestPolicy {
+  readonly origins: readonly string[];
+  readonly methods: readonly ["GET"];
+}
+
 export interface PackNetworkPolicy {
-  readonly extensionRequests: "none";
+  readonly extensionRequests: "none" | PackNetworkRequestPolicy;
 }
 
 export interface PackToolManifest {

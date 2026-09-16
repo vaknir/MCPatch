@@ -9,7 +9,9 @@ All notable MCPatch changes are documented here. The format follows
 ### Added
 
 - A reviewed TradingView pack with bounded `tradingview.current_chart` and
-  `tradingview.current_watchlist` reads plus an argument-bound
+  `tradingview.current_watchlist` reads, constrained canonical
+  `tradingview.search_symbols` discovery through one exact credential-free
+  first-party origin, plus an argument-bound
   `tradingview.change_symbol` action using canonical `EXCHANGE:TICKER` identities,
   exact optional-origin enablement, native-first resolution, and fail-closed
   English single-chart compatibility checks.

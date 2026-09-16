@@ -8,9 +8,19 @@ import {
 } from "../src/enablement-model.js";
 import { parseEnablementState } from "../src/enablement-storage.js";
 import { PackEnablementController } from "../src/pack-enablement.js";
-import { recordForSite } from "../src/reviewed-pack-catalog.js";
+import {
+  createReviewedPackCatalog,
+  recordForSite,
+} from "../src/reviewed-pack-catalog.js";
 import { FakeEnablementApi } from "./support/enablement.js";
-import { SITE_ORIGIN, SITE_TOOL, testCatalog } from "./support/site-pack.js";
+import {
+  NETWORK_ORIGIN,
+  networkSitePack,
+  runtimeOptions,
+  SITE_ORIGIN,
+  SITE_TOOL,
+  testCatalog,
+} from "./support/site-pack.js";
 
 const SITE_URL = `${SITE_ORIGIN}/app/search?q=TLV`;
 
@@ -54,6 +64,33 @@ describe("pack enablement controller", () => {
       tabId: 7,
       text: "!",
     });
+  });
+
+  it("requires and reconciles the complete page plus network authority set", async () => {
+    const api = new FakeEnablementApi();
+    const catalog = createReviewedPackCatalog(
+      [networkSitePack],
+      { ...runtimeOptions(), allowedPermissions: ["READ", "EXTERNAL_NETWORK"] },
+      [SITE_ORIGIN, NETWORK_ORIGIN],
+    );
+    const controller = new PackEnablementController(api, catalog);
+    controller.start();
+    await settle(controller);
+
+    api.action.onClicked.emit({ id: 7, url: SITE_URL });
+    await settle(controller);
+    expect(api.permissions.requests).toEqual([
+      { origins: [`${SITE_ORIGIN}/*`, `${NETWORK_ORIGIN}/*`] },
+    ]);
+    expect(controller.authority.authorize(identity())).toEqual({
+      packTools: new Set(["mcpatch.network.search"]),
+    });
+
+    await api.permissions.remove({ origins: [`${NETWORK_ORIGIN}/*`] });
+    expect(controller.authority.authorize(identity())).toBeUndefined();
+    await settle(controller);
+    expect(storedRecords(api)).toEqual([]);
+    expect(api.scripting.registrations.size).toBe(0);
   });
 
   it("does not treat a manually granted optional permission as enablement", async () => {

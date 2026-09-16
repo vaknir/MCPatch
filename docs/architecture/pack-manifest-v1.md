@@ -55,9 +55,17 @@ fragments, control characters, or normalizable dot segments. Prefix paths end in
 `/`. Query parameters never broaden activation. Runtime semantics are defined in
 [Pack matching and capability resolution](pack-resolution.md).
 
-`networkPolicy.extensionRequests` is required and its only version 1 value is
-`none`. It means pack execution cannot initiate extension-originated requests;
-normal page behavior is not turned into a network proxy.
+`networkPolicy.extensionRequests` is required. It is either `none` or a closed,
+bounded authority containing one to eight exact HTTPS origins and the sole method
+`GET`. A non-`none` policy is valid only when at least one tool declares
+`EXTERNAL_NETWORK`, and that permission is invalid without a declared policy.
+
+The policy grants no generic request primitive. A reviewed bundled pack must still
+compile one fixed operation that constructs its own URL, sends no credentials, and
+projects a bounded typed response. The extension requests all declared exact host
+patterns together with the matched page origin during the user's enable gesture;
+missing or removed authority disables the whole pack. See
+[ADR 0009](../adr/0009-reviewed-read-network-authority.md).
 
 ## Tools and fixtures
 
@@ -86,7 +94,10 @@ Consumers must run both their duplicate-safe JSON decoding and semantic validati
 schema validation alone is insufficient.
 
 Version 1 rejects unknown fields everywhere. Compatible additions therefore require
-a new manifest version. Tightening rejection of data that was already invalid or
-unsafe is allowed in a patch release; changing accepted meaning, permission scope,
-matching behavior, or compatibility intervals requires a new manifest version and
-migration note.
+a new manifest version after the first public artifact release. Before that release,
+the reviewed read-network shape was added as a recorded pre-release amendment in
+ADR 0009; implementations that support only the original `none` value continue to
+reject such packs safely. After publication, tightening rejection of data that was
+already invalid or unsafe is allowed in a patch release, while changing accepted
+meaning, permission scope, matching behavior, or compatibility intervals requires
+a new manifest version and migration note.

@@ -95,6 +95,57 @@ describe("Pack Manifest v1 runtime validation", () => {
     });
   });
 
+  it("accepts only bounded exact HTTPS GET authority paired with a tool permission", () => {
+    const candidate = structuredClone(valid);
+    candidate.networkPolicy = {
+      extensionRequests: {
+        origins: ["https://search.example.com"],
+        methods: ["GET"],
+      },
+    };
+    const tool = first(candidate.tools as Array<Record<string, unknown>>);
+    tool.permissions = ["READ", "EXTERNAL_NETWORK"];
+
+    expect(validatePackManifest(candidate)).toBeUndefined();
+    expect(parsePackManifest(candidate).networkPolicy).toEqual(
+      candidate.networkPolicy,
+    );
+
+    for (const requests of [
+      { origins: ["https://*.example.com"], methods: ["GET"] },
+      { origins: ["https://search.example.com"], methods: ["POST"] },
+      { origins: [], methods: ["GET"] },
+    ]) {
+      const malformed = structuredClone(candidate);
+      malformed.networkPolicy = { extensionRequests: requests };
+      expect(validatePackManifest(malformed)).toBeDefined();
+    }
+  });
+
+  it("rejects undeclared or unused external-network authority", () => {
+    const externalTool = structuredClone(valid);
+    first(externalTool.tools as Array<Record<string, unknown>>).permissions = [
+      "READ",
+      "EXTERNAL_NETWORK",
+    ];
+    expect(validatePackManifest(externalTool)).toEqual({
+      code: "INVALID_PERMISSION",
+      field: "networkPolicy.extensionRequests",
+    });
+
+    const unusedPolicy = structuredClone(valid);
+    unusedPolicy.networkPolicy = {
+      extensionRequests: {
+        origins: ["https://search.example.com"],
+        methods: ["GET"],
+      },
+    };
+    expect(validatePackManifest(unusedPolicy)).toEqual({
+      code: "INVALID_PERMISSION",
+      field: "networkPolicy.extensionRequests",
+    });
+  });
+
   it("returns payload-free failures", () => {
     const candidate = structuredClone(valid);
     candidate.remoteScript = "private-marker";

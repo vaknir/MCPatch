@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { BUNDLED_PAGE_ADAPTERS } from "../src/bundled-page-adapters.js";
 import {
   BUNDLED_PACKS,
-  DECLARED_SITE_ORIGINS,
+  DECLARED_OPTIONAL_ORIGINS,
   PACK_RUNTIME_OPTIONS,
 } from "../src/bundled-packs.js";
 import { createReviewedPackCatalog } from "../src/reviewed-pack-catalog.js";
@@ -28,16 +28,20 @@ describe("bundled Google Flights production pack", () => {
     expect(definition?.tools).toEqual(GOOGLE_FLIGHTS_TOOLS);
     expect(typeof definition?.create).toBe("function");
     expect(BUNDLED_PACKS).toContain(googleFlightsPack);
-    expect(PACK_RUNTIME_OPTIONS.allowedPermissions).toEqual(["READ", "ACTION"]);
+    expect(PACK_RUNTIME_OPTIONS.allowedPermissions).toEqual([
+      "READ",
+      "ACTION",
+      "EXTERNAL_NETWORK",
+    ]);
   });
 
   it("makes only the two exact paths enableable under one declared origin", () => {
     const catalog = createReviewedPackCatalog(
       BUNDLED_PACKS,
       PACK_RUNTIME_OPTIONS,
-      DECLARED_SITE_ORIGINS,
+      DECLARED_OPTIONAL_ORIGINS,
     );
-    expect(DECLARED_SITE_ORIGINS).toContain(GOOGLE_FLIGHTS_ORIGIN);
+    expect(DECLARED_OPTIONAL_ORIGINS).toContain(GOOGLE_FLIGHTS_ORIGIN);
     expect(
       catalog.match(`${GOOGLE_FLIGHTS_ORIGIN}${GOOGLE_FLIGHTS_LANDING_PATH}`),
     ).toHaveLength(1);

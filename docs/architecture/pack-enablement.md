@@ -7,18 +7,21 @@ pack arguments, or stored origin strings.
 ## Closed inputs
 
 At build time, the extension validates every compiled pack again and derives a
-catalog of pack identity, exact HTTPS origin, path rules, tool names, and a
-deterministic content-script registration ID. Each real origin must also occur in
-the closed `DECLARED_SITE_ORIGINS` list mirrored by `optional_host_permissions`.
-Synthetic `.invalid` packs are excluded. Wildcards, undeclared origins, duplicate
-identities, incompatible packs, and overlong registration identities reject the
-catalog before the service worker starts.
+catalog of pack identity, exact HTTPS page origin, path rules, tool names, declared
+network origins, and a deterministic content-script registration ID. Every page or
+network origin must also occur in the closed `DECLARED_OPTIONAL_ORIGINS` list
+mirrored by `optional_host_permissions`. Synthetic `.invalid` packs are excluded.
+Wildcards, undeclared origins, duplicate identities, incompatible packs, and
+overlong registration identities reject the catalog before the service worker
+starts.
 
 The toolbar action uses the browser-provided clicked tab and `activeTab` grant. It
 enables only when exactly one catalog pack matches that URL. The permission request
-is issued in the synchronous user-gesture turn and contains only that site's
-derived `https://host[:port]/*` pattern. A denied request writes nothing and
-registers nothing. Ambiguous and unsupported pages cannot request authority.
+is issued in the synchronous user-gesture turn and atomically contains that site's
+derived `https://host[:port]/*` pattern plus every reviewed external network
+pattern declared by the pack. A denied request writes nothing and registers
+nothing. Ambiguous and unsupported pages cannot request authority. Network patterns
+are permission proof only and never become content-script registrations.
 
 ## Durable request, live proof
 
@@ -58,7 +61,7 @@ Startup, install/update, relevant storage changes, and permission additions or
 removals enqueue one serialized reconciliation. Relevant external events revoke
 in-memory authority and live page contexts synchronously before asynchronous API
 work. Disable does the same, persists removal, unregisters the script, then attempts
-to remove host permission only when no remaining pack needs that origin.
+to remove each host permission only when no remaining pack needs that exact pattern.
 
 Any API failure clears in-memory authority, cancels live origin contexts through the
 document owner, and attempts to remove all managed registrations. It never treats
