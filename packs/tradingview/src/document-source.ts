@@ -8,6 +8,10 @@ import {
 } from "./model.js";
 import type { TradingViewSnapshotSource } from "./site.js";
 import { createTradingViewSymbolUrl } from "./symbol.js";
+import {
+  searchTradingViewSymbols,
+  type TradingViewSearchFetch,
+} from "./symbol-search.js";
 
 const MAX_CHARTS = 4;
 const MAX_CHART_DIVS = 4_096;
@@ -27,8 +31,9 @@ export interface TradingViewNavigation {
 export function createTradingViewDocumentSource(
   document: Document,
   navigation: TradingViewNavigation = createDocumentNavigation(document),
+  fetchRequest: TradingViewSearchFetch = createDocumentFetch(document),
 ): TradingViewSnapshotSource {
-  return new TradingViewDocumentSource(document, navigation);
+  return new TradingViewDocumentSource(document, navigation, fetchRequest);
 }
 
 export function collectTradingViewSemanticSnapshot(
@@ -63,16 +68,23 @@ export function collectTradingViewSemanticSnapshot(
 class TradingViewDocumentSource implements TradingViewSnapshotSource {
   readonly #document: Document;
   readonly #navigation: TradingViewNavigation;
+  readonly #fetchRequest: TradingViewSearchFetch;
 
-  constructor(document: Document, navigation: TradingViewNavigation) {
+  constructor(
+    document: Document,
+    navigation: TradingViewNavigation,
+    fetchRequest: TradingViewSearchFetch,
+  ) {
     if (
       document?.nodeType !== 9 ||
-      typeof navigation?.schedule !== "function"
+      typeof navigation?.schedule !== "function" ||
+      typeof fetchRequest !== "function"
     ) {
       throw new TypeError("TradingView document source is invalid");
     }
     this.#document = document;
     this.#navigation = navigation;
+    this.#fetchRequest = fetchRequest;
   }
 
   read(signal: AbortSignal): TradingViewSemanticSnapshot {
@@ -83,6 +95,10 @@ class TradingViewDocumentSource implements TradingViewSnapshotSource {
     abortIfNeeded(signal);
     const url = createTradingViewSymbolUrl(this.#document.location.href, input);
     this.#navigation.schedule(url);
+  }
+
+  searchSymbols(input: unknown, signal: AbortSignal) {
+    return searchTradingViewSymbols(this.#fetchRequest, input, signal);
   }
 
   subscribe(listener: () => void): () => void {
@@ -118,6 +134,16 @@ class TradingViewDocumentSource implements TradingViewSnapshotSource {
       if (pending !== undefined) view.clearTimeout(pending);
     };
   }
+}
+
+function createDocumentFetch(document: Document): TradingViewSearchFetch {
+  const view = document.defaultView;
+  if (view === null || typeof view?.fetch !== "function") {
+    return async () => {
+      throw new TypeError("TradingView document fetch is unavailable");
+    };
+  }
+  return (input, init) => view.fetch(input, init);
 }
 
 function collectChart(

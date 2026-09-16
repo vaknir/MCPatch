@@ -86,5 +86,26 @@ export function validatePackManifest(
 
   const tools = validateTools(manifest.tools, manifest.publisher as string);
   if ("issue" in tools) return tools.issue;
+  const externalTools = (manifest.tools as readonly unknown[]).some(
+    (tool) =>
+      typeof tool === "object" &&
+      tool !== null &&
+      Array.isArray((tool as { permissions?: unknown }).permissions) &&
+      (tool as { permissions: unknown[] }).permissions.includes(
+        "EXTERNAL_NETWORK",
+      ),
+  );
+  if (
+    externalTools !==
+    (typeof manifest.networkPolicy === "object" &&
+      manifest.networkPolicy !== null &&
+      (manifest.networkPolicy as { extensionRequests?: unknown })
+        .extensionRequests !== "none")
+  ) {
+    return {
+      code: "INVALID_PERMISSION",
+      field: "networkPolicy.extensionRequests",
+    };
+  }
   return validateFixtures(manifest.fixtures, tools.names);
 }

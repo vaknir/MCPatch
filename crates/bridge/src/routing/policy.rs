@@ -1,4 +1,6 @@
-use crate::protocol::{Capability, Permission};
+use std::collections::HashSet;
+
+use crate::protocol::{Capability, CapabilitySource, Permission, Risk};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PermissionDecision {
@@ -12,10 +14,24 @@ pub fn permission_decision(capability: &Capability) -> PermissionDecision {
     if capability.permissions.iter().any(|permission| {
         matches!(
             permission,
-            Permission::Credential | Permission::ExternalNetwork | Permission::ArbitraryExecution
+            Permission::Credential | Permission::ArbitraryExecution
         )
     }) {
         return PermissionDecision::Deny;
+    }
+
+    let permissions: HashSet<_> = capability.permissions.iter().copied().collect();
+    if permissions.contains(&Permission::ExternalNetwork) {
+        return if capability.source == CapabilitySource::Pack
+            && capability.pack.is_some()
+            && capability.risk == Risk::Read
+            && permissions.len() == 2
+            && permissions.contains(&Permission::Read)
+        {
+            PermissionDecision::Allow
+        } else {
+            PermissionDecision::Deny
+        };
     }
 
     if capability
@@ -54,6 +70,27 @@ mod tests {
             permission_decision(&capability(vec![Permission::Read, Permission::Credential])),
             PermissionDecision::Deny
         );
+    }
+
+    #[test]
+    fn only_reviewed_pack_reads_may_use_declared_external_network_authority() {
+        let mut reviewed = capability(vec![Permission::Read, Permission::ExternalNetwork]);
+        reviewed.source = CapabilitySource::Pack;
+        reviewed.pack = Some(crate::protocol::PackReference {
+            publisher: "test".to_owned(),
+            id: "search-pack".to_owned(),
+            version: "0.1.0".to_owned(),
+            digest: format!("sha256:{}", "a".repeat(64)),
+        });
+        assert_eq!(permission_decision(&reviewed), PermissionDecision::Allow);
+
+        let mut native = reviewed.clone();
+        native.source = CapabilitySource::NativeWebMcp;
+        native.pack = None;
+        assert_eq!(permission_decision(&native), PermissionDecision::Deny);
+
+        reviewed.risk = Risk::Action;
+        assert_eq!(permission_decision(&reviewed), PermissionDecision::Deny);
     }
 
     fn capability(permissions: Vec<Permission>) -> Capability {

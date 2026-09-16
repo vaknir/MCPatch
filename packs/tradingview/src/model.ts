@@ -7,8 +7,12 @@ export const TRADINGVIEW_CURRENT_CHART = "tradingview.current_chart" as const;
 export const TRADINGVIEW_CURRENT_WATCHLIST =
   "tradingview.current_watchlist" as const;
 export const TRADINGVIEW_CHANGE_SYMBOL = "tradingview.change_symbol" as const;
+export const TRADINGVIEW_SEARCH_SYMBOLS = "tradingview.search_symbols" as const;
+export const TRADINGVIEW_SYMBOL_SEARCH_ORIGIN =
+  "https://symbol-search.tradingview.com" as const;
 
 export const TRADINGVIEW_TOOLS = Object.freeze([
+  TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
@@ -90,6 +94,37 @@ export interface TradingViewChangeSymbolResult {
   readonly symbol: string;
 }
 
+export interface TradingViewSearchSymbolsInput {
+  readonly query: string;
+  readonly limit?: number;
+}
+
+export type TradingViewAssetType =
+  | "bond"
+  | "crypto"
+  | "economic"
+  | "forex"
+  | "fund"
+  | "futures"
+  | "index"
+  | "stock";
+
+export interface TradingViewSymbolCandidate {
+  readonly symbol: string;
+  readonly ticker: string;
+  readonly exchange: string;
+  readonly label: string;
+  readonly assetType: TradingViewAssetType;
+  readonly country?: string;
+  readonly currency?: string;
+}
+
+export interface TradingViewSearchSymbolsResult {
+  readonly fingerprint: typeof TRADINGVIEW_FINGERPRINT;
+  readonly query: string;
+  readonly candidates: readonly TradingViewSymbolCandidate[];
+}
+
 export type TradingViewErrorCode =
   "CANCELLED" | "EXECUTION_FAILED" | "TOOL_UNAVAILABLE";
 
@@ -104,6 +139,7 @@ export type TradingViewErrorReason =
   | "missing_value"
   | "navigation_already_started"
   | "navigation_unavailable"
+  | "symbol_search_unavailable"
   | "unsupported_locale"
   | "unsupported_origin"
   | "unsupported_path"

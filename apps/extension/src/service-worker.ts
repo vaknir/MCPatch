@@ -6,7 +6,7 @@ import type {
 } from "./approval-model.js";
 import {
   BUNDLED_PACKS,
-  DECLARED_SITE_ORIGINS,
+  DECLARED_OPTIONAL_ORIGINS,
   PACK_RUNTIME_OPTIONS,
 } from "./bundled-packs.js";
 import type { ChromeEnablementApi } from "./enablement-model.js";
@@ -29,7 +29,7 @@ const enablement = new PackEnablementController(
   createReviewedPackCatalog(
     BUNDLED_PACKS,
     PACK_RUNTIME_OPTIONS,
-    DECLARED_SITE_ORIGINS,
+    DECLARED_OPTIONAL_ORIGINS,
   ),
 );
 

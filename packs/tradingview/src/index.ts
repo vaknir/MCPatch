@@ -17,18 +17,24 @@ export {
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_SEARCH_SYMBOLS,
+  TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   TRADINGVIEW_TOOLS,
   TradingViewPackError,
 } from "./model.js";
 export type {
   TradingViewChangeSymbolInput,
   TradingViewChangeSymbolResult,
+  TradingViewAssetType,
   TradingViewChartSemantics,
   TradingViewCurrentChartResult,
   TradingViewCurrentWatchlistResult,
   TradingViewErrorCode,
   TradingViewErrorReason,
   TradingViewSemanticSnapshot,
+  TradingViewSearchSymbolsInput,
+  TradingViewSearchSymbolsResult,
+  TradingViewSymbolCandidate,
   TradingViewToolName,
   TradingViewWatchlistItem,
   TradingViewWatchlistRowSemantics,
@@ -41,3 +47,10 @@ export {
   TRADINGVIEW_SYMBOL_PATTERN,
   validateTradingViewChangeSymbolInput,
 } from "./symbol.js";
+export {
+  createTradingViewSearchUrl,
+  parseTradingViewSymbolSearchResponse,
+  searchTradingViewSymbols,
+  validateTradingViewSearchInput,
+} from "./symbol-search.js";
+export type { TradingViewSearchFetch } from "./symbol-search.js";

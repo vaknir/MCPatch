@@ -25,11 +25,13 @@ const demoTool = "mcpatch.demo.status";
 const currentChartTool = "tradingview.current_chart";
 const currentWatchlistTool = "tradingview.current_watchlist";
 const changeSymbolTool = "tradingview.change_symbol";
+const searchSymbolsTool = "tradingview.search_symbols";
 const fingerprint = "tradingview-chart-semantic-en-v1";
 const tradingViewTools = [
   changeSymbolTool,
   currentChartTool,
   currentWatchlistTool,
+  searchSymbolsTool,
 ] as const;
 
 test.describe.configure({ mode: "serial" });
@@ -82,7 +84,7 @@ test("invokes TradingView reads and an approved action through MCP in a disposab
 
     fieldInstruction(
       "ENABLE_REQUIRED",
-      "Click the MCPatch toolbar action for this tab and approve the exact tradingview.com permission.",
+      "Click the MCPatch toolbar action for this tab and approve the exact www.tradingview.com and symbol-search.tradingview.com permissions.",
     );
     await waitFor(
       () => registeredContentScriptCount(worker),
@@ -114,6 +116,15 @@ test("invokes TradingView reads and an approved action through MCP in a disposab
     );
     validateCurrentWatchlist(
       structuredContent(await client.callTool(currentWatchlistTool).response),
+    );
+    validateSymbolSearch(
+      structuredContent(
+        await client.callTool(searchSymbolsTool, {
+          query: "International Business Machines",
+          limit: 5,
+        }).response,
+      ),
+      "NYSE:IBM",
     );
 
     const nextSymbol = "NYSE:IBM";
@@ -218,6 +229,32 @@ async function prepareNativeHostProfile(profile: string): Promise<void> {
     )}\n`,
     { flag: "wx", mode: 0o600 },
   );
+}
+
+function validateSymbolSearch(value: unknown, expectedSymbol: string): void {
+  const result = dataObject(value);
+  const candidates = result?.["candidates"];
+  if (
+    result?.["fingerprint"] !== fingerprint ||
+    result["query"] !== "International Business Machines" ||
+    !Array.isArray(candidates) ||
+    candidates.length < 1 ||
+    candidates.length > 5
+  ) {
+    throw new Error("TradingView symbol-search result contract changed");
+  }
+  const match = candidates
+    .map(dataObject)
+    .find((candidate) => candidate?.["symbol"] === expectedSymbol);
+  if (
+    match === undefined ||
+    match["ticker"] !== "IBM" ||
+    match["exchange"] !== "NYSE" ||
+    match["assetType"] !== "stock" ||
+    typeof match["label"] !== "string"
+  ) {
+    throw new Error("TradingView symbol search lost canonical IBM identity");
+  }
 }
 
 function validateChangeAccepted(value: unknown, expectedSymbol: string): void {

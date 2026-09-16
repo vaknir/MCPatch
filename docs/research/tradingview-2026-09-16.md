@@ -5,9 +5,11 @@ Issue: [#134](https://github.com/vaknir/MCPatch/issues/134)
 This reconnaissance used a fresh temporary browser profile on TradingView's public
 English chart page. It inspected rendered, user-visible page semantics and tested
 one same-origin navigation from `NASDAQ:AAPL` to `NYSE:IBM`. It did not sign in,
-alter an account, inspect cookies or browser storage, record request traffic, retain
-a profile, or call a private endpoint. The price examples observed during research
-are intentionally absent from this document.
+alter an account, inspect cookies or browser storage, retain a profile, or call a
+private endpoint. A later #137 pass observed only the public first-party symbol
+search request shape and response schema; it retained no response values or HAR.
+The price and search examples observed during research are intentionally absent from
+this document.
 
 ## Findings
 
@@ -39,11 +41,13 @@ Playwright or browser automation at runtime. MCP calls reach reviewed page handl
 through the existing extension and bridge route; the page handlers read only their
 bounded declared semantics or schedule the exact approved navigation.
 
-Global symbol search is deferred. The observed website uses a separate TradingView
-host for symbol search, while Manifest v1 denies external extension networking.
-Guessing a listing exchange is not acceptable because tickers can exist on multiple
-venues. An agent can use canonical identifiers returned by the current chart or
-watchlist; broader discovery needs its own constrained network and output contract.
+Follow-up issue #137 inspected the separate public TradingView symbol-search host
+from the same disposable signed-out profile. Its GET response is available to the
+TradingView page origin without cookies, tokens, or captured headers. MCPatch now
+uses a separately reviewed exact-origin grant and a fixed request shape to return at
+most ten typed canonical candidates. Guessing a listing exchange remains
+unacceptable because tickers can exist on multiple venues; the agent never receives
+the raw response or a generic request capability.
 
 Watchlist mutation, alerts, and chart capture are also deferred. Each needs a
 reviewed authenticated-site action or media-result contract and dedicated approval

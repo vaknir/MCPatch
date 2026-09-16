@@ -15,7 +15,12 @@ import {
   type MCPatchToolOptions,
 } from "./mcpatch.js";
 import type { InferPackInput, InferPackOutput } from "./schema-inference.js";
-import type { JsonObject, PackCompatibility, PackPermission } from "./types.js";
+import type {
+  JsonObject,
+  PackCompatibility,
+  PackNetworkPolicy,
+  PackPermission,
+} from "./types.js";
 import { issue } from "./validation/primitives.js";
 
 export { BrowserToolExecutionError } from "./browser-page.js";
@@ -42,6 +47,7 @@ const PACK_OPTION_FIELDS = [
   "digest",
   "matches",
   "compatibility",
+  "networkPolicy",
 ] as const;
 const BROWSER_TOOL_FIELDS = [
   "name",
@@ -63,6 +69,7 @@ export type BrowserMCPatchOptions = Omit<
   "compatibility" | "execution" | "manifestVersion" | "networkPolicy"
 > & {
   readonly compatibility?: PackCompatibility;
+  readonly networkPolicy?: PackNetworkPolicy;
 };
 
 /** A risk's baseline permission is inferred unless extra permissions are explicit. */
@@ -91,7 +98,7 @@ export class MCPatch<TSite, TDocument = Document> {
     const source = authoringObject(
       options,
       PACK_OPTION_FIELDS,
-      new Set(["compatibility"]),
+      new Set(["compatibility", "networkPolicy"]),
       "browserPack",
     );
     this.#core = new CoreMCPatch({
@@ -107,7 +114,9 @@ export class MCPatch<TSite, TDocument = Document> {
         DEFAULT_COMPATIBILITY,
       execution: { kind: "bundled" },
       matches: source.matches as MCPatchOptions["matches"],
-      networkPolicy: { extensionRequests: "none" },
+      networkPolicy:
+        (source.networkPolicy as PackNetworkPolicy | undefined) ??
+        ({ extensionRequests: "none" } as const),
     });
   }
 

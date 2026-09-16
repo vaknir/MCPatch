@@ -1,6 +1,7 @@
 import {
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   TRADINGVIEW_TOOLS,
   tradingViewBrowserPack,
   tradingViewPack,
@@ -11,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { BUNDLED_PAGE_ADAPTERS } from "../src/bundled-page-adapters.js";
 import {
   BUNDLED_PACKS,
-  DECLARED_SITE_ORIGINS,
+  DECLARED_OPTIONAL_ORIGINS,
   PACK_RUNTIME_OPTIONS,
 } from "../src/bundled-packs.js";
 import { createReviewedPackCatalog } from "../src/reviewed-pack-catalog.js";
@@ -24,16 +25,20 @@ describe("bundled TradingView production pack", () => {
     expect(definition).toBe(tradingViewBrowserPack.page);
     expect(definition?.tools).toEqual(TRADINGVIEW_TOOLS);
     expect(BUNDLED_PACKS).toContain(tradingViewPack);
-    expect(PACK_RUNTIME_OPTIONS.allowedPermissions).toEqual(["READ", "ACTION"]);
+    expect(PACK_RUNTIME_OPTIONS.allowedPermissions).toEqual([
+      "READ",
+      "ACTION",
+      "EXTERNAL_NETWORK",
+    ]);
   });
 
   it("matches only exact TradingView chart paths under declared authority", () => {
     const catalog = createReviewedPackCatalog(
       BUNDLED_PACKS,
       PACK_RUNTIME_OPTIONS,
-      DECLARED_SITE_ORIGINS,
+      DECLARED_OPTIONAL_ORIGINS,
     );
-    expect(DECLARED_SITE_ORIGINS).toContain(TRADINGVIEW_ORIGIN);
+    expect(DECLARED_OPTIONAL_ORIGINS).toContain(TRADINGVIEW_ORIGIN);
     expect(
       catalog.match(`${TRADINGVIEW_ORIGIN}${TRADINGVIEW_CHART_PATH}`),
     ).toHaveLength(1);
@@ -50,6 +55,9 @@ describe("bundled TradingView production pack", () => {
     ) as Record<string, unknown>;
     expect(manifest["optional_host_permissions"]).toContain(
       `${TRADINGVIEW_ORIGIN}/*`,
+    );
+    expect(manifest["optional_host_permissions"]).toContain(
+      `${TRADINGVIEW_SYMBOL_SEARCH_ORIGIN}/*`,
     );
     expect(manifest).not.toHaveProperty("host_permissions");
   });

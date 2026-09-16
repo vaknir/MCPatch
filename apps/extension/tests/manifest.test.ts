@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { DECLARED_SITE_ORIGINS } from "../src/bundled-packs.js";
+import { DECLARED_OPTIONAL_ORIGINS } from "../src/bundled-packs.js";
 
 const manifest = JSON.parse(
   readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
@@ -32,7 +32,7 @@ describe("extension manifest", () => {
     });
   });
 
-  it("grants only native messaging and no website authority", () => {
+  it("grants no ambient website authority and declares only exact optional origins", () => {
     expect(Object.keys(manifest).sort()).toEqual([
       "action",
       "background",
@@ -53,10 +53,10 @@ describe("extension manifest", () => {
       "storage",
     ]);
     expect(manifest["optional_host_permissions"]).toEqual(
-      DECLARED_SITE_ORIGINS.map((origin) => `${origin}/*`),
+      DECLARED_OPTIONAL_ORIGINS.map((origin) => `${origin}/*`),
     );
     expect(
-      DECLARED_SITE_ORIGINS.every(
+      DECLARED_OPTIONAL_ORIGINS.every(
         (origin) => new URL(origin).origin === origin && !origin.includes("*"),
       ),
     ).toBe(true);

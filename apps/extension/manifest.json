@@ -8,7 +8,8 @@
   "permissions": ["activeTab", "nativeMessaging", "scripting", "storage"],
   "optional_host_permissions": [
     "https://www.google.com/*",
-    "https://www.tradingview.com/*"
+    "https://www.tradingview.com/*",
+    "https://symbol-search.tradingview.com/*"
   ],
   "action": {
     "default_title": "MCPatch"

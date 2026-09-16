@@ -59,9 +59,38 @@ export function validateNetworkPolicy(
     "networkPolicy",
   );
   if (checked.issue !== undefined) return checked.issue;
-  return checked.value.extensionRequests === "none"
+  const requests = checked.value.extensionRequests;
+  if (requests === "none") return undefined;
+  const requestPolicy = closedObject(
+    requests,
+    ["origins", "methods"],
+    [],
+    "networkPolicy.extensionRequests",
+  );
+  if (requestPolicy.issue !== undefined) return requestPolicy.issue;
+  if (!boundedArray(requestPolicy.value.origins, 1, 8)) {
+    return issue("LIMIT_EXCEEDED", "networkPolicy.extensionRequests.origins");
+  }
+  const origins = new Set<string>();
+  for (const [index, origin] of requestPolicy.value.origins.entries()) {
+    const originIssue = validateOrigin(
+      origin,
+      `networkPolicy.extensionRequests.origins[${index}]`,
+    );
+    if (originIssue !== undefined) return originIssue;
+    if (origins.has(origin as string)) {
+      return issue(
+        "DUPLICATE_VALUE",
+        `networkPolicy.extensionRequests.origins[${index}]`,
+      );
+    }
+    origins.add(origin as string);
+  }
+  return Array.isArray(requestPolicy.value.methods) &&
+    requestPolicy.value.methods.length === 1 &&
+    requestPolicy.value.methods[0] === "GET"
     ? undefined
-    : issue("INVALID_PERMISSION", "networkPolicy.extensionRequests");
+    : issue("INVALID_PERMISSION", "networkPolicy.extensionRequests.methods");
 }
 
 function validateOrigin(

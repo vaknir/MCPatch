@@ -5,12 +5,15 @@ import {
 } from "./extractor.js";
 import {
   TRADINGVIEW_FINGERPRINT,
+  TRADINGVIEW_SEARCH_SYMBOLS,
   TradingViewPackError,
   type TradingViewChangeSymbolInput,
   type TradingViewChangeSymbolResult,
   type TradingViewCurrentChartResult,
   type TradingViewCurrentWatchlistResult,
   type TradingViewSemanticSnapshot,
+  type TradingViewSearchSymbolsInput,
+  type TradingViewSearchSymbolsResult,
   type TradingViewToolName,
 } from "./model.js";
 import { validateTradingViewChangeSymbolInput } from "./symbol.js";
@@ -23,6 +26,10 @@ export interface TradingViewSnapshotSource {
     input: TradingViewChangeSymbolInput,
     signal: AbortSignal,
   ): void | Promise<void>;
+  searchSymbols?(
+    input: TradingViewSearchSymbolsInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewSearchSymbolsResult>;
   subscribe?(listener: () => void): () => void;
 }
 
@@ -36,6 +43,10 @@ export interface TradingViewSite {
     input: TradingViewChangeSymbolInput,
     signal: AbortSignal,
   ): Promise<TradingViewChangeSymbolResult>;
+  searchSymbols(
+    input: TradingViewSearchSymbolsInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewSearchSymbolsResult>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -68,10 +79,14 @@ class ReviewedTradingViewSite implements TradingViewSite {
       this.#source.changeSymbol !== undefined &&
         this.#navigationState === "idle",
     );
-    this.#capabilitySignature = signature(tools);
+    const availableTools =
+      this.#source.searchSymbols === undefined
+        ? tools
+        : Object.freeze([...tools, TRADINGVIEW_SEARCH_SYMBOLS]);
+    this.#capabilitySignature = signature(availableTools);
     this.#candidateSignature = undefined;
     this.#candidateCount = 0;
-    return tools;
+    return availableTools;
   }
 
   async currentChart(
@@ -134,6 +149,22 @@ class ReviewedTradingViewSite implements TradingViewSite {
     });
   }
 
+  async searchSymbols(
+    input: TradingViewSearchSymbolsInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewSearchSymbolsResult> {
+    abortIfNeeded(signal);
+    const search = this.#source.searchSymbols;
+    if (search === undefined) {
+      throw new TradingViewPackError(
+        "TOOL_UNAVAILABLE",
+        "symbol_search_unavailable",
+      );
+    }
+    extractTradingViewCurrentChart(await this.#read(signal));
+    return search.call(this.#source, input, signal);
+  }
+
   subscribe(listener: () => void): () => void {
     if (typeof listener !== "function") {
       throw new TypeError("TradingView listener is invalid");
@@ -181,10 +212,13 @@ class ReviewedTradingViewSite implements TradingViewSite {
     try {
       const snapshot = await this.#read(signal);
       return signature(
-        discoverTradingViewTools(
-          snapshot,
-          this.#source.changeSymbol !== undefined &&
-            this.#navigationState === "idle",
+        appendSearchTool(
+          discoverTradingViewTools(
+            snapshot,
+            this.#source.changeSymbol !== undefined &&
+              this.#navigationState === "idle",
+          ),
+          this.#source.searchSymbols !== undefined,
         ),
       );
     } catch (error) {
@@ -226,6 +260,15 @@ class ReviewedTradingViewSite implements TradingViewSite {
       throw new TradingViewPackError("EXECUTION_FAILED", "incompatible_page");
     }
   }
+}
+
+function appendSearchTool(
+  tools: readonly TradingViewToolName[],
+  available: boolean,
+): readonly TradingViewToolName[] {
+  return available
+    ? Object.freeze([...tools, TRADINGVIEW_SEARCH_SYMBOLS])
+    : tools;
 }
 
 function signature(tools: readonly TradingViewToolName[]): string {

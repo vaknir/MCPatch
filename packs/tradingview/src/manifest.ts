@@ -9,6 +9,8 @@ import {
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_SEARCH_SYMBOLS,
+  TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
 } from "./model.js";
 import { createTradingViewSite, type TradingViewSite } from "./site.js";
 
@@ -25,16 +27,81 @@ const mcp = new MCPatch<TradingViewSite>({
   name: "TradingView",
   description:
     "Expose bounded chart and watchlist state plus approved chart navigation from TradingView.",
-  version: "0.1.0",
+  version: "0.2.0",
   digest:
-    "sha256:4fe7409d2222804b2ed7478e1a512f847dab75477c31d5900c35f3f6ab187268",
+    "sha256:2f6b110367c7d03db62891dd2b37d3a06392a2f7cb0c4b339e3b7b9bc9fc1330",
   matches: [
     {
       origin: TRADINGVIEW_ORIGIN,
       paths: [{ kind: "prefix", path: TRADINGVIEW_CHART_PATH }],
     },
   ],
+  networkPolicy: {
+    extensionRequests: {
+      origins: [TRADINGVIEW_SYMBOL_SEARCH_ORIGIN],
+      methods: ["GET"],
+    },
+  },
 });
+
+mcp.tool(
+  {
+    name: TRADINGVIEW_SEARCH_SYMBOLS,
+    description:
+      "Resolve a bounded company or ticker query to canonical exchange-qualified TradingView symbols without exposing cookies or raw network responses.",
+    risk: "read",
+    permissions: ["READ", "EXTERNAL_NETWORK"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["query"],
+      maxProperties: 2,
+      properties: {
+        query: { type: "string", minLength: 1, maxLength: 64 },
+        limit: { type: "integer", minimum: 1, maximum: 10 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "query", "candidates"],
+      properties: {
+        fingerprint: { const: TRADINGVIEW_FINGERPRINT },
+        query: { type: "string" },
+        candidates: {
+          type: "array",
+          maxItems: 10,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["symbol", "ticker", "exchange", "label", "assetType"],
+            properties: {
+              symbol: { type: "string" },
+              ticker: { type: "string" },
+              exchange: { type: "string" },
+              label: { type: "string" },
+              assetType: {
+                enum: [
+                  "bond",
+                  "crypto",
+                  "economic",
+                  "forex",
+                  "fund",
+                  "futures",
+                  "index",
+                  "stock",
+                ],
+              },
+              country: { type: "string" },
+              currency: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.searchSymbols(input, signal),
+);
 
 mcp.tool(
   {
@@ -171,6 +238,12 @@ export const tradingViewBrowserPack = mcp.build({
       id: "page-only-current-watchlist",
       tool: TRADINGVIEW_CURRENT_WATCHLIST,
       input: {},
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-search-symbols",
+      tool: TRADINGVIEW_SEARCH_SYMBOLS,
+      input: { query: "Apple", limit: 5 },
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
     {
