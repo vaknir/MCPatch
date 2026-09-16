@@ -36,33 +36,64 @@ export {
   validateJiraSearchInput,
 } from "./issues.js";
 export {
+  assignJiraIssue,
+  unassignJiraIssue,
+  validateJiraAssignIssueInput,
+  validateJiraUnassignIssueInput,
+} from "./assign.js";
+export {
   linkJiraIssues,
+  listJiraIssueLinks,
   parseJiraIssueLinks,
+  removeJiraIssueLink,
   validateJiraLinkIssuesInput,
+  validateJiraListIssueLinksInput,
+  validateJiraRemoveIssueLinkInput,
 } from "./links.js";
-export type { JiraIssueLink } from "./links.js";
+export {
+  selectedFields,
+  updateJiraIssue,
+  updatePayload,
+  validateJiraUpdateIssueInput,
+} from "./update-issue.js";
 export { jiraBrowserPack, jiraPack } from "./manifest.js";
 export {
   JIRA_ADD_COMMENT,
+  JIRA_ASSIGN_ISSUE,
   JIRA_CREATE_ISSUE,
   JIRA_CURRENT_CONTEXT,
   JIRA_FINGERPRINT,
   JIRA_GET_ISSUE,
   JIRA_LINK_ISSUES,
   JIRA_LIST_COMMENTS,
+  JIRA_LIST_ISSUE_LINKS,
   JIRA_LIST_PROJECTS,
   JIRA_LIST_TRANSITIONS,
+  JIRA_REMOVE_ISSUE_LINK,
   JIRA_REST_PREFIX,
   JIRA_SEARCH_ISSUES,
   JIRA_SINGLE_USE_TOOLS,
   JIRA_TOOLS,
   JIRA_TRANSITION_ISSUE,
+  JIRA_UNASSIGN_ISSUE,
+  JIRA_UPDATE_ISSUE,
   JiraPackError,
 } from "./model.js";
 export type {
   JiraAddCommentInput,
   JiraAddCommentResult,
+  JiraAssignIssueInput,
+  JiraAssignIssueResult,
   JiraComment,
+  JiraIssueLink,
+  JiraIssueLinkDirection,
+  JiraListIssueLinksResult,
+  JiraRemoveIssueLinkInput,
+  JiraRemoveIssueLinkResult,
+  JiraUnassignIssueResult,
+  JiraUpdatableField,
+  JiraUpdateIssueInput,
+  JiraUpdateIssueResult,
   JiraCreateIssueInput,
   JiraCreateIssueResult,
   JiraCurrentContextResult,

@@ -12,9 +12,15 @@ const SAFE_PATH = /^(?:\/[A-Za-z0-9][A-Za-z0-9._~-]*)+$/u;
 export type JiraFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 /**
- * The only network surface of this pack: same-origin GET and POST calls to the
- * fixed Jira REST v2 prefix of one enabled site, using the browser's existing
- * session. The caller never supplies an origin, method, header, or raw URL.
+ * The only network surface of this pack: same-origin calls to the fixed Jira
+ * REST v2 prefix of one enabled site, using the browser's existing session.
+ *
+ * The method is chosen by reviewed pack code from a closed set, never by the
+ * caller, who also supplies no origin, header, raw URL, or credentials mode.
+ * `PUT` and `DELETE` carry no extra manifest authority: same-origin session
+ * actions are not a manifest permission class (ADR 0011), and
+ * `networkPolicy.extensionRequests` governs extension-issued cross-origin
+ * requests, which this pack never makes.
  */
 export interface JiraRestClient {
   readonly baseUrl: string;
@@ -24,6 +30,8 @@ export interface JiraRestClient {
     signal: AbortSignal,
   ): Promise<unknown>;
   post(path: string, body: JsonObject, signal: AbortSignal): Promise<unknown>;
+  put(path: string, body: JsonObject, signal: AbortSignal): Promise<unknown>;
+  remove(path: string, signal: AbortSignal): Promise<unknown>;
 }
 
 export function createJiraRestClient(
@@ -46,7 +54,21 @@ export function createJiraRestClient(
       request(
         fetchRequest,
         requestUrl(origin, prefix, path, {}),
-        writeInit(body),
+        writeInit("POST", body),
+        signal,
+      ),
+    put: async (path, body, signal) =>
+      request(
+        fetchRequest,
+        requestUrl(origin, prefix, path, {}),
+        writeInit("PUT", body),
+        signal,
+      ),
+    remove: async (path, signal) =>
+      request(
+        fetchRequest,
+        requestUrl(origin, prefix, path, {}),
+        deleteInit(),
         signal,
       ),
   };
@@ -86,9 +108,9 @@ function readInit(): RequestInit {
   };
 }
 
-function writeInit(body: JsonObject): RequestInit {
+function writeInit(method: "POST" | "PUT", body: JsonObject): RequestInit {
   return {
-    method: "POST",
+    method,
     credentials: "include",
     redirect: "error",
     cache: "no-store",
@@ -98,6 +120,19 @@ function writeInit(body: JsonObject): RequestInit {
       "X-Atlassian-Token": "no-check",
     },
     body: JSON.stringify(body),
+  };
+}
+
+function deleteInit(): RequestInit {
+  return {
+    method: "DELETE",
+    credentials: "include",
+    redirect: "error",
+    cache: "no-store",
+    headers: {
+      Accept: JSON_MEDIA_TYPE,
+      "X-Atlassian-Token": "no-check",
+    },
   };
 }
 

@@ -57,14 +57,27 @@ is part of the fingerprint.
 
 ## Network contract
 
-Every tool call is one same-origin `GET` or `POST` under the fixed `/rest/api/2`
-prefix of the enabled origin, so the pack declares
+Every tool call is one same-origin request under the fixed `/rest/api/2` prefix
+of the enabled origin, so the pack declares
 `networkPolicy.extensionRequests: "none"` and no tool carries
 `EXTERNAL_NETWORK`. The browser attaches the session cookie itself; MCPatch never
 reads, stores, or returns it.
 
-The agent supplies neither origin, method, header, raw URL, nor request body.
-Paths are assembled from validated identifiers, matched against
+The pack uses `GET`, `POST`, `PUT`, and `DELETE`. This is not extra authority.
+`networkPolicy.extensionRequests` — including its `GET`/`POST` method
+restriction — governs extension-issued cross-origin requests paired with
+`EXTERNAL_NETWORK` tools, which this pack never makes; the manifest validator
+only inspects a tool's methods when that permission is present.
+[ADR 0011](../adr/0011-reviewed-authenticated-session-actions.md) states that a
+reviewed pack's authenticated same-origin action "is not a new manifest
+permission class", and its enumerated constraints are about argument binding,
+bounded responses, and postconditions rather than the HTTP verb. The write
+authority here comes from the enabled page origin plus the bridge's
+argument-bound one-time approval, exactly as it does for `POST`.
+
+The agent supplies neither origin, method, header, raw URL, nor request body;
+the method is chosen by reviewed pack code from a closed set. Paths are
+assembled from validated identifiers, matched against
 `^(?:/[A-Za-z0-9][A-Za-z0-9._~-]*)+$`, and rechecked against the enabled origin
 and REST prefix before the request is issued. Requests omit redirects, disable
 the cache, and expire after ten seconds. Responses must be JSON, are capped at
@@ -153,15 +166,62 @@ deterministic `already_linked` no-op with no write. Otherwise it issues one fixe
 POST and re-reads to confirm, returning `linked` or, when confirmation is
 unavailable, `created_unconfirmed`.
 
+### `jira.list_issue_links`
+
+This `READ` returns at most 256 links of one issue, each with its exact id,
+type, direction, and the issue on the other side. It is the discovery step that
+makes `jira.remove_issue_link` approvable: without it the agent would have no
+way to name a link except by guessing an id.
+
+### `jira.update_issue`
+
+This `ACTION` sets a closed set of **named** fields on one exact issue: summary,
+description, priority, labels, and due date. A generic field-id map is
+deliberately not expressible — it would place an opaque blob in front of the
+user at approval time, while named properties put every changed value in the
+approval hash. Raw field ids, custom fields, status, reporter, parent, and
+security level therefore have no path through this tool; status changes belong
+to `jira.transition_issue`, which validates against the server's own workflow.
+
+At least one field must be present. Due dates are checked as real calendar dates,
+so `2026-02-30` fails. Setting `labels` replaces the issue's label set. The
+confirming read compares the untruncated stored values, so a description longer
+than the 4,096-character read excerpt is still confirmed exactly rather than
+against its excerpt. The result names the fields it set and reports `confirmed`
+or `applied_unconfirmed`.
+
+### `jira.assign_issue` and `jira.unassign_issue`
+
+These `ACTION` tools set or clear one issue's assignee through Jira's dedicated
+assignee endpoint. They are two tools rather than one tool with a sentinel
+value: a single `assignee` argument would need a reserved string for "nobody",
+and a real Jira account named that string would then be unreachable — or worse,
+silently unassign. Splitting them removes the ambiguity and makes each the
+distinct action the user approves. An unchanged assignee is a no-op with no
+write.
+
+### `jira.remove_issue_link`
+
+This `ACTION` removes one link by exact id, but only after reading the links of
+the issue the approval named and proving the id is among them. That binding is
+the point: a link id alone addresses every link in the instance, so without the
+precondition an approval for one issue would carry authority over any other.
+An unavailable confirming read returns `removed_unconfirmed`.
+
 ## Single-use writes
 
 `jira.add_comment`, `jira.create_issue`, and `jira.link_issues` are not
 idempotent. Each is consumed once per document context and then withdrawn from
 discovery, so a retrying agent cannot silently duplicate a comment, an issue, or
 a link. Argument validation runs before consumption, so a rejected malformed call
-does not burn the capability. `jira.transition_issue` stays repeatable because
-every attempt is re-validated against the transitions the server currently
-offers.
+does not burn the capability.
+
+The remaining actions set a named end state rather than appending, so repeating
+one converges instead of accumulating. They stay repeatable and re-validate
+their preconditions on every attempt: `jira.transition_issue` against the
+transitions the server currently offers, `jira.remove_issue_link` against the
+links currently on the approved issue, and the assignment tools against the
+current assignee.
 
 ## Resource and lifecycle bounds
 
@@ -186,7 +246,8 @@ context through the common lifecycle.
 - reading or exporting credentials, cookies, storage, headers, or request logs.
 
 Each requires its own reviewed contract rather than a generic request escape
-hatch.
+hatch. Widening `jira.update_issue` means adding named, bounded fields to its
+closed schema, never a field-id passthrough.
 
 ## Verification status
 

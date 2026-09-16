@@ -5,16 +5,21 @@ import { JIRA_SITE_ORIGINS } from "./deployment.js";
 import { createJiraDocumentSource } from "./document-source.js";
 import {
   JIRA_ADD_COMMENT,
+  JIRA_ASSIGN_ISSUE,
   JIRA_CREATE_ISSUE,
   JIRA_CURRENT_CONTEXT,
   JIRA_FINGERPRINT,
   JIRA_GET_ISSUE,
   JIRA_LINK_ISSUES,
   JIRA_LIST_COMMENTS,
+  JIRA_LIST_ISSUE_LINKS,
   JIRA_LIST_PROJECTS,
   JIRA_LIST_TRANSITIONS,
+  JIRA_REMOVE_ISSUE_LINK,
   JIRA_SEARCH_ISSUES,
   JIRA_TRANSITION_ISSUE,
+  JIRA_UNASSIGN_ISSUE,
+  JIRA_UPDATE_ISSUE,
 } from "./model.js";
 import { createJiraSite, type JiraSite } from "./site.js";
 import {
@@ -107,7 +112,7 @@ const mcp = new MCPatch<JiraSite>({
   version: "0.1.0",
   // Reviewed manifest identity; enforced by tests/digest.test.ts.
   digest:
-    "sha256:3ad6ed5dc73f679892b2923c3e06158c51a24e2b2d367ce18c080751a9e7a2c3",
+    "sha256:3cc8e7a49828ca1922ab3d61462ced2ed57cbe0a4933c28a09e747ed4cafab2c",
   matches: JIRA_SITE_ORIGINS.map((origin) => ({
     origin,
     paths: [{ kind: "prefix", path: "/" }] as const,
@@ -494,6 +499,183 @@ mcp.tool(
   (input, { site, signal }) => site.linkIssues(input, signal),
 );
 
+mcp.tool(
+  {
+    name: JIRA_LIST_ISSUE_LINKS,
+    description:
+      "Read the links of one Jira issue with each link's exact id, type, direction, and the issue on the other side.",
+    risk: "read",
+    inputSchema: ISSUE_KEY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "issueKey", "links"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        issueKey: { type: "string" },
+        links: {
+          type: "array",
+          maxItems: 256,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "type", "direction", "otherIssueKey"],
+            properties: {
+              id: { type: "string" },
+              type: { type: "string" },
+              direction: { enum: ["inward", "outward"] },
+              otherIssueKey: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listIssueLinks(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_UPDATE_ISSUE,
+    description:
+      "Set one or more named fields of one exact Jira issue after one-time approval, limited to summary, description, priority, labels, and due date.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 6,
+      required: ["issueKey"],
+      properties: {
+        issueKey: ISSUE_KEY_SCHEMA,
+        summary: {
+          type: "string",
+          minLength: 1,
+          maxLength: JIRA_MAX_SUMMARY_LENGTH,
+        },
+        description: {
+          type: "string",
+          minLength: 1,
+          maxLength: JIRA_MAX_TEXT_LENGTH,
+        },
+        priority: NAME_SCHEMA,
+        labels: {
+          type: "array",
+          maxItems: JIRA_MAX_LABELS,
+          items: { type: "string", minLength: 1, maxLength: 255 },
+        },
+        dueDate: { type: "string", minLength: 10, maxLength: 10 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "issueKey", "updatedFields"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: { enum: ["applied_unconfirmed", "confirmed"] },
+        issueKey: { type: "string" },
+        updatedFields: {
+          type: "array",
+          maxItems: 5,
+          items: {
+            enum: ["description", "dueDate", "labels", "priority", "summary"],
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.updateIssue(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_ASSIGN_ISSUE,
+    description:
+      "Assign one exact Jira issue to one exact username after one-time approval, treating an unchanged assignee as a no-op.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      required: ["issueKey", "assignee"],
+      properties: {
+        issueKey: ISSUE_KEY_SCHEMA,
+        assignee: { type: "string", minLength: 1, maxLength: 255 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "issueKey", "assignee"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: {
+          enum: ["already_assigned", "assigned", "assigned_unconfirmed"],
+        },
+        issueKey: { type: "string" },
+        assignee: { type: "string" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.assignIssue(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_UNASSIGN_ISSUE,
+    description:
+      "Clear the assignee of one exact Jira issue after one-time approval, treating an already empty assignee as a no-op.",
+    risk: "action",
+    inputSchema: ISSUE_KEY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "issueKey"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: {
+          enum: ["already_unassigned", "unassigned", "unassigned_unconfirmed"],
+        },
+        issueKey: { type: "string" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.unassignIssue(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_REMOVE_ISSUE_LINK,
+    description:
+      "Remove one exact Jira issue link by id after one-time approval, only when that link is currently on the named issue.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      required: ["issueKey", "linkId"],
+      properties: {
+        issueKey: ISSUE_KEY_SCHEMA,
+        linkId: { type: "string", minLength: 1, maxLength: 19 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "issueKey", "linkId"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: {
+          enum: ["already_absent", "removed", "removed_unconfirmed"],
+        },
+        issueKey: { type: "string" },
+        linkId: { type: "string" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.removeIssueLink(input, signal),
+);
+
 export const jiraBrowserPack = mcp.build({
   fixtures: [
     {
@@ -558,6 +740,36 @@ export const jiraBrowserPack = mcp.build({
         outwardIssueKey: "ABC-2",
         linkType: "Relates",
       },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-issue-links",
+      tool: JIRA_LIST_ISSUE_LINKS,
+      input: { issueKey: "ABC-1" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-update-issue",
+      tool: JIRA_UPDATE_ISSUE,
+      input: { issueKey: "ABC-1", summary: "Updated summary" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-assign-issue",
+      tool: JIRA_ASSIGN_ISSUE,
+      input: { issueKey: "ABC-1", assignee: "jdoe" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-unassign-issue",
+      tool: JIRA_UNASSIGN_ISSUE,
+      input: { issueKey: "ABC-1" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-remove-issue-link",
+      tool: JIRA_REMOVE_ISSUE_LINK,
+      input: { issueKey: "ABC-1", linkId: "30001" },
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
   ],

@@ -13,15 +13,25 @@ export const JIRA_ADD_COMMENT = "jira.add_comment" as const;
 export const JIRA_TRANSITION_ISSUE = "jira.transition_issue" as const;
 export const JIRA_CREATE_ISSUE = "jira.create_issue" as const;
 export const JIRA_LINK_ISSUES = "jira.link_issues" as const;
+export const JIRA_LIST_ISSUE_LINKS = "jira.list_issue_links" as const;
+export const JIRA_REMOVE_ISSUE_LINK = "jira.remove_issue_link" as const;
+export const JIRA_UPDATE_ISSUE = "jira.update_issue" as const;
+export const JIRA_ASSIGN_ISSUE = "jira.assign_issue" as const;
+export const JIRA_UNASSIGN_ISSUE = "jira.unassign_issue" as const;
 
 export const JIRA_TOOLS = Object.freeze([
   JIRA_ADD_COMMENT,
   JIRA_CREATE_ISSUE,
   JIRA_LINK_ISSUES,
+  JIRA_ASSIGN_ISSUE,
+  JIRA_REMOVE_ISSUE_LINK,
   JIRA_TRANSITION_ISSUE,
+  JIRA_UNASSIGN_ISSUE,
+  JIRA_UPDATE_ISSUE,
   JIRA_CURRENT_CONTEXT,
   JIRA_GET_ISSUE,
   JIRA_LIST_COMMENTS,
+  JIRA_LIST_ISSUE_LINKS,
   JIRA_LIST_PROJECTS,
   JIRA_LIST_TRANSITIONS,
   JIRA_SEARCH_ISSUES,
@@ -212,6 +222,72 @@ export interface JiraLinkIssuesInput {
   readonly linkType: string;
 }
 
+export type JiraIssueLinkDirection = "inward" | "outward";
+
+export interface JiraIssueLink {
+  readonly id: string;
+  readonly type: string;
+  readonly direction: JiraIssueLinkDirection;
+  readonly otherIssueKey: string;
+}
+
+export interface JiraListIssueLinksResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly issueKey: string;
+  readonly links: readonly JiraIssueLink[];
+}
+
+export interface JiraRemoveIssueLinkInput {
+  readonly issueKey: string;
+  readonly linkId: string;
+}
+
+export interface JiraRemoveIssueLinkResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "already_absent" | "removed" | "removed_unconfirmed";
+  readonly issueKey: string;
+  readonly linkId: string;
+}
+
+/** Exactly the issue fields this pack may set, each named in the approval. */
+export interface JiraUpdateIssueInput {
+  readonly issueKey: string;
+  readonly summary?: string;
+  readonly description?: string;
+  readonly priority?: string;
+  readonly labels?: readonly string[];
+  readonly dueDate?: string;
+}
+
+export type JiraUpdatableField =
+  "description" | "dueDate" | "labels" | "priority" | "summary";
+
+export interface JiraUpdateIssueResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "applied_unconfirmed" | "confirmed";
+  readonly issueKey: string;
+  readonly updatedFields: readonly JiraUpdatableField[];
+}
+
+export interface JiraAssignIssueInput {
+  readonly issueKey: string;
+  readonly assignee: string;
+}
+
+export interface JiraAssignIssueResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "already_assigned" | "assigned" | "assigned_unconfirmed";
+  readonly issueKey: string;
+  readonly assignee: string;
+}
+
+export interface JiraUnassignIssueResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state:
+    "already_unassigned" | "unassigned" | "unassigned_unconfirmed";
+  readonly issueKey: string;
+}
+
 export interface JiraLinkIssuesResult {
   readonly fingerprint: typeof JIRA_FINGERPRINT;
   readonly state: "already_linked" | "created_unconfirmed" | "linked";
@@ -233,6 +309,8 @@ export type JiraErrorReason =
   | "invalid_arguments"
   | "link_action_unavailable"
   | "missing_value"
+  | "no_updatable_field"
+  | "unknown_issue_link"
   | "request_failed"
   | "transition_action_unavailable"
   | "unknown_transition"
