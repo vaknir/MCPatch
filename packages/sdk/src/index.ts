@@ -53,3 +53,31 @@ export type {
   PackImageContent,
   PackToolReturn,
 } from "./tool-result.js";
+export {
+  canonicalizeDeclarativePackBundle,
+  computeDeclarativePackBundleDigest,
+  decodeDeclarativePackBundle,
+  parseDeclarativePackBundle,
+  parseDeclarativePackBundleBytes,
+  publisherKeyId,
+  registryAttestationSigningBytes,
+  serializeDeclarativePackBundle,
+  signDeclarativePackBundle,
+  validateDeclarativePackBundle,
+  verifyDeclarativePackBundle,
+  verifyRegistryAttestation,
+  MAX_BUNDLE_ARRAY_ITEMS,
+  MAX_BUNDLE_JSON_DEPTH,
+  MAX_BUNDLE_JSON_NODES,
+  MAX_BUNDLE_OBJECT_FIELDS,
+  MAX_BUNDLE_STRING_BYTES,
+  MAX_DECLARATIVE_BUNDLE_BYTES,
+} from "./declarative-bundle.js";
+export {
+  BUNDLE_SIGNATURE_VERSION,
+  DECLARATIVE_OPERATIONS_VERSION,
+  DECLARATIVE_PACK_BUNDLE_VERSION,
+  REGISTRY_ATTESTATION_VERSION,
+  DeclarativePackBundleValidationError,
+} from "./declarative-bundle-types.js";
+export type * from "./declarative-bundle-types.js";

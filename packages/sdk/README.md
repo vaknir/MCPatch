@@ -183,3 +183,13 @@ runtime code-loading field. The manifest API does not load or execute code.
 
 See [../../docs/architecture/pack-manifest-v1.md](../../docs/architecture/pack-manifest-v1.md)
 for the compatibility, matching, identity, and validation rules.
+
+## Declarative Pack Bundle v1
+
+The SDK also validates and serializes the one-document .mcpack artifact defined
+in [Declarative Pack Bundle v1](../../docs/architecture/declarative-pack-bundle.md).
+Use parseDeclarativePackBundleBytes for duplicate-safe byte ingestion,
+computeDeclarativePackBundleDigest for the domain-separated content digest, and
+verifyDeclarativePackBundle with a caller-supplied trusted publisher key lookup.
+The bundle contains no executable handler surface. Registry attestations, when
+present, are a separate trust decision.

@@ -13,6 +13,13 @@ MCPatch has five independent compatibility domains.
 | Pack manifest         | Positive integer | `1`           | Pack manifest interpretation changes incompatibly                  |
 | External MCP revision | Date string      | `2026-07-28`  | The upstream MCP specification publishes and MCPatch adopts a date |
 
+Declarative Pack Bundle v1 is an additional artifact domain. It is independent
+from Pack Manifest v1 and Declarative Operations v1. Its canonical projection,
+digest domains, signature envelope, and registry-attestation separation are
+documented in [Declarative Pack Bundle v1](architecture/declarative-pack-bundle.md).
+Unknown bundle or operations versions fail closed; a change to accepted authority
+or cryptographic projection requires a new version.
+
 Product and package SemVer may align for early releases but are not required to.
 Bridge, page, and pack-manifest protocol numbers never derive from package versions.
 
