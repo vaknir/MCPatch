@@ -4,3 +4,4 @@ node_modules/
 .artifacts/
 pnpm-lock.yaml
 target/
+packages/sdk/fixtures/v1/canonical-vector.json

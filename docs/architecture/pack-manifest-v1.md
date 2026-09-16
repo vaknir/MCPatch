@@ -13,9 +13,14 @@ tool name must begin with that publisher followed by a dot. Pack IDs are lowerca
 ASCII kebab-case. Versions are strict SemVer. Digests use exactly
 `sha256:<64 lowercase hex characters>`.
 
-The manifest validator checks digest shape, not artifact integrity. A future
-installer must verify the digest against the canonical complete artifact before it
-creates an installed-pack record; registry metadata is not proof of integrity.
+The manifest validator checks digest shape, not artifact integrity. For a
+Declarative Pack Bundle v1, bundle validation additionally requires
+`manifest.digest` to equal the digest of the documented canonical content
+projection: the manifest with only its digest member omitted, plus operations
+and metadata. This is the common manifest field's bundle-specific projection,
+not a second digest contract. Other pack artifact formats may retain their own
+complete-artifact digest semantics, and registry metadata is never proof of
+integrity.
 
 Runtime compatibility is a closed-open stable SemVer interval:
 `minimum <= current < maximumExclusive`. Bridge protocol compatibility is a closed
@@ -36,11 +41,10 @@ Both execution objects are closed. URLs, source text, module paths, remote scrip
 and additional fields are invalid. The contract never authorizes `eval`, dynamic
 code generation, downloaded JavaScript or WebAssembly, or an ambient browser API.
 
-The manifest is the versioned envelope, not the declarative operation payload. A
-future operations contract will use the fixed `operationsVersion` and a fixed file
-location inside the digest-covered pack artifact; the manifest deliberately has no
-path or URL capable of selecting code. Declarative manifests cannot activate until
-that interpreter and operations schema are implemented.
+The manifest is the versioned envelope, not the declarative operation payload. The
+fixed v1 program is embedded in `operations.program` in the one canonical bundle
+document; there is no archive path or URL capable of selecting code. See
+[Declarative Operations v1](declarative-operations.md).
 
 ## Origins, paths, and network policy
 

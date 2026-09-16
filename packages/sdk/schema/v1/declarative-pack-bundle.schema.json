@@ -1,0 +1,725 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcpatch.dev/schema/declarative-pack-bundle/v1",
+  "title": "MCPatch Declarative Pack Bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundleVersion",
+    "manifest",
+    "operations",
+    "metadata",
+    "publisherSignature"
+  ],
+  "properties": {
+    "bundleVersion": { "const": 1 },
+    "manifest": { "$ref": "#/$defs/manifest" },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationsVersion", "program"],
+      "properties": {
+        "operationsVersion": { "const": 1 },
+        "program": { "$ref": "#/$defs/operationsProgram" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["license"],
+      "properties": {
+        "license": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "homepage": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "sourceCommit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40,64}$"
+        }
+      }
+    },
+    "publisherSignature": { "$ref": "#/$defs/publisherSignature" },
+    "registryAttestation": { "$ref": "#/$defs/registryAttestation" }
+  },
+  "$defs": {
+    "operationsProgram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "operations"],
+      "properties": {
+        "version": { "const": 1 },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/operation" }
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "tool", "availability", "scope", "projection"],
+      "properties": {
+        "kind": { "const": "read" },
+        "tool": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "availability": { "$ref": "#/$defs/availability" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "projection": { "$ref": "#/$defs/projection" }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator"],
+      "properties": {
+        "kind": { "const": "present" },
+        "locator": { "$ref": "#/$defs/locator" }
+      }
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator"],
+          "properties": {
+            "kind": { "const": "single" },
+            "locator": { "$ref": "#/$defs/locator" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator", "maxMatches"],
+          "properties": {
+            "kind": { "const": "list" },
+            "locator": { "$ref": "#/$defs/locator" },
+            "maxMatches": { "type": "integer", "minimum": 1, "maximum": 64 }
+          }
+        }
+      ]
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "role"],
+          "properties": {
+            "kind": { "const": "role" },
+            "role": {
+              "enum": [
+                "alert",
+                "article",
+                "button",
+                "checkbox",
+                "combobox",
+                "dialog",
+                "grid",
+                "gridcell",
+                "heading",
+                "img",
+                "link",
+                "list",
+                "listitem",
+                "listbox",
+                "menu",
+                "menuitem",
+                "main",
+                "meter",
+                "navigation",
+                "option",
+                "progressbar",
+                "radio",
+                "radiogroup",
+                "region",
+                "row",
+                "cell",
+                "columnheader",
+                "rowheader",
+                "searchbox",
+                "slider",
+                "spinbutton",
+                "status",
+                "tab",
+                "tabpanel",
+                "table",
+                "textbox",
+                "tree",
+                "treeitem"
+              ]
+            },
+            "name": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "selector" },
+            "tag": {
+              "enum": [
+                "a",
+                "article",
+                "button",
+                "code",
+                "dd",
+                "div",
+                "dl",
+                "dt",
+                "form",
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+                "img",
+                "input",
+                "label",
+                "li",
+                "main",
+                "nav",
+                "ol",
+                "option",
+                "p",
+                "pre",
+                "section",
+                "select",
+                "span",
+                "table",
+                "tbody",
+                "td",
+                "textarea",
+                "tfoot",
+                "th",
+                "thead",
+                "tr",
+                "ul"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+            },
+            "classes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"
+              }
+            },
+            "attributes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": { "$ref": "#/$defs/locatorAttribute" }
+            }
+          }
+        }
+      ]
+    },
+    "locatorAttribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "enum": [
+            "aria-label",
+            "aria-labelledby",
+            "data-state",
+            "data-testid",
+            "id",
+            "role"
+          ]
+        },
+        "value": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "outputAttribute": {
+      "enum": [
+        "alt",
+        "aria-label",
+        "aria-valuemax",
+        "aria-valuemin",
+        "aria-valuenow",
+        "aria-valuetext",
+        "datetime",
+        "role",
+        "title"
+      ]
+    },
+    "scalarSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "text" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "attribute" },
+            "name": { "$ref": "#/$defs/outputAttribute" }
+          }
+        }
+      ]
+    },
+    "projection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "text" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "attribute" },
+            "name": { "$ref": "#/$defs/outputAttribute" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "constant" },
+            "value": { "$ref": "#/$defs/json" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "number" },
+            "source": { "$ref": "#/$defs/scalarSource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "percentage" },
+            "source": { "$ref": "#/$defs/scalarSource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "boolean" },
+            "source": { "$ref": "#/$defs/scalarSource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "optional" },
+            "value": { "$ref": "#/$defs/projection" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "scope", "projection"],
+          "properties": {
+            "kind": { "const": "descendant" },
+            "scope": { "$ref": "#/$defs/descendantScope" },
+            "projection": { "$ref": "#/$defs/projection" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "fields"],
+          "properties": {
+            "kind": { "const": "object" },
+            "fields": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "value"],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+                  },
+                  "value": { "$ref": "#/$defs/projection" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "items"],
+          "properties": {
+            "kind": { "const": "array" },
+            "items": {
+              "type": "array",
+              "maxItems": 64,
+              "items": { "$ref": "#/$defs/projection" }
+            }
+          }
+        }
+      ]
+    },
+    "descendantScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator"],
+          "properties": {
+            "kind": { "const": "single" },
+            "locator": { "$ref": "#/$defs/locator" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator", "maxMatches"],
+          "properties": {
+            "kind": { "const": "list" },
+            "locator": { "$ref": "#/$defs/locator" },
+            "maxMatches": { "type": "integer", "minimum": 1, "maximum": 64 }
+          }
+        }
+      ]
+    },
+    "json": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        { "type": "string", "maxLength": 16384 },
+        {
+          "type": "array",
+          "maxItems": 512,
+          "items": { "$ref": "#/$defs/json" }
+        },
+        {
+          "type": "object",
+          "maxProperties": 256,
+          "propertyNames": { "maxLength": 16384 },
+          "additionalProperties": { "$ref": "#/$defs/json" }
+        }
+      ]
+    },
+    "semver": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "stableSemver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifestVersion",
+        "publisher",
+        "id",
+        "name",
+        "description",
+        "version",
+        "digest",
+        "compatibility",
+        "execution",
+        "matches",
+        "networkPolicy",
+        "tools",
+        "fixtures"
+      ],
+      "properties": {
+        "manifestVersion": { "const": 1 },
+        "publisher": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?$"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "version": { "$ref": "#/$defs/semver" },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["runtime", "bridgeProtocol"],
+          "properties": {
+            "runtime": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["minimum", "maximumExclusive"],
+              "properties": {
+                "minimum": { "$ref": "#/$defs/stableSemver" },
+                "maximumExclusive": { "$ref": "#/$defs/stableSemver" }
+              }
+            },
+            "bridgeProtocol": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["minimum", "maximum"],
+              "properties": {
+                "minimum": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "maximum": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "operationsVersion"],
+          "properties": {
+            "kind": { "const": "declarative" },
+            "operationsVersion": { "const": 1 }
+          }
+        },
+        "matches": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/match" }
+        },
+        "networkPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["extensionRequests"],
+          "properties": { "extensionRequests": { "const": "none" } }
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/tool" }
+        },
+        "fixtures": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/fixture" }
+        }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "paths"],
+      "properties": {
+        "origin": { "type": "string", "pattern": "^https://[^*/?#]+$" },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/path" }
+        }
+      }
+    },
+    "path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": { "enum": ["exact", "prefix"] },
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "risk",
+        "permissions",
+        "inputSchema",
+        "outputSchema"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "risk": { "enum": ["read", "action", "sensitive"] },
+        "permissions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "enum": [
+              "READ",
+              "ACTION",
+              "SENSITIVE",
+              "CREDENTIAL",
+              "EXTERNAL_NETWORK",
+              "ARBITRARY_EXECUTION"
+            ]
+          }
+        },
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json" }
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json" }
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tool", "input", "expect"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "tool": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "input": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json" }
+        },
+        "expect": { "$ref": "#/$defs/json" }
+      }
+    },
+    "publisherSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signatureVersion",
+        "algorithm",
+        "publisher",
+        "keyId",
+        "publicKey",
+        "signature"
+      ],
+      "properties": {
+        "signatureVersion": { "const": 1 },
+        "algorithm": { "const": "Ed25519" },
+        "publisher": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "keyId": {
+          "type": "string",
+          "minLength": 83,
+          "maxLength": 144,
+          "pattern": "^ed25519:[a-z][a-z0-9.-]{1,63}:sha256:[a-f0-9]{64}$"
+        },
+        "publicKey": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 86,
+          "maxLength": 86,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    },
+    "registryAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attestationVersion",
+        "registryId",
+        "keyId",
+        "publisher",
+        "id",
+        "version",
+        "bundleDigest",
+        "publicationSequence",
+        "reviewState",
+        "issuedAt",
+        "expiresAt",
+        "signature"
+      ],
+      "properties": {
+        "attestationVersion": { "const": 1 },
+        "registryId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{1,63}$"
+        },
+        "keyId": {
+          "type": "string",
+          "minLength": 82,
+          "maxLength": 144,
+          "pattern": "^ed25519:[a-z][a-z0-9.-]{1,63}:sha256:[a-f0-9]{64}$"
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "version": { "$ref": "#/$defs/semver" },
+        "bundleDigest": {
+          "type": "string",
+          "minLength": 71,
+          "maxLength": 71,
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "publicationSequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "reviewState": { "enum": ["OFFICIAL", "REVIEWED_COMMUNITY"] },
+        "issuedAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "expiresAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 86,
+          "maxLength": 86,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+  }
+}

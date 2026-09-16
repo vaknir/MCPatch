@@ -1,0 +1,74 @@
+{
+  "bundleVersion": 1,
+  "manifest": {
+    "manifestVersion": 1,
+    "publisher": "example",
+    "id": "read-page",
+    "name": "Declarative read example",
+    "description": "Manifest-only example for the reviewed declarative execution tier.",
+    "version": "1.2.3",
+    "digest": "sha256:bb4e5a9ec1eca3429b126a340415f670041c62a0242e5bd51da4c5ca680e24fb",
+    "compatibility": {
+      "runtime": { "minimum": "0.1.0", "maximumExclusive": "1.0.0" },
+      "bridgeProtocol": { "minimum": 1, "maximum": 1 }
+    },
+    "execution": { "kind": "declarative", "operationsVersion": 1 },
+    "matches": [
+      {
+        "origin": "https://example.com",
+        "paths": [{ "kind": "prefix", "path": "/items/" }]
+      }
+    ],
+    "networkPolicy": { "extensionRequests": "none" },
+    "tools": [
+      {
+        "name": "example.items.current",
+        "description": "Return the current visible item.",
+        "risk": "read",
+        "permissions": ["READ"],
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "outputSchema": { "type": "object" }
+      }
+    ],
+    "fixtures": [
+      {
+        "id": "current-item",
+        "tool": "example.items.current",
+        "input": {},
+        "expect": { "kind": "result", "result": { "id": "fixture-item" } }
+      }
+    ]
+  },
+  "operations": {
+    "operationsVersion": 1,
+    "program": {
+      "version": 1,
+      "operations": [
+        {
+          "kind": "read",
+          "tool": "example.items.current",
+          "availability": { "kind": "present", "locator": { "kind": "role", "role": "main" } },
+          "scope": { "kind": "single", "locator": { "kind": "role", "role": "main" } },
+          "projection": { "kind": "object", "fields": [{ "key": "text", "value": { "kind": "text" } }] }
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "license": "MIT",
+    "homepage": "https://example.test/declarative-read",
+    "sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "publisherSignature": {
+    "signatureVersion": 1,
+    "algorithm": "Ed25519",
+    "publisher": "example",
+    "keyId": "ed25519:example:sha256:21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+    "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+    "signature": "VswRpByJjEEEJbqBvGvVnzxfo-mgdINzgScAqGSS543OQyRq5FUB6uYkAE-Haf8grRTSKYQ8LFpRlxasnKLYAQ"
+  }
+}
