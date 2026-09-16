@@ -46,7 +46,7 @@ test.skip(
   "temporary-profile Native Messaging registration is Unix-only",
 );
 
-test("invokes TradingView read tools through MCP in a disposable signed-out profile", async ({
+test("invokes TradingView reads and an approved action through MCP in a disposable signed-out profile", async ({
   browserName,
 }, testInfo) => {
   if (browserName !== "chromium") {
@@ -116,6 +116,67 @@ test("invokes TradingView read tools through MCP in a disposable signed-out prof
       structuredContent(await client.callTool(currentWatchlistTool).response),
     );
 
+    const nextSymbol = "NYSE:IBM";
+    const change = client.callTool(
+      changeSymbolTool,
+      { symbol: nextSymbol },
+      90_000,
+    );
+    await waitFor(
+      () =>
+        context
+          ?.pages()
+          .some((candidate) =>
+            candidate
+              .url()
+              .startsWith(`chrome-extension://${extensionId}/approval.html?`),
+          ) ?? false,
+      (opened) => opened,
+      10_000,
+      "trusted MCPatch approval page did not open",
+    );
+    fieldInstruction(
+      "APPROVAL_REQUIRED",
+      "Review the extension-owned MCPatch prompt and click Approve once. Do not interact with TradingView; the MCP tool owns the chart change.",
+    );
+    validateChangeAccepted(
+      structuredContent(await change.response),
+      nextSymbol,
+    );
+    await waitFor(
+      () =>
+        context
+          ?.pages()
+          .some((candidate) =>
+            candidate
+              .url()
+              .startsWith(`chrome-extension://${extensionId}/approval.html`),
+          ) ?? false,
+      (opened) => !opened,
+      10_000,
+      "trusted MCPatch approval page did not close after its one-time decision",
+    );
+    await waitFor(
+      () => new URL(page.url()).searchParams.get("symbol"),
+      (symbol) => symbol === nextSymbol,
+      120_000,
+      "TradingView did not navigate to the approved canonical symbol",
+    );
+    try {
+      await waitForTools(client, [demoTool, ...tradingViewTools], 60_000);
+    } catch (error) {
+      throw new Error(
+        `TradingView pack did not reactivate after MCP navigation: ${JSON.stringify(
+          await readActivationDiagnostic(worker, page),
+        )}`,
+        { cause: error },
+      );
+    }
+    validateCurrentChart(
+      structuredContent(await client.callTool(currentChartTool).response),
+      nextSymbol,
+    );
+
     await page.goto(unsupportedUrl, { waitUntil: "domcontentloaded" });
     await waitForTools(client, [demoTool], 30_000);
 
@@ -157,6 +218,18 @@ async function prepareNativeHostProfile(profile: string): Promise<void> {
     )}\n`,
     { flag: "wx", mode: 0o600 },
   );
+}
+
+function validateChangeAccepted(value: unknown, expectedSymbol: string): void {
+  const accepted = dataObject(value);
+  if (
+    accepted?.["fingerprint"] !== fingerprint ||
+    accepted["state"] !== "accepted" ||
+    accepted["symbol"] !== expectedSymbol ||
+    Object.keys(accepted).length !== 3
+  ) {
+    throw new Error("TradingView change-symbol acknowledgement changed");
+  }
 }
 
 function validateCurrentChart(value: unknown, expectedSymbol: string): void {

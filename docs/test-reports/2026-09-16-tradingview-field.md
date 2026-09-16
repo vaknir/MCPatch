@@ -1,6 +1,6 @@
 # TradingView MCP field report — 2026-09-16
 
-Status: **read path passed locally**
+Status: **read and approved action paths passed locally**
 
 Environment:
 
@@ -43,15 +43,20 @@ Security limits:
 - the pack exposed no generic browser, DOM, JavaScript, fetch, screenshot, or
   request-replay capability.
 
-Action limitation:
+Approved action contract:
 
-- this final pass discovered but did not approve or execute
-  `tradingview.change_symbol`;
+- the field harness now invokes `tradingview.change_symbol` through MCP, waits for
+  the extension-owned approval surface, and requires a fresh human approval;
+- after approval it requires an exact `NYSE:IBM` acknowledgement, waits for the
+  current tab to navigate to the canonical symbol, requires a fresh page context,
+  and reads back a schema-valid IBM chart through MCP;
+- the trusted prompt displayed exactly `tradingview.change_symbol`,
+  `https://www.tradingview.com`, the bridge-owned arguments hash, and an expiry;
+- the approved call completed once, the prompt closed, and the old AAPL document
+  authority was replaced before the IBM document republished the tool set;
 - deterministic tests cover canonical-symbol validation, exact same-origin URL
   generation, one-attempt document state, live-document revalidation, manifest
-  `ACTION` classification, and bridge-owned argument-bound one-time approvals; and
-- complete live action evidence remains follow-up work and must use the trusted
-  extension approval page rather than bypassing approval or clicking TradingView.
+  `ACTION` classification, and bridge-owned argument-bound one-time approvals.
 
 Known volatility:
 
