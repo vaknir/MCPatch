@@ -63,12 +63,14 @@ pack's tools; the aggregate browser grant and content registration remain while 
 least one other enabled identity still needs the origin. Cleanup removes the grant
 only after the last dependent identity is gone.
 
-Same-name community packs are ambiguous and hidden. A same-name community pack and
-reviewed compiled pack are also hidden rather than selected by arrival order. An
-eligible native WebMCP tool wins either collision, as specified by the existing
-native-first resolver. Any change to the aggregate enabled identity set closes the
-old context, cancels its work, and publishes a fresh context revision containing
-the newly resolved set; an old revision cannot retain tools from a removed pack.
+Same-name pack candidates of any combination—community/community,
+community/compiled, or compiled/compiled—are ambiguous and hidden rather than
+selected by arrival order. An eligible native WebMCP tool wins an exact-name
+collision, as specified by the existing native-first resolver. Multiple active
+packs may share an origin and context only for unambiguous distinct tool names. Any
+change to the aggregate enabled identity set closes the old context, cancels its
+work, and publishes a fresh context revision containing the newly resolved set; an
+old revision cannot retain tools from a removed pack.
 
 ## State machine
 
@@ -157,13 +159,16 @@ artifact cannot be restored by offline mode.
 ## Existing behavior preserved
 
 Native WebMCP remains the first capability source. An eligible native tool wins an
-identical community or compiled-pack name; an ambiguous native set hides the name.
-The existing reviewed compiled packs remain extension-bundled, separately
-reviewed, and governed by their current exact-origin enablement. Community metadata
-cannot replace, shadow, or change a compiled definition. The declarative interpreter
-is packaged code and receives only the validated operation data for the one active
-pack; it has no generic browser, cookie, storage, raw DOM, or arbitrary network
-primitive.
+identical pack name; an ambiguous native set hides the name. If no native candidate
+exists, compiled and declarative pack candidates participate in the same set:
+exactly one publishes and two or more are hidden as ambiguous. There is no
+compiled-over-declarative priority. The existing reviewed compiled packs remain
+extension-bundled, separately reviewed, and governed by their current exact-origin
+enablement; community metadata cannot replace, shadow, or change a compiled
+definition. The packaged runtime receives each enabled identity's validated
+operations and per-tool allowlist for that context, not the operations of one
+arbitrarily selected active pack. It has no generic browser, cookie, storage, raw
+DOM, or arbitrary network primitive.
 
 ## Follow-up implementation issues
 

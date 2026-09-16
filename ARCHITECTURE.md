@@ -124,7 +124,8 @@ unrevoked cached artifact, with freshness visible to the user.
 For the active context, the extension resolves capabilities in this order:
 
 1. Native WebMCP tools exposed by the document.
-2. Explicitly enabled, compatible MCPatch packs whose origin matches exactly.
+2. One unambiguous candidate from all explicitly enabled, compatible MCPatch
+   packs—compiled and declarative—whose origin matches exactly.
 3. No capability.
 
 A later automation fallback would be a separate, high-risk subsystem with explicit
@@ -138,9 +139,11 @@ are detailed in
 
 For community packs, discovery metadata is not capability metadata until the
 selected artifact, signature, digest, compatibility, revocation, enabled identity,
-exact origin/path, and page handshake all pass local validation. Native WebMCP
-still wins an identical name, followed by the existing reviewed compiled-pack
-behavior, then one unambiguous active declarative pack.
+exact origin/path, and page handshake all pass local validation. For each exact
+tool name, an eligible native WebMCP candidate wins. If no native candidate exists,
+compiled and declarative pack candidates participate in one set: exactly one
+candidate publishes, while two or more candidates are hidden as ambiguous. There
+is no compiled-over-declarative priority.
 
 The bridge does not guess which tab is active in protocol version 2. If the same
 tool name is live in multiple contexts or connections, it is hidden from discovery
