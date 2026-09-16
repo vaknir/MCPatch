@@ -96,14 +96,24 @@ parse internally.
 
 The complete serialized document is limited to 1 MiB, with at most 32 JSON
 levels, 8,192 nodes, 512 array elements per array, 256 object members per
-object, and 16 KiB per string measured in UTF-8 bytes. Fatal UTF-8 decoding is
-required. Duplicate keys, escaped duplicate
+object, and 16,384 Unicode code points per string. The complete serialized
+artifact limit is measured in UTF-8 bytes. Fatal UTF-8 decoding is required.
+Duplicate keys, escaped duplicate
 names, truncation, invalid JSON, unknown fields, unknown versions, noncharacters,
 lone surrogates, unsafe numbers, and negative zero fail closed.
 
 Errors contain only a stable code and static field name. Rejected values, signatures,
 keys, fixture data, and exception messages are never copied into an error.
 Validated objects are detached and deeply frozen.
+
+The JSON Schema `maxLength` values use the same Unicode code-point definition
+as the SDK's `MAX_BUNDLE_STRING_CODE_POINTS` limit. Schema validation does not
+replace the SDK's aggregate 1 MiB serialized-byte check; object APIs apply that
+same aggregate check before digesting or signing.
+
+The checked-in `packages/sdk/fixtures/v1/canonical-vector.json` is a compact
+cross-runtime JCS acceptance vector. Its canonical UTF-8 bytes, SHA-256 digest,
+and Ed25519 signature are asserted as fixed hex goldens in the SDK tests.
 
 ## Publisher keys and registry trust
 

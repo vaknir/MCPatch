@@ -32,9 +32,10 @@ import {
   MAX_BUNDLE_JSON_DEPTH,
   MAX_BUNDLE_JSON_NODES,
   MAX_BUNDLE_OBJECT_FIELDS,
-  MAX_BUNDLE_STRING_BYTES,
+  MAX_BUNDLE_STRING_CODE_POINTS,
   MAX_DECLARATIVE_BUNDLE_BYTES,
   bundleIssue,
+  validateBundleBounds,
 } from "./declarative-bundle-limits.js";
 import {
   isCanonicalTimestamp,
@@ -50,7 +51,7 @@ export {
   MAX_BUNDLE_JSON_DEPTH,
   MAX_BUNDLE_JSON_NODES,
   MAX_BUNDLE_OBJECT_FIELDS,
-  MAX_BUNDLE_STRING_BYTES,
+  MAX_BUNDLE_STRING_CODE_POINTS,
   MAX_DECLARATIVE_BUNDLE_BYTES,
 };
 
@@ -60,6 +61,7 @@ export function parseDeclarativePackBundle(
   const issue = validateDeclarativePackBundle(value);
   if (issue !== undefined)
     throw new DeclarativePackBundleValidationError(issue);
+  assertCanonicalByteLimit(value);
   return cloneAndFreeze(value) as DeclarativePackBundle;
 }
 
@@ -91,10 +93,20 @@ export function canonicalizeDeclarativePackBundle(
 export async function computeDeclarativePackBundleDigest(
   bundle: DeclarativePackBundleContent | DeclarativePackBundle,
 ): Promise<string> {
-  const content = "publisherSignature" in bundle ? contentOf(bundle) : bundle;
-  const issue = validateBundleContent(content);
+  const issue =
+    "publisherSignature" in bundle
+      ? validateDeclarativePackBundle(bundle)
+      : validateBundleContent(bundle);
   if (issue !== undefined)
     throw new DeclarativePackBundleValidationError(issue);
+  const content = "publisherSignature" in bundle ? contentOf(bundle) : bundle;
+  const boundsIssue = validateBundleBounds(content);
+  if (boundsIssue !== undefined) {
+    throw new DeclarativePackBundleValidationError(
+      bundleIssue(boundsIssue.code, "bundle"),
+    );
+  }
+  assertCanonicalByteLimit("publisherSignature" in bundle ? bundle : content);
   return computeDigest(content);
 }
 
@@ -107,6 +119,7 @@ export async function signDeclarativePackBundle(
   const issue = validateBundleContent(bundle);
   if (issue !== undefined)
     throw new DeclarativePackBundleValidationError(issue);
+  assertCanonicalByteLimit(bundle);
   const digest = await computeDigest(bundle);
   if (bundle.manifest.digest !== digest) {
     throw new DeclarativePackBundleValidationError(
@@ -186,7 +199,8 @@ export async function verifyRegistryAttestation(
   if (shapeIssue !== undefined) return false;
   const attestation = value as RegistryAttestation;
   if (attestation.registryId !== options.expectedRegistryId) return false;
-  const now = options.now?.getTime() ?? Date.now();
+  const now = options.now === undefined ? Date.now() : options.now.getTime();
+  if (!Number.isFinite(now)) return false;
   if (
     !isCanonicalTimestamp(attestation.issuedAt) ||
     !isCanonicalTimestamp(attestation.expiresAt) ||
@@ -206,4 +220,15 @@ function contentOf(
     operations: bundle.operations,
     metadata: bundle.metadata,
   };
+}
+
+function assertCanonicalByteLimit(value: unknown): void {
+  if (
+    encodeUtf8(canonicalizeOrThrow(value)).byteLength >
+    MAX_DECLARATIVE_BUNDLE_BYTES
+  ) {
+    throw new DeclarativePackBundleValidationError(
+      bundleIssue("LIMIT_EXCEEDED", "bundle"),
+    );
+  }
 }

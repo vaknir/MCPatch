@@ -10,12 +10,17 @@ import {
 } from "./declarative-bundle-types.js";
 import {
   bundleIssue,
+  MAX_DECLARATIVE_BUNDLE_BYTES,
   MAX_METADATA_HOMEPAGE_LENGTH,
   MAX_METADATA_LICENSE_LENGTH,
   validateBundleBounds,
   type BundleRecord,
 } from "./declarative-bundle-limits.js";
 import { decodeBase64Url } from "./declarative-bundle-encoding.js";
+import {
+  canonicalizeOrThrow,
+  encodeUtf8,
+} from "./declarative-bundle-canonical.js";
 import { isRecord } from "./validation/primitives.js";
 import { validatePackManifest } from "./validation/manifest.js";
 
@@ -73,12 +78,14 @@ export function validateDeclarativePackBundle(
     );
     if (attestationIssue !== undefined) return attestationIssue;
   }
-  return undefined;
+  return canonicalByteLimitIssue(value);
 }
 
 export function validateBundleContent(
   value: unknown,
 ): DeclarativePackBundleValidationIssue | undefined {
+  const boundsIssue = validateBundleBounds(value);
+  if (boundsIssue !== undefined) return safeBoundaryIssue(boundsIssue);
   if (!isRecord(value)) return bundleIssue("INVALID_TYPE", "content");
   const unknown = Object.keys(value).find(
     (key) =>
@@ -138,7 +145,7 @@ export function validateBundleContent(
   ) {
     return bundleIssue("INVALID_VALUE", "metadata.sourceCommit");
   }
-  return undefined;
+  return canonicalByteLimitIssue(value);
 }
 
 export function validatePublisherSignature(
@@ -375,4 +382,17 @@ function safeBoundaryIssue(issue: {
     code: issue.code as DeclarativePackBundleValidationIssue["code"],
     field: "bundle",
   };
+}
+
+function canonicalByteLimitIssue(
+  value: unknown,
+): DeclarativePackBundleValidationIssue | undefined {
+  try {
+    return encodeUtf8(canonicalizeOrThrow(value)).byteLength <=
+      MAX_DECLARATIVE_BUNDLE_BYTES
+      ? undefined
+      : bundleIssue("LIMIT_EXCEEDED", "bundle");
+  } catch {
+    return bundleIssue("INVALID_VALUE", "bundle");
+  }
 }

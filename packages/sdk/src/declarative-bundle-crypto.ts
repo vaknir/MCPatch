@@ -25,8 +25,14 @@ import {
   decodeBase64Url,
   encodeBase64Url,
 } from "./declarative-bundle-encoding.js";
-import { bundleIssue, bytesEqual } from "./declarative-bundle-limits.js";
+import {
+  bundleIssue,
+  bytesEqual,
+  validateBundleBounds,
+} from "./declarative-bundle-limits.js";
 import type { DeclarativePackBundleValidationIssue } from "./declarative-bundle-types.js";
+import { DeclarativePackBundleValidationError } from "./declarative-bundle-types.js";
+import { validateRegistryAttestationShape } from "./declarative-bundle-validation.js";
 
 export async function computeDigest(
   content: DeclarativePackBundleContent,
@@ -135,6 +141,16 @@ export async function verifyRegistrySignature(
 export function registryAttestationSigningBytes(
   attestation: RegistryAttestation,
 ): Uint8Array {
+  const boundsIssue = validateBundleBounds(attestation);
+  if (boundsIssue !== undefined) {
+    throw new DeclarativePackBundleValidationError(
+      bundleIssue(boundsIssue.code, "registryAttestation"),
+    );
+  }
+  const shapeIssue = validateRegistryAttestationShape(attestation);
+  if (shapeIssue !== undefined) {
+    throw new DeclarativePackBundleValidationError(shapeIssue);
+  }
   return concat(
     encodeUtf8(DOMAIN_REGISTRY),
     encodeUtf8(

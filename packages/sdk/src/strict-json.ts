@@ -5,7 +5,7 @@ import {
   MAX_BUNDLE_JSON_DEPTH,
   MAX_BUNDLE_JSON_NODES,
   MAX_BUNDLE_OBJECT_FIELDS,
-  MAX_BUNDLE_STRING_BYTES,
+  MAX_BUNDLE_STRING_CODE_POINTS,
   bundleIssue,
   hasNoncharacter,
   isWellFormed,
@@ -121,9 +121,7 @@ class Parser {
         if (!isWellFormed(value) || hasNoncharacter(value)) {
           this.fail("INVALID_VALUE", field);
         }
-        if (
-          new TextEncoder().encode(value).byteLength > MAX_BUNDLE_STRING_BYTES
-        ) {
+        if (Array.from(value).length > MAX_BUNDLE_STRING_CODE_POINTS) {
           this.fail("LIMIT_EXCEEDED", field);
         }
         return value;

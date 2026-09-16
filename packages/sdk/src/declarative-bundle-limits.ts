@@ -5,7 +5,7 @@ import type {
 import { isRecord, validateJsonBounds } from "./validation/primitives.js";
 
 export const MAX_DECLARATIVE_BUNDLE_BYTES = 1024 * 1024;
-export const MAX_BUNDLE_STRING_BYTES = 16 * 1024;
+export const MAX_BUNDLE_STRING_CODE_POINTS = 16 * 1024;
 export const MAX_BUNDLE_ARRAY_ITEMS = 512;
 export const MAX_BUNDLE_OBJECT_FIELDS = 256;
 export const MAX_BUNDLE_JSON_DEPTH = 32;
@@ -47,10 +47,7 @@ export function validateBundleBounds(
       if (!isWellFormed(current.value) || hasNoncharacter(current.value)) {
         return bundleIssue("INVALID_VALUE", current.field);
       }
-      if (
-        new TextEncoder().encode(current.value).byteLength >
-        MAX_BUNDLE_STRING_BYTES
-      ) {
+      if (Array.from(current.value).length > MAX_BUNDLE_STRING_CODE_POINTS) {
         return bundleIssue("LIMIT_EXCEEDED", current.field);
       }
     } else if (typeof current.value === "number") {
@@ -77,6 +74,12 @@ export function validateBundleBounds(
         return bundleIssue("LIMIT_EXCEEDED", current.field);
       }
       for (const key of keys) {
+        if (!isWellFormed(key) || hasNoncharacter(key)) {
+          return bundleIssue("INVALID_VALUE", current.field);
+        }
+        if (Array.from(key).length > MAX_BUNDLE_STRING_CODE_POINTS) {
+          return bundleIssue("LIMIT_EXCEEDED", current.field);
+        }
         stack.push({
           value: current.value[key],
           depth: current.depth + 1,

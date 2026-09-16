@@ -11,6 +11,7 @@ import {
   decodeDeclarativePackBundle,
   MAX_BUNDLE_JSON_DEPTH,
   MAX_BUNDLE_OBJECT_FIELDS,
+  MAX_BUNDLE_STRING_CODE_POINTS,
   MAX_DECLARATIVE_BUNDLE_BYTES,
   parseDeclarativePackBundle,
   parseDeclarativePackBundleBytes,
@@ -29,6 +30,8 @@ import type {
 } from "../src/index.js";
 import type { JsonValue } from "../src/index.js";
 import { DeclarativePackBundleValidationError } from "../src/index.js";
+import { canonicalizeOrThrow } from "../src/declarative-bundle-canonical.js";
+import { DOMAIN_DIGEST } from "../src/declarative-bundle-canonical.js";
 
 const manifestFixture = JSON.parse(
   readFileSync(
@@ -76,6 +79,48 @@ describe("Declarative Pack Bundle v1", () => {
         field: "metadata.license",
       },
     );
+    const unicodeProgram = {
+      ...bundle,
+      operations: {
+        ...bundle.operations,
+        program: "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS),
+      },
+    };
+    expect(validateSchema(unicodeProgram)).toBe(true);
+    expect(validateDeclarativePackBundle(unicodeProgram)).toBeUndefined();
+    const overlongUnicodeProgram = {
+      ...bundle,
+      operations: {
+        ...bundle.operations,
+        program: "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1),
+      },
+    };
+    expect(validateSchema(overlongUnicodeProgram)).toBe(false);
+    expect(validateDeclarativePackBundle(overlongUnicodeProgram)).toMatchObject(
+      { code: "LIMIT_EXCEEDED", field: "bundle" },
+    );
+    const unicodeKeyProgram = {
+      ...bundle,
+      operations: {
+        ...bundle.operations,
+        program: { ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS)]: 0 },
+      },
+    };
+    expect(validateSchema(unicodeKeyProgram)).toBe(true);
+    expect(validateDeclarativePackBundle(unicodeKeyProgram)).toBeUndefined();
+    const overlongUnicodeKeyProgram = {
+      ...bundle,
+      operations: {
+        ...bundle.operations,
+        program: {
+          ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1)]: 0,
+        },
+      },
+    };
+    expect(validateSchema(overlongUnicodeKeyProgram)).toBe(false);
+    expect(
+      validateDeclarativePackBundle(overlongUnicodeKeyProgram),
+    ).toMatchObject({ code: "LIMIT_EXCEEDED", field: "bundle" });
     const bundled = structuredClone(bundle) as Record<string, unknown>;
     (bundled.manifest as Record<string, unknown>).execution = {
       kind: "bundled",
@@ -151,6 +196,39 @@ describe("Declarative Pack Bundle v1", () => {
     expect(composedText).toContain('"10":"ten","2":"two"');
   });
 
+  it("accepts the checked-in deterministic canonical-byte vector", async () => {
+    const vector = readFileSync(
+      fileURLToPath(
+        new URL("../fixtures/v1/canonical-vector.json", import.meta.url),
+      ),
+      "utf8",
+    );
+    const canonical = canonicalizeOrThrow({
+      b: "é",
+      a: [2, 1],
+      "10": "ten",
+      "2": "two",
+    });
+    expect(vector.trimEnd()).toBe(canonical);
+    const bytes = new TextEncoder().encode(vector.trimEnd());
+    expect(toHex(bytes)).toBe(
+      "7b223130223a2274656e222c2232223a2274776f222c2261223a5b322c315d2c2262223a22c3a9227d",
+    );
+    const digestInput = new Uint8Array(
+      new TextEncoder().encode(DOMAIN_DIGEST).byteLength + bytes.byteLength,
+    );
+    digestInput.set(new TextEncoder().encode(DOMAIN_DIGEST));
+    digestInput.set(bytes, new TextEncoder().encode(DOMAIN_DIGEST).byteLength);
+    const digest = await crypto.subtle.digest("SHA-256", digestInput);
+    expect(toHex(new Uint8Array(digest))).toBe(
+      "cd3fcd303e538d334c296cdfbe2c25a0aeaacda8c5862cbe4b462f0ff3f61cf8",
+    );
+    const signature = await ed25519.signAsync(bytes, rfc8032Keys().privateKey);
+    expect(toHex(signature)).toBe(
+      "7a69e63016c3ef37fd01d7ebb4b651a07c6ad314f0ea8adf990fe6623c4a01c1c660b07f275ef7aace43e951716acd3cf78b1cd63c89ef8a6821f743fdad8f08",
+    );
+  });
+
   it("rejects invalid UTF-8, truncation, lone surrogates, noncharacters, unsafe numbers, and -0", () => {
     expect(() =>
       decodeDeclarativePackBundle(new Uint8Array([0xc3, 0x28])),
@@ -182,6 +260,108 @@ describe("Declarative Pack Bundle v1", () => {
     expect(() =>
       decodeDeclarativePackBundle(JSON.stringify("x".repeat(16 * 1024 + 1))),
     ).toThrow(/LIMIT_EXCEEDED/);
+    expect(() =>
+      decodeDeclarativePackBundle(
+        JSON.stringify("é".repeat(MAX_BUNDLE_STRING_CODE_POINTS)),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      decodeDeclarativePackBundle(
+        JSON.stringify("é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1)),
+      ),
+    ).toThrow(/LIMIT_EXCEEDED/);
+    expect(() =>
+      decodeDeclarativePackBundle(
+        JSON.stringify({ ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS)]: 0 }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      decodeDeclarativePackBundle(
+        JSON.stringify({ ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1)]: 0 }),
+      ),
+    ).toThrow(/LIMIT_EXCEEDED/);
+    expect(() =>
+      parseDeclarativePackBundle(bundleWithProgram({ ["\ud800"]: 0 })),
+    ).toThrow(/INVALID_VALUE/);
+    expect(() =>
+      parseDeclarativePackBundle(bundleWithProgram({ ["\ufdd0"]: 0 })),
+    ).toThrow(/INVALID_VALUE/);
+    const cyclicProgram = {} as Record<string, unknown>;
+    cyclicProgram.self = cyclicProgram;
+    expect(() =>
+      parseDeclarativePackBundle(bundleWithProgram(cyclicProgram as JsonValue)),
+    ).toThrow(/INVALID_VALUE/);
+  });
+
+  it("keeps object APIs subject to the same aggregate and member-name bounds", async () => {
+    const exactProgram = bundleWithProgram(
+      "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS),
+    );
+    expect(() => parseDeclarativePackBundle(exactProgram)).not.toThrow();
+    await expect(
+      computeDeclarativePackBundleDigest(exactProgram),
+    ).resolves.toMatch(/^sha256:/u);
+    const exactContent = await withComputedDigest(exactProgram);
+    await expect(
+      signDeclarativePackBundle(exactContent, rfc8032Keys()),
+    ).resolves.toBeDefined();
+
+    const overlongProgram = bundleWithProgram(
+      "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1),
+    );
+    expect(() => parseDeclarativePackBundle(overlongProgram)).toThrow(
+      /LIMIT_EXCEEDED/,
+    );
+    await expect(
+      computeDeclarativePackBundleDigest(overlongProgram),
+    ).rejects.toThrow(/LIMIT_EXCEEDED/);
+    await expect(
+      signDeclarativePackBundle(
+        overlongProgram as unknown as DeclarativePackBundleContent,
+        rfc8032Keys(),
+      ),
+    ).rejects.toThrow(/LIMIT_EXCEEDED/);
+
+    const exactKey = bundleWithProgram({
+      ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS)]: 0,
+    });
+    expect(() => parseDeclarativePackBundle(exactKey)).not.toThrow();
+    await expect(computeDeclarativePackBundleDigest(exactKey)).resolves.toMatch(
+      /^sha256:/u,
+    );
+    await expect(
+      signDeclarativePackBundle(
+        await withComputedDigest(exactKey),
+        rfc8032Keys(),
+      ),
+    ).resolves.toBeDefined();
+    const overlongKey = bundleWithProgram({
+      ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1)]: 0,
+    });
+    expect(() => parseDeclarativePackBundle(overlongKey)).toThrow(
+      /LIMIT_EXCEEDED/,
+    );
+    await expect(
+      computeDeclarativePackBundleDigest(overlongKey),
+    ).rejects.toThrow(/LIMIT_EXCEEDED/);
+    await expect(
+      signDeclarativePackBundle(
+        overlongKey as unknown as DeclarativePackBundleContent,
+        rfc8032Keys(),
+      ),
+    ).rejects.toThrow(/LIMIT_EXCEEDED/);
+
+    const oversizedProgram = bundleWithProgram(
+      Array.from({ length: 64 }, () =>
+        "x".repeat(MAX_BUNDLE_STRING_CODE_POINTS),
+      ),
+    );
+    expect(() => parseDeclarativePackBundle(oversizedProgram)).toThrow(
+      /LIMIT_EXCEEDED/,
+    );
+    await expect(
+      computeDeclarativePackBundleDigest(oversizedProgram),
+    ).rejects.toThrow(/LIMIT_EXCEEDED/);
   });
 
   it("enforces exact raw-byte, depth, node, and object limits", () => {
@@ -409,7 +589,7 @@ describe("Declarative Pack Bundle v1", () => {
     const attestationForSigning = {
       ...attestationBase,
       keyId: await publisherKeyId("mcp-registry", publicKey),
-      signature: "A",
+      signature: encodeBase64Url(new Uint8Array(64)),
     } as RegistryAttestation;
     const attestation: RegistryAttestation = {
       ...attestationForSigning,
@@ -443,6 +623,13 @@ describe("Declarative Pack Bundle v1", () => {
           now: new Date("2026-09-16T12:00:00.000Z"),
         },
       ),
+    ).resolves.toBe(false);
+    await expect(
+      verifyRegistryAttestation(JSON.stringify(attestation), {
+        publicKey,
+        expectedRegistryId: "mcp-registry",
+        now: new Date("not-a-date"),
+      }),
     ).resolves.toBe(false);
     await expect(
       verifyRegistryAttestation(JSON.stringify(attestation), {

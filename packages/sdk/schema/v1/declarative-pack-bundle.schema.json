@@ -58,6 +58,7 @@
         {
           "type": "object",
           "maxProperties": 256,
+          "propertyNames": { "maxLength": 16384 },
           "additionalProperties": { "$ref": "#/$defs/json" }
         }
       ]
