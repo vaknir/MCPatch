@@ -20,6 +20,13 @@ documented in [Declarative Pack Bundle v1](architecture/declarative-pack-bundle.
 Unknown bundle or operations versions fail closed; a change to accepted authority
 or cryptographic projection requires a new version.
 
+Declarative Operations v1 is a read-only, non-computational AST embedded in
+`operations.program`. Its selector, projection, resource-limit, output-schema,
+and permission semantics are versioned together. Tightening rejection of data
+that is already outside the v1 language is compatible hardening; accepting a new
+operation, side effect, dynamic reference, or authority requires a new operations
+version and migration note.
+
 Product and package SemVer may align for early releases but are not required to.
 Bridge, page, and pack-manifest protocol numbers never derive from package versions.
 

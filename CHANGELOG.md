@@ -8,6 +8,14 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Declarative Operations v1: an immutable, closed, read-only AST embedded at
+  `operations.program`, with one operation per manifest tool, static role and
+  structured selectors, bounded descendant reads and projections, exact resource
+  limits, output-schema parity checks, malicious golden fixtures, and stable
+  payload-safe validation/runtime error taxonomies. The contract is deliberately
+  not computationally complete and exposes no script, network, mutation, storage,
+  credential, raw HTML, style, canvas, or ambient browser primitive.
+
 - Declarative Pack Bundle v1: one canonical UTF-8 JSON .mcpack artifact with
   duplicate-safe strict ingestion, RFC 8785/JCS bytes, bounded immutable content,
   domain-separated SHA-256 digest, trusted-lookup Ed25519 publisher signatures,

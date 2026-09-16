@@ -23,6 +23,7 @@ import {
 } from "./declarative-bundle-canonical.js";
 import { isRecord } from "./validation/primitives.js";
 import { validatePackManifest } from "./validation/manifest.js";
+import { validateDeclarativeOperations } from "./declarative-operations-validation.js";
 
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const KEY_ID = /^ed25519:[a-z][a-z0-9.-]{1,63}:sha256:[a-f0-9]{64}$/u;
@@ -116,6 +117,17 @@ export function validateBundleContent(
   }
   if (operations.program === undefined)
     return bundleIssue("INVALID_VALUE", "operations.program");
+  if (manifest.networkPolicy.extensionRequests !== "none") {
+    return bundleIssue(
+      "INVALID_PERMISSION",
+      "manifest.networkPolicy.extensionRequests",
+    );
+  }
+  const operationsIssue = validateDeclarativeOperations(
+    operations.program,
+    manifest.tools,
+  );
+  if (operationsIssue !== undefined) return operationsIssue;
   const metadata = value.metadata;
   if (!isRecord(metadata)) return bundleIssue("INVALID_TYPE", "metadata");
   const metadataUnknown = Object.keys(metadata).find(

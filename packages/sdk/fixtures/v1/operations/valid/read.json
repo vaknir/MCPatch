@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "operations": [
+    {
+      "kind": "read",
+      "tool": "example.items.current",
+      "availability": {
+        "kind": "present",
+        "locator": { "kind": "role", "role": "main", "name": "Items" }
+      },
+      "scope": {
+        "kind": "single",
+        "locator": { "kind": "selector", "tag": "article", "classes": ["item"] }
+      },
+      "projection": {
+        "kind": "object",
+        "fields": [
+          { "key": "title", "value": { "kind": "text" } },
+          {
+            "key": "price",
+            "value": {
+              "kind": "descendant",
+              "scope": {
+                "kind": "single",
+                "locator": {
+                  "kind": "selector",
+                  "tag": "span",
+                  "attributes": [{ "name": "data-state", "value": "price" }]
+                }
+              },
+              "projection": { "kind": "number", "source": { "kind": "text" } }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

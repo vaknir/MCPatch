@@ -20,7 +20,7 @@
       "required": ["operationsVersion", "program"],
       "properties": {
         "operationsVersion": { "const": 1 },
-        "program": { "$ref": "#/$defs/json" }
+        "program": { "$ref": "#/$defs/operationsProgram" }
       }
     },
     "metadata": {
@@ -40,6 +40,371 @@
     "registryAttestation": { "$ref": "#/$defs/registryAttestation" }
   },
   "$defs": {
+    "operationsProgram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "operations"],
+      "properties": {
+        "version": { "const": 1 },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/operation" }
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "tool", "availability", "scope", "projection"],
+      "properties": {
+        "kind": { "const": "read" },
+        "tool": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "availability": { "$ref": "#/$defs/availability" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "projection": { "$ref": "#/$defs/projection" }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator"],
+      "properties": {
+        "kind": { "const": "present" },
+        "locator": { "$ref": "#/$defs/locator" }
+      }
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator"],
+          "properties": {
+            "kind": { "const": "single" },
+            "locator": { "$ref": "#/$defs/locator" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator", "maxMatches"],
+          "properties": {
+            "kind": { "const": "list" },
+            "locator": { "$ref": "#/$defs/locator" },
+            "maxMatches": { "type": "integer", "minimum": 1, "maximum": 64 }
+          }
+        }
+      ]
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "role"],
+          "properties": {
+            "kind": { "const": "role" },
+            "role": {
+              "enum": [
+                "alert",
+                "article",
+                "button",
+                "checkbox",
+                "combobox",
+                "dialog",
+                "grid",
+                "gridcell",
+                "heading",
+                "img",
+                "link",
+                "list",
+                "listitem",
+                "listbox",
+                "menu",
+                "menuitem",
+                "main",
+                "meter",
+                "navigation",
+                "option",
+                "progressbar",
+                "radio",
+                "radiogroup",
+                "region",
+                "row",
+                "cell",
+                "columnheader",
+                "rowheader",
+                "searchbox",
+                "slider",
+                "spinbutton",
+                "status",
+                "tab",
+                "tabpanel",
+                "table",
+                "textbox",
+                "tree",
+                "treeitem"
+              ]
+            },
+            "name": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "selector" },
+            "tag": {
+              "enum": [
+                "a",
+                "article",
+                "button",
+                "code",
+                "dd",
+                "div",
+                "dl",
+                "dt",
+                "form",
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+                "img",
+                "input",
+                "label",
+                "li",
+                "main",
+                "nav",
+                "ol",
+                "option",
+                "p",
+                "pre",
+                "section",
+                "select",
+                "span",
+                "table",
+                "tbody",
+                "td",
+                "textarea",
+                "tfoot",
+                "th",
+                "thead",
+                "tr",
+                "ul"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,127}$"
+            },
+            "classes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"
+              }
+            },
+            "attributes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": { "$ref": "#/$defs/locatorAttribute" }
+            }
+          }
+        }
+      ]
+    },
+    "locatorAttribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "enum": [
+            "aria-label",
+            "aria-labelledby",
+            "data-state",
+            "data-testid",
+            "id",
+            "role"
+          ]
+        },
+        "value": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "outputAttribute": {
+      "enum": [
+        "alt",
+        "aria-label",
+        "aria-valuemax",
+        "aria-valuemin",
+        "aria-valuenow",
+        "aria-valuetext",
+        "datetime",
+        "role",
+        "title"
+      ]
+    },
+    "scalarSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "text" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "attribute" },
+            "name": { "$ref": "#/$defs/outputAttribute" }
+          }
+        }
+      ]
+    },
+    "projection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "text" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "attribute" },
+            "name": { "$ref": "#/$defs/outputAttribute" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "constant" },
+            "value": { "$ref": "#/$defs/json" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "number" },
+            "source": { "$ref": "#/$defs/scalarSource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "percentage" },
+            "source": { "$ref": "#/$defs/scalarSource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "boolean" },
+            "source": { "$ref": "#/$defs/scalarSource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "optional" },
+            "value": { "$ref": "#/$defs/projection" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "scope", "projection"],
+          "properties": {
+            "kind": { "const": "descendant" },
+            "scope": { "$ref": "#/$defs/descendantScope" },
+            "projection": { "$ref": "#/$defs/projection" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "fields"],
+          "properties": {
+            "kind": { "const": "object" },
+            "fields": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "value"],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+                  },
+                  "value": { "$ref": "#/$defs/projection" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "items"],
+          "properties": {
+            "kind": { "const": "array" },
+            "items": {
+              "type": "array",
+              "maxItems": 64,
+              "items": { "$ref": "#/$defs/projection" }
+            }
+          }
+        }
+      ]
+    },
+    "descendantScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator"],
+          "properties": {
+            "kind": { "const": "single" },
+            "locator": { "$ref": "#/$defs/locator" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "locator", "maxMatches"],
+          "properties": {
+            "kind": { "const": "list" },
+            "locator": { "$ref": "#/$defs/locator" },
+            "maxMatches": { "type": "integer", "minimum": 1, "maximum": 64 }
+          }
+        }
+      ]
+    },
     "json": {
       "anyOf": [
         { "type": "null" },

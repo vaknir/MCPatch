@@ -1,4 +1,5 @@
-import type { JsonValue, PackManifest } from "./types.js";
+import type { PackManifest } from "./types.js";
+import type { DeclarativeOperationsProgram } from "./declarative-operations-types.js";
 
 export const DECLARATIVE_PACK_BUNDLE_VERSION = 1 as const;
 export const DECLARATIVE_OPERATIONS_VERSION = 1 as const;
@@ -7,8 +8,7 @@ export const REGISTRY_ATTESTATION_VERSION = 1 as const;
 
 export type DeclarativePackBundleOperations = Readonly<{
   readonly operationsVersion: typeof DECLARATIVE_OPERATIONS_VERSION;
-  /** Opaque data for the separately versioned Declarative Operations contract. */
-  readonly program: JsonValue;
+  readonly program: DeclarativeOperationsProgram;
 }>;
 
 export type DeclarativePackBundleMetadata = Readonly<{
@@ -81,7 +81,13 @@ export type DeclarativePackBundleValidationCode =
   | "INVALID_SCHEMA"
   | "INVALID_VERSION"
   | "UNKNOWN_FIELD"
-  | "UNSUPPORTED_VERSION";
+  | "UNSUPPORTED_VERSION"
+  | "INVALID_SELECTOR"
+  | "INVALID_PROJECTION"
+  | "CONFLICTING_PROJECTION"
+  | "DYNAMIC_REFERENCE"
+  | "UNBOUNDED_QUERY"
+  | "UNSUPPORTED_OPERATION";
 
 export type DeclarativePackBundleValidationIssue = Readonly<{
   readonly code: DeclarativePackBundleValidationCode;

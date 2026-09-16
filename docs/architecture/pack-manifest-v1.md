@@ -41,11 +41,10 @@ Both execution objects are closed. URLs, source text, module paths, remote scrip
 and additional fields are invalid. The contract never authorizes `eval`, dynamic
 code generation, downloaded JavaScript or WebAssembly, or an ambient browser API.
 
-The manifest is the versioned envelope, not the declarative operation payload. A
-future operations contract will use the fixed `operationsVersion` and a fixed file
-location inside the digest-covered pack artifact; the manifest deliberately has no
-path or URL capable of selecting code. Declarative manifests cannot activate until
-that interpreter and operations schema are implemented.
+The manifest is the versioned envelope, not the declarative operation payload. The
+fixed v1 program is embedded in `operations.program` in the one canonical bundle
+document; there is no archive path or URL capable of selecting code. See
+[Declarative Operations v1](declarative-operations.md).
 
 ## Origins, paths, and network policy
 
