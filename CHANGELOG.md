@@ -194,6 +194,12 @@ All notable MCPatch changes are documented here. The format follows
   session, and the requirement is documented in `docs/installation.md`.
 - The README no longer says the Google Flights field smoke is outstanding; it
   links the recorded report.
+- An approved action no longer fails with "The approval is no longer valid" when
+  a second tab or browser profile publishes the same tool name while the human is
+  deciding. The bridge now dispatches an approved call to the exact registration
+  the approval was bound to instead of resolving the tool name again, and reports
+  the distinct `ApprovalContextChanged` outcome—with guidance to request a fresh
+  approval—only when that registration was replaced or closed before dispatch.
 
 ### Removed
 

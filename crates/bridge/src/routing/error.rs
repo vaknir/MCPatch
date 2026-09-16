@@ -3,6 +3,9 @@ use thiserror::Error;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RegistryErrorCode {
     AmbiguousTool,
+    /// The registration an approval was bound to was replaced or closed before
+    /// dispatch; the human's decision was valid but its target is gone.
+    ApprovalContextChanged,
     ApprovalExpired,
     ApprovalMismatch,
     ApprovalNotFound,

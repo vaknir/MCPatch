@@ -19,6 +19,25 @@ use crate::{
 
 const TEST_TIMEOUT: Duration = Duration::from_secs(1);
 
+#[test]
+fn a_lost_approval_target_tells_the_caller_to_approve_again() {
+    use crate::routing::RegistryErrorCode;
+
+    let changed = super::approval_route_failure(RegistryErrorCode::ApprovalContextChanged);
+    assert!(changed.contains("fresh approval"));
+    for code in [
+        RegistryErrorCode::ApprovalMismatch,
+        RegistryErrorCode::ApprovalExpired,
+        RegistryErrorCode::InvalidArguments,
+        RegistryErrorCode::LimitExceeded,
+    ] {
+        assert_eq!(
+            super::approval_route_failure(code),
+            "The approval is no longer valid."
+        );
+    }
+}
+
 #[tokio::test]
 async fn returns_only_the_exact_validated_browser_result() {
     let fixture = fixture(Duration::from_millis(100)).await;

@@ -81,14 +81,28 @@ impl CapabilityRegistry {
             return Err(RegistryError::new(RegistryErrorCode::ApprovalExpired));
         }
         self.validate_reservation(&binding.invocation)?;
-        let resolved = self.resolve_capability(&binding.invocation.tool)?;
+        // The human approved one exact document, so dispatch is bound to that
+        // registration rather than re-resolved by name: a same-named tool that
+        // appeared in another tab or profile meanwhile must neither hijack nor
+        // block the approved call.
+        let resolved = self
+            .resolve_bound_capability(
+                &binding.connection_id,
+                &binding.context_id,
+                &binding.invocation.tool,
+            )
+            .ok_or_else(|| RegistryError::new(RegistryErrorCode::ApprovalContextChanged))?;
+        if resolved.context_revision != binding.context_revision {
+            return Err(RegistryError::new(
+                RegistryErrorCode::ApprovalContextChanged,
+            ));
+        }
         self.validate_arguments(&binding.invocation, &resolved)?;
         let current_hash =
             super::approvals::canonical_arguments_hash(&binding.invocation.arguments)?;
         if permission_decision(&resolved.capability) != PermissionDecision::ApprovalRequired
             || resolved.connection.id() != &binding.connection_id
             || resolved.context_id != binding.context_id
-            || resolved.context_revision != binding.context_revision
             || resolved.origin != binding.origin
             || resolved.capability != binding.capability
             || current_hash != binding.args_hash

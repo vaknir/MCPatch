@@ -4,7 +4,8 @@ use mcpatch_bridge::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
     protocol::{
         ApprovalDecision, ApprovalResult, Capability, CapabilitySnapshot, CapabilitySource,
-        JsonObject, Message, PROTOCOL_VERSION, PackReference, Permission, Risk,
+        ContextClosed, ContextClosedReason, JsonObject, Message, PROTOCOL_VERSION, PackReference,
+        Permission, Risk,
     },
     routing::{
         ApprovalCompletionError, CallReservation, CapabilityRegistry, RegistryErrorCode,
@@ -213,9 +214,11 @@ async fn route_change_after_decision_invalidates_the_grant() {
     registry
         .replace_snapshot(&id, snapshot(2, action_capability()))
         .unwrap();
+    // The decision was valid; its target changed. That is reported distinctly
+    // from a binding mismatch so the caller knows to approve again.
     assert_eq!(
         registry.route_approved(grant, now).unwrap_err().code(),
-        RegistryErrorCode::ApprovalMismatch
+        RegistryErrorCode::ApprovalContextChanged
     );
 }
 
@@ -311,6 +314,144 @@ async fn concurrent_decisions_have_exactly_one_winner() {
 }
 
 #[tokio::test]
+async fn approved_call_dispatches_to_the_bound_context_when_a_second_context_appears() {
+    let (mut registry, id, browser) = action_registry();
+    let now = fixed_time();
+    let approval = prepare(
+        &mut registry,
+        invocation("request-1", "demo.action", "bound-value"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+
+    // While the human was deciding, a second tab of the same site published the
+    // same tool. Discovery hides the ambiguous name, but the approval was bound to
+    // one exact registration and must still dispatch there.
+    registry
+        .replace_snapshot(&id, snapshot_in("tab-8", 1, action_capability()))
+        .unwrap();
+    assert!(registry.visible_capabilities().is_empty());
+
+    let routed = registry.route_approved(grant, now).unwrap();
+    assert_eq!(routed.message().context_id, "tab-7");
+    assert_eq!(routed.message().context_revision, 1);
+    routed.dispatch().await.unwrap();
+    assert!(matches!(
+        browser.receive_from_bridge().await.unwrap(),
+        Some(Message::ToolCall(call)) if call.context_id == "tab-7"
+    ));
+}
+
+#[tokio::test]
+async fn approved_call_dispatches_to_the_bound_connection_when_another_connection_collides() {
+    let (mut registry, id, browser) = action_registry();
+    let now = fixed_time();
+    let approval = prepare(
+        &mut registry,
+        invocation("request-1", "demo.action", "bound-value"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+
+    // A second browser profile connects and advertises the same tool name.
+    let (other, other_browser) = connection("connection-b");
+    let other_id = other.id().clone();
+    registry.add_connection(other).unwrap();
+    registry
+        .replace_snapshot(&other_id, snapshot(1, action_capability()))
+        .unwrap();
+    assert!(registry.visible_capabilities().is_empty());
+
+    let routed = registry.route_approved(grant, now).unwrap();
+    routed.dispatch().await.unwrap();
+    assert!(matches!(
+        browser.receive_from_bridge().await.unwrap(),
+        Some(Message::ToolCall(_))
+    ));
+    assert!(
+        tokio::time::timeout(
+            Duration::from_millis(20),
+            other_browser.receive_from_bridge()
+        )
+        .await
+        .is_err(),
+        "the colliding connection must never receive the approved call"
+    );
+}
+
+#[tokio::test]
+async fn approved_call_fails_distinctly_when_the_bound_context_changes() {
+    let (mut registry, id, _browser) = action_registry();
+    let now = fixed_time();
+
+    // The bound document republished under a new revision (navigation).
+    let approval = prepare(
+        &mut registry,
+        invocation("request-1", "demo.action", "replaced"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+    registry
+        .replace_snapshot(&id, snapshot(2, action_capability()))
+        .unwrap();
+    assert_eq!(
+        registry.route_approved(grant, now).unwrap_err().code(),
+        RegistryErrorCode::ApprovalContextChanged
+    );
+
+    // The bound document disappeared entirely before dispatch.
+    let approval = prepare(
+        &mut registry,
+        invocation("request-2", "demo.action", "closed"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+    registry
+        .close_context(
+            &id,
+            ContextClosed {
+                protocol_version: PROTOCOL_VERSION,
+                context_id: "tab-7".to_owned(),
+                context_revision: 3,
+                reason: ContextClosedReason::Navigation,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        registry.route_approved(grant, now).unwrap_err().code(),
+        RegistryErrorCode::ApprovalContextChanged
+    );
+}
+
+#[tokio::test]
 async fn pending_authority_does_not_survive_registry_restart() {
     let (mut original, id, _browser) = action_registry();
     let now = fixed_time();
@@ -379,9 +520,13 @@ fn approval_result(approval: &RoutedApproval, decision: ApprovalDecision) -> App
 }
 
 fn snapshot(revision: u64, capability: Capability) -> CapabilitySnapshot {
+    snapshot_in("tab-7", revision, capability)
+}
+
+fn snapshot_in(context_id: &str, revision: u64, capability: Capability) -> CapabilitySnapshot {
     CapabilitySnapshot {
         protocol_version: PROTOCOL_VERSION,
-        context_id: "tab-7".to_owned(),
+        context_id: context_id.to_owned(),
         context_revision: revision,
         origin: ORIGIN.to_owned(),
         capabilities: vec![capability],

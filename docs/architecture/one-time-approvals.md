@@ -63,11 +63,18 @@ mutex, the record is removed before the decision is processed. Denial, malformed
 input, expiry, mismatch, and replay therefore cannot preserve a usable record.
 
 An approved decision yields a non-cloneable in-process grant to the waiting MCP call.
-Before creating a browser tool call, the bridge re-resolves the capability and
-rechecks the protocol and policy versions, expiry, connection, context, revision,
-origin, complete capability and pack identity, permission decision, schema, tool,
-and canonical argument hash. The grant is moved into this check exactly once. No
-wire token is returned to the MCP client.
+Before creating a browser tool call, the bridge looks up the exact registration the
+approval was bound to—its connection, context, and tool—rather than resolving the
+tool name again, so a same-named tool that appeared in another tab or browser
+profile while the human was deciding can neither receive nor block the approved
+call. It then rechecks the protocol and policy versions, expiry, connection,
+context, revision, origin, complete capability and pack identity, permission
+decision, schema, tool, and canonical argument hash. If the bound registration was
+replaced by a newer revision or closed in the interval between the decision and
+dispatch, the call fails with the distinct `ApprovalContextChanged` outcome and the
+MCP client is told to request a fresh approval; every other discrepancy is an
+`ApprovalMismatch`. The grant is moved into this check exactly once. No wire token
+is returned to the MCP client.
 
 Navigation, capability replacement, context closure, browser disconnect, explicit
 MCP cancellation, approval timeout, and bridge restart revoke pending approval

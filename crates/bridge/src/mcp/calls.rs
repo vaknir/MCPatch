@@ -100,7 +100,9 @@ impl McpCallRuntime {
                     .route_approved(grant, OffsetDateTime::now_utc())
                 {
                     Ok(routed) => routed,
-                    Err(_) => return Ok(tool_failure("The approval is no longer valid.")),
+                    Err(error) => {
+                        return Ok(tool_failure(approval_route_failure(error.code())));
+                    }
                 }
             }
         };
@@ -275,6 +277,17 @@ fn map_completion(
 
 fn tool_failure(message: &'static str) -> CallToolResponse {
     CallToolResult::error(vec![ContentBlock::text(message)]).into()
+}
+
+/// Tell the caller when a valid decision lost its target, so the model retries
+/// with a fresh approval instead of concluding the human refused.
+const fn approval_route_failure(code: RegistryErrorCode) -> &'static str {
+    match code {
+        RegistryErrorCode::ApprovalContextChanged => {
+            "The approved page changed before the call could run. Call the tool again to request a fresh approval."
+        }
+        _ => "The approval is no longer valid.",
+    }
 }
 
 #[cfg(test)]
