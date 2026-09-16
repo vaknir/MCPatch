@@ -1,9 +1,10 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject } from "@mcpatch/protocol";
 import { BrowserToolExecutionError } from "@mcpatch/sdk/browser";
 import {
   canonicalizePageLocation,
   packMatchesLocation,
   type PackManifest,
+  type PackToolReturn,
 } from "@mcpatch/sdk/runtime";
 
 import type { PageCapability } from "./page-channel.js";
@@ -154,7 +155,7 @@ class ReviewedDocumentAdapter implements PageAdapter {
     tool: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue> {
+  ): Promise<PackToolReturn> {
     const adapter = this.#routes.get(tool);
     if (adapter === undefined) {
       throw new PageAdapterExecutionError("TOOL_UNAVAILABLE");

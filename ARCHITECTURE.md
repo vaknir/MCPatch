@@ -63,7 +63,9 @@ are injected only for granted origins and receive the minimum message required f
 one typed operation.
 
 The extension does not expose cookies, arbitrary JavaScript, unrestricted fetch,
-or generic page dumps. Host permissions should be optional and requested when the
+generic page dumps, or generic screenshots. A reviewed tool may return one bounded
+typed media result from its own semantic scope; it cannot choose arbitrary browser
+surfaces. Host permissions should be optional and requested when the
 user enables a pack.
 
 Real-site contexts are owned by top-level isolated-world content ports rather than
@@ -102,7 +104,7 @@ For the active context, the extension resolves capabilities in this order:
 3. No capability.
 
 A later automation fallback would be a separate, high-risk subsystem with explicit
-permission and approval semantics. It is not part of protocol version 1.
+permission and approval semantics. It is not part of protocol version 2.
 
 Native and pack tools with the same logical name do not merge. Native capabilities
 win, and the collision is recorded without exposing page-controlled metadata as a
@@ -110,7 +112,7 @@ trusted description. Canonical URL matching, collision outcomes, and context bin
 are detailed in
 [Pack matching and capability resolution](docs/architecture/pack-resolution.md).
 
-The bridge does not guess which tab is active in protocol version 1. If the same
+The bridge does not guess which tab is active in protocol version 2. If the same
 tool name is live in multiple contexts or connections, it is hidden from discovery
 and calls fail as ambiguous. Snapshot revision, permission, schema, revocation, and
 result-binding rules are detailed in

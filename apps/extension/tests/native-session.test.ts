@@ -52,10 +52,10 @@ describe("native session supervisor", () => {
     expect(runtime.applications).toEqual([MCPATCH_NATIVE_HOST_NAME]);
     expect(supervisor.state).toEqual({ phase: "negotiating" });
     expect(parsePosted(runtime.latestPort, 0)).toEqual({
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: "hello",
       role: "extension",
-      supportedProtocolVersions: [1],
+      supportedProtocolVersions: [2],
       implementation: {
         name: "mcpatch-extension",
         version: "0.1.0",
@@ -121,7 +121,7 @@ describe("native session supervisor", () => {
 
     scheduler.advanceBy(100);
     expect(parsePosted(first, 1)).toEqual({
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: "heartbeat",
       heartbeatId: "heartbeat.1.1",
       sentAt: "2026-09-15T00:00:00.100Z",
@@ -452,6 +452,15 @@ describe("native session supervisor", () => {
         requestId: call.requestId,
         tool: call.tool,
         result: { status: "page" },
+        content: [
+          {
+            type: "image",
+            mimeType: "image/webp",
+            data: "UklGRg==",
+            width: 2,
+            height: 1,
+          },
+        ],
       }),
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -460,6 +469,15 @@ describe("native session supervisor", () => {
       type: "tool_result",
       contextId: "page.9",
       result: { status: "page" },
+      content: [
+        {
+          type: "image",
+          mimeType: "image/webp",
+          data: "UklGRg==",
+          width: 2,
+          height: 1,
+        },
+      ],
     });
 
     page.emitDisconnect();

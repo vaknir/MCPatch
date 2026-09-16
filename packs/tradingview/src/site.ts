@@ -3,12 +3,15 @@ import {
   extractTradingViewCurrentChart,
   extractTradingViewCurrentWatchlist,
 } from "./extractor.js";
+import type { PackExecutionResult } from "@mcpatch/sdk/runtime";
 import {
   TRADINGVIEW_FINGERPRINT,
+  TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TradingViewPackError,
   type TradingViewChangeSymbolInput,
   type TradingViewChangeSymbolResult,
+  type TradingViewCaptureChartResult,
   type TradingViewCurrentChartResult,
   type TradingViewCurrentWatchlistResult,
   type TradingViewSemanticSnapshot,
@@ -30,6 +33,12 @@ export interface TradingViewSnapshotSource {
     input: TradingViewSearchSymbolsInput,
     signal: AbortSignal,
   ): Promise<TradingViewSearchSymbolsResult>;
+  captureChart?(
+    symbol: string,
+    signal: AbortSignal,
+  ):
+    | PackExecutionResult<TradingViewCaptureChartResult>
+    | Promise<PackExecutionResult<TradingViewCaptureChartResult>>;
   subscribe?(listener: () => void): () => void;
 }
 
@@ -47,6 +56,9 @@ export interface TradingViewSite {
     input: TradingViewSearchSymbolsInput,
     signal: AbortSignal,
   ): Promise<TradingViewSearchSymbolsResult>;
+  captureChart(
+    signal: AbortSignal,
+  ): Promise<PackExecutionResult<TradingViewCaptureChartResult>>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -79,10 +91,7 @@ class ReviewedTradingViewSite implements TradingViewSite {
       this.#source.changeSymbol !== undefined &&
         this.#navigationState === "idle",
     );
-    const availableTools =
-      this.#source.searchSymbols === undefined
-        ? tools
-        : Object.freeze([...tools, TRADINGVIEW_SEARCH_SYMBOLS]);
+    const availableTools = appendOptionalTools(tools, this.#source);
     this.#capabilitySignature = signature(availableTools);
     this.#candidateSignature = undefined;
     this.#candidateCount = 0;
@@ -165,6 +174,21 @@ class ReviewedTradingViewSite implements TradingViewSite {
     return search.call(this.#source, input, signal);
   }
 
+  async captureChart(
+    signal: AbortSignal,
+  ): Promise<PackExecutionResult<TradingViewCaptureChartResult>> {
+    abortIfNeeded(signal);
+    const capture = this.#source.captureChart;
+    if (capture === undefined) {
+      throw new TradingViewPackError(
+        "TOOL_UNAVAILABLE",
+        "chart_capture_unavailable",
+      );
+    }
+    const chart = extractTradingViewCurrentChart(await this.#read(signal));
+    return capture.call(this.#source, chart.symbol, signal);
+  }
+
   subscribe(listener: () => void): () => void {
     if (typeof listener !== "function") {
       throw new TypeError("TradingView listener is invalid");
@@ -212,13 +236,13 @@ class ReviewedTradingViewSite implements TradingViewSite {
     try {
       const snapshot = await this.#read(signal);
       return signature(
-        appendSearchTool(
+        appendOptionalTools(
           discoverTradingViewTools(
             snapshot,
             this.#source.changeSymbol !== undefined &&
               this.#navigationState === "idle",
           ),
-          this.#source.searchSymbols !== undefined,
+          this.#source,
         ),
       );
     } catch (error) {
@@ -262,13 +286,15 @@ class ReviewedTradingViewSite implements TradingViewSite {
   }
 }
 
-function appendSearchTool(
+function appendOptionalTools(
   tools: readonly TradingViewToolName[],
-  available: boolean,
+  source: TradingViewSnapshotSource,
 ): readonly TradingViewToolName[] {
-  return available
-    ? Object.freeze([...tools, TRADINGVIEW_SEARCH_SYMBOLS])
-    : tools;
+  return Object.freeze([
+    ...tools,
+    ...(source.searchSymbols === undefined ? [] : [TRADINGVIEW_SEARCH_SYMBOLS]),
+    ...(source.captureChart === undefined ? [] : [TRADINGVIEW_CAPTURE_CHART]),
+  ]);
 }
 
 function signature(tools: readonly TradingViewToolName[]): string {

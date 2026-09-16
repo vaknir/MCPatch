@@ -55,7 +55,7 @@ can publish or complete more work.
 | worker → page | `page_hello_ack`           | Select version and establish binding        |
 | page → worker | `page_capability_snapshot` | Replace one document's available candidates |
 | worker → page | `page_tool_call`           | Invoke one exact bound named tool           |
-| page → worker | `page_tool_result`         | Return one exact bound JSON result          |
+| page → worker | `page_tool_result`         | Return bound structured data and media      |
 | page → worker | `page_tool_error`          | Return one allowlisted payload-free error   |
 | worker → page | `page_cancel`              | Abort one exact pending invocation          |
 | page → worker | `page_context_closed`      | Gracefully report document/adapter shutdown |
@@ -92,6 +92,12 @@ validated pack manifest matches the exact current origin/path and whose complete
 declared tool set appears in `authorizedPackTools`. Factories are not called before
 authorization. A partial allowlist, duplicate route, undeclared capability, or
 factory failure closes the page context without forwarding exception details.
+
+`page_tool_result` may carry one optional image content block under the shared
+bridge-protocol contract. It is limited to PNG or WebP, 2,048 pixels per dimension,
+and 160 KiB decoded data. The image remains separate from schema-validated
+structured output. No page message can request capture or choose a selector,
+rectangle, tab, window, or browser surface.
 
 ## Explicit absences
 

@@ -87,6 +87,34 @@ describe("page-channel protocol", () => {
     );
   });
 
+  it("accepts one bounded image and rejects malformed page media", () => {
+    const result = structuredClone(pageToWorker[2]) as Record<string, unknown>;
+    result.content = [
+      {
+        type: "image",
+        mimeType: "image/webp",
+        data: "UklGRg==",
+        width: 2,
+        height: 1,
+      },
+    ];
+    expect(() =>
+      encodePageToWorkerMessage(result as unknown as PageToWorkerMessage),
+    ).not.toThrow();
+
+    const malformed = structuredClone(result) as {
+      content: Array<{ data: string }>;
+    };
+    const image = malformed.content[0];
+    if (image === undefined) throw new Error("missing image fixture");
+    image.data = "not base64";
+    expectCode(
+      () =>
+        encodePageToWorkerMessage(malformed as unknown as PageToWorkerMessage),
+      "INVALID_VALUE",
+    );
+  });
+
   it("requires read-only native metadata and rejects duplicate source identities", () => {
     const snapshot = structuredClone(pageToWorker[1]) as {
       capabilities: Array<Record<string, unknown>>;

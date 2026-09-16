@@ -23,7 +23,7 @@ describe("reviewed synthetic demo pack", () => {
   it("passes manifest, compatibility, schema, permission, and fixture checks", async () => {
     const result = await verifyPackFixtures(demoPack, {
       runtimeVersion: "0.1.0",
-      bridgeProtocolVersion: 1,
+      bridgeProtocolVersion: 2,
       allowedPermissions: ["READ"],
     });
 

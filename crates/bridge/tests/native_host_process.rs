@@ -116,7 +116,7 @@ async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
     let mut child = command.spawn().expect("native host must spawn");
     let payload = serde_json::to_vec(&json!({
         "type": "heartbeat",
-        "protocolVersion": 1,
+        "protocolVersion": 2,
         "heartbeatId": "private-heartbeat-marker",
         "sentAt": "2026-09-15T00:00:00Z"
     }))

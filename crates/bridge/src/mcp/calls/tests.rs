@@ -1,6 +1,8 @@
 use std::{num::NonZeroUsize, time::Duration};
 
-use rmcp::model::{CallToolRequestParams, CallToolResponse, ErrorCode as McpErrorCode};
+use rmcp::model::{
+    CallToolRequestParams, CallToolResponse, ContentBlock, ErrorCode as McpErrorCode,
+};
 use serde_json::{Map, Value, json};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
@@ -10,7 +12,7 @@ use crate::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
     protocol::{
         ApprovalDecision, ApprovalResult, ErrorCode, Message, PROTOCOL_VERSION, Permission, Risk,
-        ToolError, ToolResult, parse_message,
+        ToolContent, ToolError, ToolImageContent, ToolResult, parse_message,
     },
     routing::{BrowserToolResponse, SharedCapabilityRegistry, shared_capability_registry},
 };
@@ -40,6 +42,7 @@ async fn returns_only_the_exact_validated_browser_result() {
                 context_revision: call.context_revision,
                 origin: call.origin,
                 result: json!({"status": "ready"}),
+                content: vec![],
             }),
         )
         .unwrap();
@@ -47,6 +50,64 @@ async fn returns_only_the_exact_validated_browser_result() {
     let result = complete(task).await;
     assert_eq!(result.structured_content, Some(json!({"status": "ready"})));
     assert_eq!(result.is_error, Some(false));
+}
+
+#[tokio::test]
+async fn projects_bounded_browser_media_as_mcp_image_content() {
+    let fixture = fixture_with_capability(Duration::from_millis(100), |capability| {
+        capability.output_schema = Some(
+            json!({
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["symbol", "width", "height"],
+                "properties": {
+                    "symbol": {"type": "string"},
+                    "width": {"type": "integer"},
+                    "height": {"type": "integer"}
+                }
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
+    })
+    .await;
+    let task = spawn_call(&fixture.runtime, CancellationToken::new(), Map::new());
+    let call = receive_call(&fixture.browser).await;
+    fixture
+        .registry
+        .lock()
+        .await
+        .accept_response(
+            &fixture.connection_id,
+            BrowserToolResponse::Result(ToolResult {
+                protocol_version: call.protocol_version,
+                request_id: call.request_id,
+                context_id: call.context_id,
+                context_revision: call.context_revision,
+                origin: call.origin,
+                result: json!({"symbol": "NASDAQ:AAPL", "width": 2, "height": 1}),
+                content: vec![ToolContent::Image(ToolImageContent {
+                    mime_type: "image/webp".to_owned(),
+                    data: "UklGRg==".to_owned(),
+                    width: 2,
+                    height: 1,
+                })],
+            }),
+        )
+        .unwrap();
+
+    let result = complete(task).await;
+    assert_eq!(result.content.len(), 2);
+    let ContentBlock::Image(image) = &result.content[1] else {
+        panic!("bounded media must be projected as MCP image content");
+    };
+    assert_eq!(image.mime_type, "image/webp");
+    assert_eq!(image.data, "UklGRg==");
+    assert_eq!(
+        result.structured_content,
+        Some(json!({"symbol": "NASDAQ:AAPL", "width": 2, "height": 1}))
+    );
 }
 
 #[tokio::test]
@@ -182,6 +243,7 @@ async fn elevated_call_dispatches_only_after_the_exact_approval() {
                 context_revision: call.context_revision,
                 origin: call.origin,
                 result: json!({"status": "ready"}),
+                content: vec![],
             }),
         )
         .unwrap();
@@ -313,6 +375,7 @@ async fn invalid_output_and_disconnect_fail_without_returning_browser_data() {
                     context_revision: call.context_revision,
                     origin: call.origin,
                     result: json!({"secret": "must-not-pass"}),
+                    content: vec![],
                 }),
             )
             .is_err()
@@ -370,7 +433,7 @@ async fn fixture_with_timeouts(
     );
     let connection_id = connection.id().clone();
     let Message::CapabilitySnapshot(mut snapshot) = parse_message(include_bytes!(
-        "../../../../../packages/protocol/fixtures/v1/valid/demo-capability-snapshot.json"
+        "../../../../../packages/protocol/fixtures/v2/valid/demo-capability-snapshot.json"
     ))
     .unwrap() else {
         panic!("demo fixture must contain a capability snapshot");

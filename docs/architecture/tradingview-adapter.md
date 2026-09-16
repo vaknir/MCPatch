@@ -3,7 +3,8 @@
 The second reviewed MCPatch real-site pack exposes a narrow chart workflow from
 TradingView. It reads the active chart and visible watchlist, resolves bounded
 company/ticker queries, and can navigate the active tab to one caller-supplied
-canonical symbol. The implementation follows the
+canonical symbol. It can also return the active chart as bounded native MCP image
+content. The implementation follows the
 bounded observations in
 [TradingView public-page reconnaissance](../research/tradingview-2026-09-16.md).
 
@@ -96,10 +97,24 @@ asset type, and optional country/currency. Malformed candidates are omitted;
 malformed envelopes and oversized responses fail the call. No URL, request option,
 header, body, cookie, token, raw response, or opaque provider field crosses MCP.
 
+### `tradingview.capture_chart`
+
+This `READ` accepts an empty object and returns typed metadata plus one native MCP
+WebP image. The document adapter requires exactly one compatible visible chart and
+composites only visible canvas descendants whose rectangles remain fully inside
+that chart region. Output is at most 1,600 × 1,200 and 160 KiB decoded; bounded
+lower-resolution attempts are allowed when the first encoding is too large.
+
+The tool cannot capture browser chrome, another tab, an arbitrary selector or
+rectangle, DOM text, cookies, storage, request traffic, or a caller-chosen region.
+The shared SDK, page channel, bridge protocol, and Rust MCP projection each enforce
+the closed one-image result contract.
+
 ## Resource and lifecycle bounds
 
 Collection admits at most four chart regions, examines at most 4,096 chart `div`
-elements, returns at most 64 watchlist rows, and bounds every string before it
+elements, returns at most 64 watchlist rows, admits at most 16 chart canvases, and
+bounds every string before it
 crosses the page channel. Long aggregate containers are ignored when looking for
 small OHLC or change leaves. Cancellation is checked while collecting and before
 navigation.
@@ -118,8 +133,9 @@ disconnect revokes the context through the common lifecycle.
 The opt-in signed-out smoke in `apps/extension/e2e/tradingview-field.spec.ts` uses
 a disposable Chromium profile. The harness only launches the browser and performs
 the required extension-enable and trusted one-time approval gestures; every pack
-operation is invoked through MCP. The 2026-09-16 run discovered all four tools,
-validated both page reads, resolved `NYSE:IBM` through symbol search, approved and
+operation is invoked through MCP. The 2026-09-16 run discovered all five tools,
+validated both page reads, returned one bounded active-chart image, resolved
+`NYSE:IBM` through symbol search, approved and
 executed the exact symbol change, verified fresh-context readback and
 unsupported-path revocation, and deleted the profile without retaining prices or
 page data. See the
@@ -129,7 +145,6 @@ page data. See the
 
 - creating, deleting, or changing watchlist entries;
 - creating or changing alerts;
-- chart-image transport;
 - placing trades or connecting a broker;
 - background collection, repeated scraping, or historical data export; and
 - reading or exporting credentials, cookies, storage, headers, or request logs.

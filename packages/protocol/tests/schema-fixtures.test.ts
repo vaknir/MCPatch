@@ -51,7 +51,7 @@ const validate = createValidator();
 const validFixtures = fixtureNames(validDirectory);
 const invalidFixtures = fixtureNames(invalidDirectory);
 
-describe("protocol v1 golden fixtures", () => {
+describe("protocol v2 golden fixtures", () => {
   it("contains both accepted and rejected cases", () => {
     expect(validFixtures.length).toBeGreaterThan(0);
     expect(invalidFixtures.length).toBeGreaterThan(0);
@@ -89,6 +89,6 @@ describe("protocol v1 golden fixtures", () => {
 
   it.each(invalidFixtures)("rejects %s", (name) => {
     const valid = validate(readJson(join(invalidDirectory, name)));
-    expect(valid, `${name} unexpectedly matched protocol v1`).toBe(false);
+    expect(valid, `${name} unexpectedly matched protocol v2`).toBe(false);
   });
 });

@@ -6,7 +6,7 @@ relays one connection without interpreting its lifecycle. The authenticated brow
 endpoint then runs this state machine:
 
 1. wait at most five seconds for the first complete local frame;
-2. require a validated version-1 bootstrap `hello` with role `extension`;
+2. require a validated version-2 bootstrap `hello` with role `extension`;
 3. select the highest version advertised by both peers and return the bridge's set
    so the extension can verify that choice;
 4. assign a fresh opaque connection ID scoped to the current bridge-core process;

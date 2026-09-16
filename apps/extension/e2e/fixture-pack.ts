@@ -67,7 +67,7 @@ export const fixturePack = definePack({
     "sha256:92aff532b5c12b6a7648251cd7ca3a57cc149d4a2470a726e808b8f2f2e1c3f4",
   compatibility: {
     runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
-    bridgeProtocol: { minimum: 1, maximum: 1 },
+    bridgeProtocol: { minimum: 2, maximum: 2 },
   },
   execution: { kind: "bundled" },
   matches: [

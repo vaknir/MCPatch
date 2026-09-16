@@ -4,8 +4,11 @@ use super::formats::{validate_origin, validate_timestamp};
 use super::{invalid, primitives::*};
 use crate::protocol::{
     ApprovalRequired, ApprovalResult, Cancel, ConnectionError, ContextClosed, Heartbeat, Hello,
-    HelloAck, ToolCall, ToolError, ToolResult, ValidationCode, ValidationError,
+    HelloAck, ToolCall, ToolContent, ToolError, ToolResult, ValidationCode, ValidationError,
 };
+
+const MAX_IMAGE_DIMENSION: u32 = 2_048;
+const MAX_IMAGE_BYTES: usize = 160 * 1_024;
 
 pub(super) fn validate_hello(message: &Hello) -> Result<(), ValidationError> {
     validate_protocol_version(message.protocol_version)?;
@@ -61,7 +64,56 @@ pub(super) fn validate_tool_result(message: &ToolResult) -> Result<(), Validatio
         &message.context_id,
         message.context_revision,
         &message.origin,
-    )
+    )?;
+    validate_collection_size(&message.content, 0, 1, "content")?;
+    for content in &message.content {
+        match content {
+            ToolContent::Image(image) => validate_image_content(image)?,
+        }
+    }
+    Ok(())
+}
+
+fn validate_image_content(
+    image: &crate::protocol::ToolImageContent,
+) -> Result<(), ValidationError> {
+    if !matches!(image.mime_type.as_str(), "image/png" | "image/webp") {
+        return Err(invalid(ValidationCode::InvalidValue, "content.mimeType"));
+    }
+    if image.width == 0
+        || image.width > MAX_IMAGE_DIMENSION
+        || image.height == 0
+        || image.height > MAX_IMAGE_DIMENSION
+    {
+        return Err(invalid(ValidationCode::LimitExceeded, "content.dimensions"));
+    }
+    if !valid_bounded_base64(&image.data, MAX_IMAGE_BYTES) {
+        return Err(invalid(ValidationCode::InvalidValue, "content.data"));
+    }
+    Ok(())
+}
+
+fn valid_bounded_base64(value: &str, maximum_bytes: usize) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() < 4 || !bytes.len().is_multiple_of(4) {
+        return false;
+    }
+    let padding = if bytes.ends_with(b"==") {
+        2
+    } else if bytes.ends_with(b"=") {
+        1
+    } else {
+        0
+    };
+    let data_length = bytes.len() - padding;
+    if bytes[..data_length]
+        .iter()
+        .any(|byte| !byte.is_ascii_alphanumeric() && !matches!(byte, b'+' | b'/'))
+        || bytes[data_length..].iter().any(|byte| *byte != b'=')
+    {
+        return false;
+    }
+    bytes.len() / 4 * 3 - padding <= maximum_bytes
 }
 
 pub(super) fn validate_tool_error(message: &ToolError) -> Result<(), ValidationError> {

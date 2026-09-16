@@ -12,6 +12,7 @@ import {
   searchTradingViewSymbols,
   type TradingViewSearchFetch,
 } from "./symbol-search.js";
+import { captureTradingViewChartImage } from "./chart-image.js";
 
 const MAX_CHARTS = 4;
 const MAX_CHART_DIVS = 4_096;
@@ -99,6 +100,10 @@ class TradingViewDocumentSource implements TradingViewSnapshotSource {
 
   searchSymbols(input: unknown, signal: AbortSignal) {
     return searchTradingViewSymbols(this.#fetchRequest, input, signal);
+  }
+
+  captureChart(symbol: string, signal: AbortSignal) {
+    return captureTradingViewChartImage(this.#document, symbol, signal);
   }
 
   subscribe(listener: () => void): () => void {

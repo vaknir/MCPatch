@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject, JsonValue, ToolContent } from "@mcpatch/protocol";
 
 export const PAGE_PROTOCOL_VERSION = 2 as const;
 export const MAX_PAGE_FRAME_BYTES = 256 * 1024;
@@ -76,6 +76,7 @@ export interface PageToolResult extends PageBinding {
   readonly requestId: string;
   readonly tool: string;
   readonly result: JsonValue;
+  readonly content?: ToolContent[];
 }
 
 export type PageToolErrorCode =

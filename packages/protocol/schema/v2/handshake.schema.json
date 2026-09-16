@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpatch.dev/protocol/v2/handshake.schema.json",
+  "title": "MCPatch protocol v2 handshake messages",
+  "$defs": {
+    "hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "role",
+        "supportedProtocolVersions",
+        "implementation"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "hello"
+        },
+        "role": {
+          "enum": ["bridge", "extension"]
+        },
+        "supportedProtocolVersions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "common.schema.json#/$defs/positiveVersion"
+          }
+        },
+        "implementation": {
+          "$ref": "common.schema.json#/$defs/implementation"
+        }
+      }
+    },
+    "helloAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "type",
+        "supportedProtocolVersions",
+        "selectedProtocolVersion",
+        "connectionId",
+        "implementation"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "hello_ack"
+        },
+        "supportedProtocolVersions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "common.schema.json#/$defs/positiveVersion"
+          }
+        },
+        "selectedProtocolVersion": {
+          "$ref": "common.schema.json#/$defs/positiveVersion"
+        },
+        "connectionId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "implementation": {
+          "$ref": "common.schema.json#/$defs/implementation"
+        }
+      }
+    }
+  }
+}

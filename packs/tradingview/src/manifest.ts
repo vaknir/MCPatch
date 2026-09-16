@@ -4,6 +4,7 @@ import type { MCPatchDefinition } from "@mcpatch/sdk/runtime";
 import { createTradingViewDocumentSource } from "./document-source.js";
 import {
   TRADINGVIEW_CHANGE_SYMBOL,
+  TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
@@ -27,9 +28,9 @@ const mcp = new MCPatch<TradingViewSite>({
   name: "TradingView",
   description:
     "Expose bounded chart and watchlist state plus approved chart navigation from TradingView.",
-  version: "0.2.0",
+  version: "0.3.0",
   digest:
-    "sha256:2f6b110367c7d03db62891dd2b37d3a06392a2f7cb0c4b339e3b7b9bc9fc1330",
+    "sha256:0302771a5570c24f8d5abb3458b311b753e357d8937a9126d1759ac4ff7497be",
   matches: [
     {
       origin: TRADINGVIEW_ORIGIN,
@@ -43,6 +44,29 @@ const mcp = new MCPatch<TradingViewSite>({
     },
   },
 });
+
+mcp.tool(
+  {
+    name: TRADINGVIEW_CAPTURE_CHART,
+    description:
+      "Capture only the active reviewed TradingView chart canvases as one bounded WebP MCP image, excluding browser chrome and unrelated page regions.",
+    risk: "read",
+    inputSchema: EMPTY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "symbol", "mimeType", "width", "height"],
+      properties: {
+        fingerprint: { const: TRADINGVIEW_FINGERPRINT },
+        symbol: { type: "string" },
+        mimeType: { const: "image/webp" },
+        width: { type: "integer", minimum: 1, maximum: 2048 },
+        height: { type: "integer", minimum: 1, maximum: 2048 },
+      },
+    },
+  },
+  (_input, { site, signal }) => site.captureChart(signal),
+);
 
 mcp.tool(
   {
@@ -228,6 +252,12 @@ mcp.tool(
 
 export const tradingViewBrowserPack = mcp.build({
   fixtures: [
+    {
+      id: "page-only-capture-chart",
+      tool: TRADINGVIEW_CAPTURE_CHART,
+      input: {},
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
     {
       id: "page-only-current-chart",
       tool: TRADINGVIEW_CURRENT_CHART,

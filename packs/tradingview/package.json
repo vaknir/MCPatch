@@ -1,6 +1,6 @@
 {
   "name": "@mcpatch/tradingview-pack",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Reviewed TradingView pack for MCPatch",
   "type": "module",

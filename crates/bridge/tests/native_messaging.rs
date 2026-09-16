@@ -110,6 +110,7 @@ async fn refuses_to_emit_oversized_messages() {
         context_revision: 1,
         origin: "https://example.com".into(),
         result: json!("x".repeat(MAX_NATIVE_MESSAGE_BYTES)),
+        content: vec![],
     });
     let mut sink = tokio::io::sink();
 

@@ -17,7 +17,7 @@ const mcp = new MCPatch({
     "sha256:879486d0000d36f06d47958b5285dec823c7805112a4bd086962c20e1d54fb78",
   compatibility: {
     runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
-    bridgeProtocol: { minimum: 1, maximum: 1 },
+    bridgeProtocol: { minimum: 2, maximum: 2 },
   },
   execution: { kind: "bundled" },
   matches: [

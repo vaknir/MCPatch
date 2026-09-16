@@ -190,7 +190,9 @@ describe("page context owner", () => {
       }),
     );
 
-    await expect(result).resolves.toEqual({ query: "TLV-LHR" });
+    await expect(result).resolves.toEqual({
+      result: { query: "TLV-LHR" },
+    });
   });
 
   it("revokes crossed replies, expired authority, aborts, and timeouts", async () => {

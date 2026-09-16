@@ -123,7 +123,7 @@ import { verifyPackFixtures } from "@mcpatch/sdk";
 
 const verification = await verifyPackFixtures(pack, {
   runtimeVersion: "0.1.0",
-  bridgeProtocolVersion: 1,
+  bridgeProtocolVersion: 2,
   allowedPermissions: ["READ"],
   timeoutMs: 1_000,
 });

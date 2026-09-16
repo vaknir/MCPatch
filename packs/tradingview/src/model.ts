@@ -8,10 +8,12 @@ export const TRADINGVIEW_CURRENT_WATCHLIST =
   "tradingview.current_watchlist" as const;
 export const TRADINGVIEW_CHANGE_SYMBOL = "tradingview.change_symbol" as const;
 export const TRADINGVIEW_SEARCH_SYMBOLS = "tradingview.search_symbols" as const;
+export const TRADINGVIEW_CAPTURE_CHART = "tradingview.capture_chart" as const;
 export const TRADINGVIEW_SYMBOL_SEARCH_ORIGIN =
   "https://symbol-search.tradingview.com" as const;
 
 export const TRADINGVIEW_TOOLS = Object.freeze([
+  TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
@@ -125,6 +127,14 @@ export interface TradingViewSearchSymbolsResult {
   readonly candidates: readonly TradingViewSymbolCandidate[];
 }
 
+export interface TradingViewCaptureChartResult extends JsonObject {
+  readonly fingerprint: typeof TRADINGVIEW_FINGERPRINT;
+  readonly symbol: string;
+  readonly mimeType: "image/webp";
+  readonly width: number;
+  readonly height: number;
+}
+
 export type TradingViewErrorCode =
   "CANCELLED" | "EXECUTION_FAILED" | "TOOL_UNAVAILABLE";
 
@@ -140,6 +150,7 @@ export type TradingViewErrorReason =
   | "navigation_already_started"
   | "navigation_unavailable"
   | "symbol_search_unavailable"
+  | "chart_capture_unavailable"
   | "unsupported_locale"
   | "unsupported_origin"
   | "unsupported_path"
@@ -157,3 +168,4 @@ export class TradingViewPackError extends Error {
     this.reason = reason;
   }
 }
+import type { JsonObject } from "@mcpatch/sdk/runtime";

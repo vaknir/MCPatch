@@ -65,7 +65,7 @@ fn rejects_downgraded_or_unoffered_acknowledgements() {
 #[test]
 fn verifies_the_selection_against_the_acceptor_set_carried_by_hello_ack() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../packages/protocol/fixtures/v1/valid/hello-ack.json");
+        .join("../../packages/protocol/fixtures/v2/valid/hello-ack.json");
     let bytes = fs::read(path).expect("hello acknowledgement fixture must be readable");
     let Message::HelloAck(acknowledgement) =
         parse_message(&bytes).expect("hello acknowledgement fixture must parse")
@@ -75,7 +75,7 @@ fn verifies_the_selection_against_the_acceptor_set_carried_by_hello_ack() {
 
     assert_eq!(
         verify_selected_version(
-            &[1],
+            &[2],
             &acknowledgement.supported_protocol_versions,
             acknowledgement.selected_protocol_version,
         ),

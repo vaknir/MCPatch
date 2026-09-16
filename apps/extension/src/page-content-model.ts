@@ -1,4 +1,5 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject } from "@mcpatch/protocol";
+import type { PackToolReturn } from "@mcpatch/sdk/runtime";
 
 import type { PageCapability, PageToolErrorCode } from "./page-channel.js";
 import type { PagePort } from "./page-context-model.js";
@@ -15,7 +16,7 @@ export interface PageAdapter {
     tool: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue>;
+  ): Promise<PackToolReturn>;
   subscribe?(listener: () => void): () => void;
 }
 

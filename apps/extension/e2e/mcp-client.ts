@@ -208,6 +208,36 @@ export function structuredContent(response: JsonRpcResponse): unknown {
   return result?.["structuredContent"];
 }
 
+export function mcpImageContent(response: JsonRpcResponse): {
+  readonly data: string;
+  readonly mimeType: string;
+} {
+  const result = dataObject(response.result);
+  const content = result?.["content"];
+  if (
+    response.error !== undefined ||
+    result?.["isError"] === true ||
+    !Array.isArray(content)
+  ) {
+    throw new Error("MCP tool call did not return content");
+  }
+  const images = content
+    .map(dataObject)
+    .filter((item) => item?.["type"] === "image");
+  if (images.length !== 1) {
+    throw new Error("MCP tool call did not return exactly one image");
+  }
+  const image = images[0];
+  if (
+    image === undefined ||
+    typeof image["data"] !== "string" ||
+    typeof image["mimeType"] !== "string"
+  ) {
+    throw new Error("MCP image content is malformed");
+  }
+  return { data: image["data"], mimeType: image["mimeType"] };
+}
+
 function dataObject(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)

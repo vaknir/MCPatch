@@ -467,6 +467,7 @@ async fn accepts_only_results_bound_to_the_original_route() {
         context_revision: 3,
         origin: "https://example.com".to_owned(),
         result: json!({"ok": true}),
+        content: vec![],
     };
     assert_eq!(
         registry
@@ -483,6 +484,7 @@ async fn accepts_only_results_bound_to_the_original_route() {
         context_revision: 3,
         origin: "https://example.com".to_owned(),
         result: json!({"ok": true}),
+        content: vec![],
     };
     assert_eq!(
         registry
@@ -499,6 +501,7 @@ async fn accepts_only_results_bound_to_the_original_route() {
         context_revision: 3,
         origin: "https://attacker.example".to_owned(),
         result: json!({"ok": true}),
+        content: vec![],
     };
     assert_eq!(
         registry
@@ -515,6 +518,7 @@ async fn accepts_only_results_bound_to_the_original_route() {
         context_revision: 3,
         origin: "https://example.com".to_owned(),
         result: json!({"ok": true}),
+        content: vec![],
     };
     registry
         .accept_response(&id, BrowserToolResponse::Result(result.clone()))
@@ -573,6 +577,7 @@ async fn validates_and_consumes_browser_results() {
         context_revision: 1,
         origin: "https://example.com".to_owned(),
         result: json!({"ok": "not-a-boolean"}),
+        content: vec![],
     };
     assert_eq!(
         registry
@@ -593,6 +598,7 @@ async fn validates_and_consumes_browser_results() {
         context_revision: 1,
         origin: "https://example.com".to_owned(),
         result: json!({"ok": true}),
+        content: vec![],
     };
     assert_eq!(
         registry

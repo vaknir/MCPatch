@@ -60,7 +60,7 @@ const BROWSER_TOOL_FIELDS = [
 ] as const;
 const DEFAULT_COMPATIBILITY: PackCompatibility = Object.freeze({
   runtime: Object.freeze({ minimum: "0.1.0", maximumExclusive: "0.2.0" }),
-  bridgeProtocol: Object.freeze({ minimum: 1, maximum: 1 }),
+  bridgeProtocol: Object.freeze({ minimum: 2, maximum: 2 }),
 });
 
 /** Fixed-safe browser pack metadata; protocol and deny-network defaults are added. */

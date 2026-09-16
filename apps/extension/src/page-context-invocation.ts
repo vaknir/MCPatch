@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject } from "@mcpatch/protocol";
 
 import {
   encodeWorkerToPageMessage,
@@ -8,6 +8,7 @@ import {
   type WorkerToPageMessage,
 } from "./page-channel.js";
 import { PageInvocationError } from "./page-context-model.js";
+import type { PageInvocationResult } from "./page-context-model.js";
 import type {
   OwnedPagePort,
   PendingInvocation,
@@ -29,7 +30,7 @@ export class PageInvocationRouter {
     tool: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue> {
+  ): Promise<PageInvocationResult> {
     if (
       session?.binding === undefined ||
       session.phase !== "ready" ||
@@ -43,7 +44,7 @@ export class PageInvocationRouter {
     }
     const requestId = `page-request.${++this.#requestSequence}`;
     const binding = session.binding;
-    return new Promise<JsonValue>((resolve, reject) => {
+    return new Promise<PageInvocationResult>((resolve, reject) => {
       const onAbort = () => this.#cancel(session, requestId, "CANCELLED", true);
       const timer = this.scheduler.schedule(
         () => this.#cancel(session, requestId, "TIMEOUT", true),
@@ -80,8 +81,12 @@ export class PageInvocationRouter {
     const pending = session.pending.get(message.requestId);
     if (pending === undefined || pending.tool !== message.tool) return false;
     this.#remove(session, message.requestId, pending);
-    if (message.type === "page_tool_result") pending.resolve(message.result);
-    else pending.reject(new PageInvocationError(message.code));
+    if (message.type === "page_tool_result") {
+      pending.resolve({
+        result: message.result,
+        ...(message.content === undefined ? {} : { content: message.content }),
+      });
+    } else pending.reject(new PageInvocationError(message.code));
     return true;
   }
 

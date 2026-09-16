@@ -16,7 +16,7 @@ pub(crate) const TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_s
 
 pub(crate) fn demo_snapshot(revision: u64) -> Message {
     let Message::CapabilitySnapshot(mut snapshot) = parse_message(include_bytes!(
-        "../../../../packages/protocol/fixtures/v1/valid/demo-capability-snapshot.json"
+        "../../../../packages/protocol/fixtures/v2/valid/demo-capability-snapshot.json"
     ))
     .unwrap() else {
         panic!("demo fixture must contain a capability snapshot");
@@ -42,5 +42,6 @@ pub(crate) fn complete_demo_call(call: ToolCall) -> Message {
         context_revision: call.context_revision,
         origin: call.origin,
         result: json!({"status": "ready"}),
+        content: vec![],
     })
 }

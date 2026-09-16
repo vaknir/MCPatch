@@ -1,4 +1,5 @@
 import type { ValidationCode, ValidationIssue } from "./error.js";
+import { PROTOCOL_VERSION } from "../types/common.js";
 
 export type JsonRecord = Record<string, unknown>;
 
@@ -47,7 +48,7 @@ export function checkClosedObject(
 export function validateProtocolVersion(
   value: unknown,
 ): ValidationIssue | undefined {
-  if (value !== 1) {
+  if (value !== PROTOCOL_VERSION) {
     return issue("UNSUPPORTED_VERSION", "protocolVersion");
   }
   return undefined;

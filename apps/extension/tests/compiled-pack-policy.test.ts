@@ -248,7 +248,7 @@ describe("compiled pack runtime policy", () => {
             [{ manifest, handlers: definition.handlers }],
             {
               runtimeVersion: "0.1.0",
-              bridgeProtocolVersion: 1,
+              bridgeProtocolVersion: 2,
               allowedPermissions: ["READ"],
             },
           ),

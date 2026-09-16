@@ -11,6 +11,7 @@ import type {
   PackManifest,
   PackToolManifest,
 } from "./types.js";
+import type { PackToolReturn } from "./tool-result.js";
 import { parsePackManifest } from "./validation/manifest.js";
 import {
   cloneAndFreeze,
@@ -62,7 +63,7 @@ export type PackToolHandler<
 > = (
   context: PackExecutionContext,
   input: TInput,
-) => TOutput | Promise<TOutput>;
+) => PackToolReturn<TOutput> | Promise<PackToolReturn<TOutput>>;
 
 export type PackToolAuthoringInput<
   TName extends string,

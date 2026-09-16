@@ -2,7 +2,7 @@
 
 This workspace contains the Chromium Manifest V3 browser runtime. Its service
 worker synchronously installs lifecycle listeners, owns one long-lived Native
-Messaging port to `dev.mcpatch.bridge`, negotiates protocol version 1, and sends a
+Messaging port to `dev.mcpatch.bridge`, negotiates protocol version 2, and sends a
 heartbeat every 15 seconds while connected.
 
 ## Build

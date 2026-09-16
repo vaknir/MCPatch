@@ -153,6 +153,23 @@ pub struct ToolResult {
     pub context_revision: u64,
     pub origin: String,
     pub result: Value,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub content: Vec<ToolContent>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolContent {
+    Image(ToolImageContent),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ToolImageContent {
+    pub mime_type: String,
+    pub data: String,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

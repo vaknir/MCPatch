@@ -11,7 +11,7 @@ After exact capability resolution and input-schema validation, a read-only call 
 reserved normally. A capability requiring `ACTION` or `SENSITIVE` instead creates a
 pending approval bound to:
 
-- protocol version 1 and approval-policy version 1;
+- protocol version 2 and approval-policy version 1;
 - the authenticated browser connection;
 - exact context ID, active positive revision, and canonical HTTPS origin;
 - the complete accepted capability, including source and immutable pack identity;

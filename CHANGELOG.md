@@ -9,12 +9,17 @@ All notable MCPatch changes are documented here. The format follows
 ### Added
 
 - A reviewed TradingView pack with bounded `tradingview.current_chart` and
-  `tradingview.current_watchlist` reads, constrained canonical
+  `tradingview.current_watchlist` reads, canvas-scoped bounded
+  `tradingview.capture_chart` native MCP image results, constrained canonical
   `tradingview.search_symbols` discovery through one exact credential-free
   first-party origin, plus an argument-bound
   `tradingview.change_symbol` action using canonical `EXCHANGE:TICKER` identities,
   exact optional-origin enablement, native-first resolution, and fail-closed
   English single-chart compatibility checks.
+- A cross-language bounded media-result contract with one closed PNG/WebP content
+  block, shared count/dimension/decoded-byte validation, SDK authoring support,
+  page-channel transport, native MCP image projection in the Rust bridge, and a
+  closed protocol-v2 wire contract that retains the historical v1 schemas.
 - A one-object browser pack SDK at `@mcpatch/sdk/browser` that registers real typed
   page handlers and generates capability discovery, routing, cancellation, safe
   errors, subscriptions, tool lists, and fail-closed compiled fallbacks, with safe
@@ -72,7 +77,8 @@ All notable MCPatch changes are documented here. The format follows
   pack execution, permissions, and approvals.
 - Cargo and pnpm workspaces with formatting, linting, tests, builds, dependency
   audits, CI, and automated dependency updates.
-- Canonical bridge protocol version 1 schemas and cross-language golden fixtures.
+- Historical bridge protocol version 1 and current version 2 schemas with
+  cross-language golden fixtures.
 - Rust protocol types with strict JSON decoding, bounded semantic validation,
   typed errors, and shared-fixture contract tests.
 - Dependency-free TypeScript protocol types and deterministic runtime validation

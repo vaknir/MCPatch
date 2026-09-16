@@ -21,9 +21,9 @@ runtime code generation, so it is suitable for a Manifest V3 service worker. It
 validates already-decoded JSON values; byte framing and the 1 MiB limit belong to
 the selected transport.
 
-## Version 1
+## Version 2
 
-Every message is a closed JSON object with `protocolVersion: 1` and a `type`
+Every message is a closed JSON object with `protocolVersion: 2` and a `type`
 discriminator. Unknown fields, unknown types, unsupported versions, invalid formats,
 and ambiguous messages are rejected.
 
@@ -37,6 +37,11 @@ Opaque means their internal keys are defined by the selected tool, not that they
 bypass size, depth, schema, policy, or output validation.
 Approval messages contain only a canonical argument hash, never raw arguments or
 results.
+
+`tool_result.content`, when present, is not opaque. Version 1 permits exactly one
+closed PNG or WebP image block, with dimensions from 1 through 2,048 and no more
+than 160 KiB of decoded base64 data. Structured data and media remain separate so
+the bridge can project native MCP image content without weakening output schemas.
 
 ## Message families
 
@@ -75,7 +80,7 @@ routes, and approval expiry require runtime validation in addition to JSON Schem
 
 The transport enforces a maximum encoded message size of 1 MiB before JSON parsing.
 Schema limits include 128-character identifiers, 256 capabilities per context, 128
-top-level tool argument fields, and bounded descriptions/errors. Runtime validators
+top-level tool argument fields, one 160-KiB image, and bounded descriptions/errors. Runtime validators
 also constrain context revisions to JavaScript-safe integers and bound JSON nesting
 and traversal work. Transports and stateful runtimes must additionally bound schema
 complexity, in-flight calls, and validation time.
@@ -83,12 +88,13 @@ complexity, in-flight calls, and validation time.
 ## Layout
 
 ```text
-schema/v1/            canonical modular schemas
-fixtures/v1/valid/    one accepted example per message family and edge case
-fixtures/v1/invalid/  rejected examples with the violated rule in the filename
+schema/v2/            current canonical modular schemas
+schema/v1/            historical pre-release JSON-only contract
+fixtures/v2/valid/    one accepted example per message family and edge case
+fixtures/v2/invalid/  rejected examples with the violated rule in the filename
 fixtures/negotiation/ shared cross-language version-selection cases
 tests/                schema and fixture integrity tests
 ```
 
-`schema/v1/message.schema.json` is the root schema. Load every sibling schema by its
+`schema/v2/message.schema.json` is the current root schema. Load every sibling schema by its
 `$id` before compiling the root.

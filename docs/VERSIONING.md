@@ -8,7 +8,7 @@ MCPatch has five independent compatibility domains.
 | --------------------- | ---------------- | ------------- | ------------------------------------------------------------------ |
 | Product release       | SemVer           | `0.1.0`       | Installable MCPatch behavior is released                           |
 | Rust/npm package      | SemVer           | `0.1.0`       | A package API or implementation is released                        |
-| Bridge protocol       | Positive integer | `1`           | Bridge↔extension wire compatibility changes                        |
+| Bridge protocol       | Positive integer | `2`           | Bridge↔extension wire compatibility changes                        |
 | Page protocol         | Positive integer | `2`           | Service worker↔content-runtime compatibility changes               |
 | Pack manifest         | Positive integer | `1`           | Pack manifest interpretation changes incompatibly                  |
 | External MCP revision | Date string      | `2026-07-28`  | The upstream MCP specification publishes and MCPatch adopts a date |
@@ -30,7 +30,7 @@ Peers advertise supported protocol versions and select the highest common intege
 A peer may support more than one version during a migration window. No intersection
 fails negotiation before capabilities or calls are accepted.
 
-Protocol version 1 uses closed message schemas. Adding, removing, renaming, or
+Protocol versions use closed message schemas. Adding, removing, renaming, or
 changing the meaning of a field or message requires a new protocol version unless
 the existing schema explicitly marks that location as extensible.
 

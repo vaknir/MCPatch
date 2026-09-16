@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 2,
+  "type": "tool_result",
+  "requestId": "request-image-1",
+  "contextId": "context-chart-1",
+  "contextRevision": 1,
+  "origin": "https://www.tradingview.com",
+  "result": {},
+  "content": [
+    {
+      "type": "image",
+      "mimeType": "image/svg+xml",
+      "data": "UklGRg==",
+      "width": 1,
+      "height": 1
+    }
+  ]
+}

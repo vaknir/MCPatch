@@ -1,7 +1,6 @@
-import type { JsonValue } from "@mcpatch/protocol";
-
 import type { PageBinding } from "./page-channel.js";
 import type {
+  PageInvocationResult,
   PageInvocationError,
   PageAuthority,
   PageAuthorization,
@@ -14,7 +13,7 @@ const TOOL_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
 
 export interface PendingInvocation {
   readonly reject: (error: PageInvocationError) => void;
-  readonly resolve: (value: JsonValue) => void;
+  readonly resolve: (value: PageInvocationResult) => void;
   readonly timer: unknown;
   readonly tool: string;
   readonly signal: AbortSignal;

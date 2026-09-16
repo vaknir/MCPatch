@@ -49,10 +49,14 @@ common version from both advertised sets, so a lower shared or unadvertised
 selection is rejected as a downgrade. Before the acceptor sends and the initiator
 verifies that acknowledgement, all other message types are invalid.
 
-Handshake messages use the stable version 1 bootstrap envelope. Their
+The current runtime uses the version 2 bootstrap envelope. Its
 `supportedProtocolVersions` and `selectedProtocolVersion` fields refer to the
-application-message protocol, so a peer that has dropped application protocol 1
+application-message protocol, so a peer that does not support protocol 2
 can still report incompatibility safely.
+
+Version 1 was the pre-release JSON-only contract. ADR 0010 introduced a bounded
+media result field and therefore advanced the closed wire contract to version 2;
+the v1 schemas remain available as historical compatibility artifacts.
 
 No shared version closes the connection with a bounded, machine-readable error.
 The selected version is repeated on every message and must match the connection.
@@ -134,3 +138,4 @@ pack/runtime compatibility to the external client protocol.
 - [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
 - [Official MCP Rust SDK](https://github.com/modelcontextprotocol/rust-sdk)
 - [JSON Schema 2020-12](https://json-schema.org/draft/2020-12)
+- [ADR 0010: bounded MCP media results](0010-bounded-mcp-media-results.md)
