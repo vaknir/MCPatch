@@ -36,6 +36,13 @@ review state are independently checked by the registry client. Registry
 high-water and rollback policy belongs to the registry issues, not this artifact
 contract.
 
+The attestation shape is closed and contains `attestationVersion`, `registryId`,
+`keyId`, publisher/pack identity, `bundleDigest`, a positive
+`publicationSequence`, `reviewState` (`OFFICIAL` or `REVIEWED_COMMUNITY`),
+canonical millisecond UTC timestamps, and a strict 64-byte Ed25519 signature.
+Verification requires the expected registry identity supplied by the caller;
+the attestation cannot select its own trust root.
+
 ## Canonical bytes and digest
 
 All canonical bytes use RFC 8785 JSON Canonicalization Scheme (JCS). Object
@@ -81,17 +88,20 @@ The SDK uses the small pinned browser-safe canonicalize 2.1.0 package for JCS.
 Duplicate-key rejection happens in the byte decoder before ordinary object
 semantics can discard evidence. Consumers must use
 parseDeclarativePackBundleBytes at artifact boundaries; JSON.parse alone is not
-an acceptable signed-bundle decoder.
+an acceptable signed-bundle decoder. Security verification APIs accept only the
+serialized UTF-8 document (`string` or `Uint8Array`) and perform this strict
+parse internally.
 
 ## Bounds and errors
 
-The complete document is limited to 1 MiB, with at most 32 JSON levels, 8,192
-nodes, 512 array elements per array, 256 object members per object, and 16 KiB
-per string. Fatal UTF-8 decoding is required. Duplicate keys, escaped duplicate
+The complete serialized document is limited to 1 MiB, with at most 32 JSON
+levels, 8,192 nodes, 512 array elements per array, 256 object members per
+object, and 16 KiB per string measured in UTF-8 bytes. Fatal UTF-8 decoding is
+required. Duplicate keys, escaped duplicate
 names, truncation, invalid JSON, unknown fields, unknown versions, noncharacters,
 lone surrogates, unsafe numbers, and negative zero fail closed.
 
-Errors contain only a stable code and field path. Rejected values, signatures,
+Errors contain only a stable code and static field name. Rejected values, signatures,
 keys, fixture data, and exception messages are never copied into an error.
 Validated objects are detached and deeply frozen.
 
@@ -111,6 +121,11 @@ the publisher, pack ID, version, manifest authority, operations, metadata,
 digest, key, or signature invalidates verification. A publisher signature does
 not establish registry review, revocation, freshness, or browser-origin
 authority.
+
+When present, `metadata.homepage` is a canonical HTTPS UI link: its DNS host is
+lowercase ASCII, and it has no credentials, fragment, explicit port, or
+non-canonical origin slash. It is display metadata and never grants navigation
+or network authority.
 
 Ed25519 uses the pinned @noble/ed25519 3.0.0 implementation because the
 extension's current Chrome 106 floor predates portable native WebCrypto Ed25519.

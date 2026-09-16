@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseDeclarativePackBundleBytes,
+  serializeDeclarativePackBundle,
   DeclarativePackBundleValidationError,
   verifyDeclarativePackBundle,
 } from "../src/index.js";
@@ -22,7 +23,7 @@ describe("Declarative Pack Bundle v1 golden files", () => {
       expect(bundle.bundleVersion).toBe(1);
       expect(bundle.manifest.execution.kind).toBe("declarative");
       await expect(
-        verifyDeclarativePackBundle(bundle, {
+        verifyDeclarativePackBundle(serializeDeclarativePackBundle(bundle), {
           trustedPublicKey: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
         }),
       ).resolves.toMatchObject({ ok: true });

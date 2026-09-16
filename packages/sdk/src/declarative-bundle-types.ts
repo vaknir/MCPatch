@@ -112,7 +112,7 @@ export type BundleVerificationResult =
 
 export type RegistryVerificationOptions = Readonly<{
   readonly publicKey: string;
-  readonly expectedRegistryId?: string;
+  readonly expectedRegistryId: string;
   readonly now?: Date;
 }>;
 

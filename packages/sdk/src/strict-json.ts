@@ -1,11 +1,15 @@
 import { DeclarativePackBundleValidationError } from "./declarative-bundle-types.js";
 import type { DeclarativePackBundleValidationCode } from "./declarative-bundle-types.js";
-
-const MAX_ARRAY_ITEMS = 512;
-const MAX_OBJECT_FIELDS = 256;
-const MAX_JSON_DEPTH = 32;
-const MAX_JSON_NODES = 8_192;
-const MAX_STRING_BYTES = 16 * 1024;
+import {
+  MAX_BUNDLE_ARRAY_ITEMS,
+  MAX_BUNDLE_JSON_DEPTH,
+  MAX_BUNDLE_JSON_NODES,
+  MAX_BUNDLE_OBJECT_FIELDS,
+  MAX_BUNDLE_STRING_BYTES,
+  bundleIssue,
+  hasNoncharacter,
+  isWellFormed,
+} from "./declarative-bundle-limits.js";
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 /** Parses JSON while retaining duplicate-key evidence and rejecting unsafe JSON. */
@@ -14,7 +18,9 @@ export function parseStrictJson(bytes: Uint8Array): unknown {
   try {
     text = decoder.decode(bytes);
   } catch {
-    throw new DeclarativePackBundleValidationError(issue("INVALID_JSON", "$"));
+    throw new DeclarativePackBundleValidationError(
+      bundleIssue("INVALID_JSON", "$"),
+    );
   }
   const parser = new Parser(text);
   const value = parser.value(0, "$");
@@ -31,7 +37,7 @@ class Parser {
 
   value(depth: number, field: string): unknown {
     this.#nodes += 1;
-    if (depth > MAX_JSON_DEPTH || this.#nodes > MAX_JSON_NODES) {
+    if (depth > MAX_BUNDLE_JSON_DEPTH || this.#nodes > MAX_BUNDLE_JSON_NODES) {
       this.fail("LIMIT_EXCEEDED", field);
     }
     this.whitespace();
@@ -70,9 +76,10 @@ class Parser {
       this.whitespace();
       if (this.text[this.#index] !== '"') this.fail("INVALID_JSON", field);
       const key = this.string(field + ".[key]");
-      if (keys.has(key)) this.fail("DUPLICATE_KEY", field + "." + key);
+      if (keys.has(key)) this.fail("DUPLICATE_KEY", field);
       keys.add(key);
-      if (keys.size > MAX_OBJECT_FIELDS) this.fail("LIMIT_EXCEEDED", field);
+      if (keys.size > MAX_BUNDLE_OBJECT_FIELDS)
+        this.fail("LIMIT_EXCEEDED", field);
       this.whitespace();
       if (!this.take(":")) this.fail("INVALID_JSON", field);
       result[key] = this.value(depth + 1, field + "." + key);
@@ -88,7 +95,8 @@ class Parser {
     this.whitespace();
     if (this.take("]")) return result;
     while (true) {
-      if (result.length >= MAX_ARRAY_ITEMS) this.fail("LIMIT_EXCEEDED", field);
+      if (result.length >= MAX_BUNDLE_ARRAY_ITEMS)
+        this.fail("LIMIT_EXCEEDED", field);
       result.push(this.value(depth + 1, field + "[" + result.length + "]"));
       this.whitespace();
       if (this.take("]")) return result;
@@ -113,7 +121,9 @@ class Parser {
         if (!isWellFormed(value) || hasNoncharacter(value)) {
           this.fail("INVALID_VALUE", field);
         }
-        if (new TextEncoder().encode(value).byteLength > MAX_STRING_BYTES) {
+        if (
+          new TextEncoder().encode(value).byteLength > MAX_BUNDLE_STRING_BYTES
+        ) {
           this.fail("LIMIT_EXCEEDED", field);
         }
         return value;
@@ -162,44 +172,14 @@ class Parser {
   }
 
   fail(code: DeclarativePackBundleValidationCode, field: string): never {
-    throw new DeclarativePackBundleValidationError(issue(code, field));
+    const safeField =
+      code === "DUPLICATE_KEY" || code === "UNKNOWN_FIELD"
+        ? "$"
+        : field === "$"
+          ? "$"
+          : "bundle";
+    throw new DeclarativePackBundleValidationError(
+      bundleIssue(code, safeField),
+    );
   }
-}
-
-function issue(
-  code: DeclarativePackBundleValidationCode,
-  field: string,
-): {
-  readonly code: DeclarativePackBundleValidationCode;
-  readonly field: string;
-} {
-  return { code, field };
-}
-
-function isWellFormed(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (Number.isNaN(next) || next < 0xdc00 || next > 0xdfff) return false;
-      index += 1;
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function hasNoncharacter(value: string): boolean {
-  for (const character of value) {
-    const codePoint = character.codePointAt(0);
-    if (
-      codePoint !== undefined &&
-      ((codePoint >= 0xfdd0 && codePoint <= 0xfdef) ||
-        (codePoint & 0xffff) >= 0xfffe)
-    ) {
-      return true;
-    }
-  }
-  return false;
 }

@@ -9,6 +9,9 @@ import {
   canonicalizeDeclarativePackBundle,
   computeDeclarativePackBundleDigest,
   decodeDeclarativePackBundle,
+  MAX_BUNDLE_JSON_DEPTH,
+  MAX_BUNDLE_OBJECT_FIELDS,
+  MAX_DECLARATIVE_BUNDLE_BYTES,
   parseDeclarativePackBundle,
   parseDeclarativePackBundleBytes,
   publisherKeyId,
@@ -164,6 +167,47 @@ describe("Declarative Pack Bundle v1", () => {
     ).toThrow(/LIMIT_EXCEEDED/);
   });
 
+  it("enforces exact raw-byte, depth, node, and object limits", () => {
+    const exactBytes = "0" + " ".repeat(MAX_DECLARATIVE_BUNDLE_BYTES - 1);
+    expect(() => decodeDeclarativePackBundle(exactBytes)).not.toThrow();
+    expect(() => decodeDeclarativePackBundle(exactBytes + " ")).toThrow(
+      /LIMIT_EXCEEDED/,
+    );
+
+    const nested = (depth: number): string =>
+      "[".repeat(depth) + "0" + "]".repeat(depth);
+    expect(() =>
+      decodeDeclarativePackBundle(nested(MAX_BUNDLE_JSON_DEPTH)),
+    ).not.toThrow();
+    expect(() =>
+      decodeDeclarativePackBundle(nested(MAX_BUNDLE_JSON_DEPTH + 1)),
+    ).toThrow(/LIMIT_EXCEEDED/);
+
+    const exactNodes = [
+      ...Array.from({ length: 511 }, () => Array.from({ length: 15 }, () => 0)),
+      Array.from({ length: 14 }, () => 0),
+    ];
+    expect(() =>
+      decodeDeclarativePackBundle(JSON.stringify(exactNodes)),
+    ).not.toThrow();
+    expect(() =>
+      decodeDeclarativePackBundle(JSON.stringify([...exactNodes, [0, 0]])),
+    ).toThrow(/LIMIT_EXCEEDED/);
+
+    const exactObject = Object.fromEntries(
+      Array.from({ length: MAX_BUNDLE_OBJECT_FIELDS }, (_, index) => [
+        `k${index}`,
+        0,
+      ]),
+    );
+    expect(() =>
+      decodeDeclarativePackBundle(JSON.stringify(exactObject)),
+    ).not.toThrow();
+    expect(() =>
+      decodeDeclarativePackBundle(JSON.stringify({ ...exactObject, extra: 0 })),
+    ).toThrow(/LIMIT_EXCEEDED/);
+  });
+
   it("computes a stable domain-separated digest over the canonical content payload", async () => {
     const bundle = fixtureBundle();
     const digest = await computeDeclarativePackBundleDigest(bundle);
@@ -191,9 +235,13 @@ describe("Declarative Pack Bundle v1", () => {
     const signed = await signDeclarativePackBundle(content, keys);
     const publicKey = encodeBase64Url(keys.publicKey);
     await expect(
-      verifyDeclarativePackBundle(signed, { trustedPublicKey: publicKey }),
+      verifyDeclarativePackBundle(serializeDeclarativePackBundle(signed), {
+        trustedPublicKey: publicKey,
+      }),
     ).resolves.toMatchObject({ ok: true });
-    await expect(verifyDeclarativePackBundle(signed)).resolves.toMatchObject({
+    await expect(
+      verifyDeclarativePackBundle(serializeDeclarativePackBundle(signed)),
+    ).resolves.toMatchObject({
       ok: false,
       issue: { code: "INVALID_SIGNATURE" },
     });
@@ -205,7 +253,9 @@ describe("Declarative Pack Bundle v1", () => {
     );
     await expect(
       verifyDeclarativePackBundle(
-        substituted as unknown as DeclarativePackBundle,
+        serializeDeclarativePackBundle(
+          substituted as unknown as DeclarativePackBundle,
+        ),
         { trustedPublicKey: publicKey },
       ),
     ).resolves.toMatchObject({ ok: false, issue: { code: "KEY_ID_MISMATCH" } });
@@ -221,9 +271,14 @@ describe("Declarative Pack Bundle v1", () => {
     } & Omit<DeclarativePackBundle, "manifest">;
     replay.manifest.id = "other-pack";
     await expect(
-      verifyDeclarativePackBundle(replay as unknown as DeclarativePackBundle, {
-        trustedPublicKey: publicKey,
-      }),
+      verifyDeclarativePackBundle(
+        serializeDeclarativePackBundle(
+          replay as unknown as DeclarativePackBundle,
+        ),
+        {
+          trustedPublicKey: publicKey,
+        },
+      ),
     ).resolves.toMatchObject({ ok: false, issue: { code: "DIGEST_MISMATCH" } });
     const flipped = structuredClone(signed) as {
       publisherSignature: { signature: string };
@@ -232,12 +287,17 @@ describe("Declarative Pack Bundle v1", () => {
       flipped.publisherSignature.signature.slice(0, -1) +
       (flipped.publisherSignature.signature.endsWith("A") ? "B" : "A");
     await expect(
-      verifyDeclarativePackBundle(flipped as unknown as DeclarativePackBundle, {
-        trustedPublicKey: publicKey,
-      }),
+      verifyDeclarativePackBundle(
+        serializeDeclarativePackBundle(
+          flipped as unknown as DeclarativePackBundle,
+        ),
+        {
+          trustedPublicKey: publicKey,
+        },
+      ),
     ).resolves.toMatchObject({ ok: false });
     await expect(
-      verifyDeclarativePackBundle(signed, {
+      verifyDeclarativePackBundle(serializeDeclarativePackBundle(signed), {
         trustedPublicKey: publicKey,
         runtimeVersion: "9.0.0",
       }),
@@ -262,6 +322,23 @@ describe("Declarative Pack Bundle v1", () => {
     await expect(
       ed25519.verifyAsync(signature, new Uint8Array(), publicKey),
     ).resolves.toBe(true);
+  });
+
+  it("rejects a ZIP-215-only small-order vector in strict RFC 8032 mode", async () => {
+    const message = new TextEncoder().encode("Zcash");
+    const publicKey = hexToBytes(
+      "0100000000000000000000000000000000000000000000000000000000000000",
+    );
+    const signature = hexToBytes(
+      "0100000000000000000000000000000000000000000000000000000000000000" +
+        "0000000000000000000000000000000000000000000000000000000000000000",
+    );
+    await expect(
+      ed25519.verifyAsync(signature, message, publicKey, { zip215: true }),
+    ).resolves.toBe(true);
+    await expect(
+      ed25519.verifyAsync(signature, message, publicKey, { zip215: false }),
+    ).resolves.toBe(false);
   });
 
   it("keeps registry review attestation in a separate signing domain", async () => {
@@ -300,12 +377,58 @@ describe("Declarative Pack Bundle v1", () => {
     });
     expect(parsed.registryAttestation?.reviewState).toBe("REVIEWED_COMMUNITY");
     await expect(
-      verifyRegistryAttestation(attestation, {
+      verifyRegistryAttestation(JSON.stringify(attestation), {
         publicKey,
         expectedRegistryId: "mcp-registry",
         now: new Date("2026-09-16T12:00:00.000Z"),
       }),
     ).resolves.toBe(true);
+
+    await expect(
+      verifyRegistryAttestation(
+        JSON.stringify({ ...attestation, issuedAt: "2026-09-16T00:00:00Z" }),
+        {
+          publicKey,
+          expectedRegistryId: "mcp-registry",
+          now: new Date("2026-09-16T12:00:00.000Z"),
+        },
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      verifyRegistryAttestation(JSON.stringify(attestation), {
+        publicKey: "not-a-key",
+        expectedRegistryId: "other-registry",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("requires canonical HTTPS homepages and keeps validation errors payload-safe", () => {
+    for (const homepage of [
+      "http://example.test/pack",
+      "https://example.test/",
+      "https://EXAMPLE.TEST/pack",
+      "https://example.test:443/pack",
+      "https://user:password@example.test/pack",
+      "https://example.test/pack#fragment",
+    ]) {
+      expect(
+        validateDeclarativePackBundle({
+          ...fixtureBundle(),
+          metadata: { ...fixtureBundle().metadata, homepage },
+        }),
+      ).toMatchObject({
+        code: "INVALID_VALUE",
+        field: "metadata.homepage",
+      });
+    }
+    const hostileKey = "secret-user-key-path";
+    const invalid = { ...fixtureBundle(), [hostileKey]: true };
+    expect(() => parseDeclarativePackBundle(invalid)).toThrow(
+      "UNKNOWN_FIELD at bundle",
+    );
+    expect(() =>
+      decodeDeclarativePackBundle(`{"${hostileKey}":1,"${hostileKey}":2}`),
+    ).toThrow("DUPLICATE_KEY at $");
   });
 });
 

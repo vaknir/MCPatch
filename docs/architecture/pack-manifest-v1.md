@@ -13,9 +13,14 @@ tool name must begin with that publisher followed by a dot. Pack IDs are lowerca
 ASCII kebab-case. Versions are strict SemVer. Digests use exactly
 `sha256:<64 lowercase hex characters>`.
 
-The manifest validator checks digest shape, not artifact integrity. A future
-installer must verify the digest against the canonical complete artifact before it
-creates an installed-pack record; registry metadata is not proof of integrity.
+The manifest validator checks digest shape, not artifact integrity. For a
+Declarative Pack Bundle v1, bundle validation additionally requires
+`manifest.digest` to equal the digest of the documented canonical content
+projection: the manifest with only its digest member omitted, plus operations
+and metadata. This is the common manifest field's bundle-specific projection,
+not a second digest contract. Other pack artifact formats may retain their own
+complete-artifact digest semantics, and registry metadata is never proof of
+integrity.
 
 Runtime compatibility is a closed-open stable SemVer interval:
 `minimum <= current < maximumExclusive`. Bridge protocol compatibility is a closed
