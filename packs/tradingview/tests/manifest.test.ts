@@ -2,11 +2,13 @@ import { verifyPackFixtures } from "@mcpatch/sdk";
 import { describe, expect, it } from "vitest";
 
 import {
+  TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
   TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   tradingViewPack,
@@ -28,6 +30,16 @@ describe("TradingView reviewed pack manifest", () => {
     });
     expect(tradingViewPack.manifest.tools).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          name: TRADINGVIEW_ADD_TO_WATCHLIST,
+          risk: "action",
+          permissions: ["ACTION"],
+        }),
+        expect.objectContaining({
+          name: TRADINGVIEW_REMOVE_FROM_WATCHLIST,
+          risk: "action",
+          permissions: ["ACTION"],
+        }),
         expect.objectContaining({
           name: TRADINGVIEW_CAPTURE_CHART,
           risk: "read",
@@ -68,8 +80,8 @@ describe("TradingView reviewed pack manifest", () => {
     if (!result.ok) return;
     expect(result.evidence.passed).toBe(true);
     expect(result.evidence.summary).toEqual({
-      total: 5,
-      passed: 5,
+      total: 7,
+      passed: 7,
       failed: 0,
       skipped: 0,
     });

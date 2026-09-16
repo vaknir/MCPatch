@@ -29,14 +29,18 @@ const demoTool = "mcpatch.demo.status";
 const currentChartTool = "tradingview.current_chart";
 const currentWatchlistTool = "tradingview.current_watchlist";
 const captureChartTool = "tradingview.capture_chart";
+const addToWatchlistTool = "tradingview.add_to_watchlist";
 const changeSymbolTool = "tradingview.change_symbol";
+const removeFromWatchlistTool = "tradingview.remove_from_watchlist";
 const searchSymbolsTool = "tradingview.search_symbols";
 const fingerprint = "tradingview-chart-semantic-en-v1";
 const tradingViewTools = [
+  addToWatchlistTool,
   captureChartTool,
   changeSymbolTool,
   currentChartTool,
   currentWatchlistTool,
+  removeFromWatchlistTool,
   searchSymbolsTool,
 ] as const;
 

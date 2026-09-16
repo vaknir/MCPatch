@@ -49,10 +49,16 @@ most ten typed canonical candidates. Guessing a listing exchange remains
 unacceptable because tickers can exist on multiple venues; the agent never receives
 the raw response or a generic request capability.
 
-Watchlist mutation, alerts, and chart capture are also deferred. Each needs a
-reviewed authenticated-site action or media-result contract and dedicated approval
-semantics. They must not be implemented by exposing generic clicking, selectors,
-JavaScript execution, screenshots, or request replay.
+Follow-up issues #138 and #139 added a bounded chart-image contract and exact
+current-watchlist mutations. The watchlist review identified TradingView's
+same-origin active-list read plus custom-list `append` and `remove` operations.
+MCPatch fixes those paths and request shapes in reviewed code, derives the list ID
+from the authenticated response, performs no retry, and verifies the final state.
+Cookies remain in the browser and no generic request capability is exposed.
+
+Alert creation remains deferred pending its own reviewed authenticated-site action
+contract. None of these capabilities may be implemented by exposing generic
+clicking, selectors, JavaScript execution, screenshots, or request replay.
 
 ## Volatility and verification
 

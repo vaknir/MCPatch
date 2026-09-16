@@ -5,9 +5,11 @@ import {
 } from "./extractor.js";
 import type { PackExecutionResult } from "@mcpatch/sdk/runtime";
 import {
+  TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_SEARCH_SYMBOLS,
+  TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TradingViewPackError,
   type TradingViewChangeSymbolInput,
   type TradingViewChangeSymbolResult,
@@ -18,6 +20,8 @@ import {
   type TradingViewSearchSymbolsInput,
   type TradingViewSearchSymbolsResult,
   type TradingViewToolName,
+  type TradingViewWatchlistMutationInput,
+  type TradingViewWatchlistMutationResult,
 } from "./model.js";
 import { validateTradingViewChangeSymbolInput } from "./symbol.js";
 
@@ -39,6 +43,14 @@ export interface TradingViewSnapshotSource {
   ):
     | PackExecutionResult<TradingViewCaptureChartResult>
     | Promise<PackExecutionResult<TradingViewCaptureChartResult>>;
+  addToWatchlist?(
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult>;
+  removeFromWatchlist?(
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult>;
   subscribe?(listener: () => void): () => void;
 }
 
@@ -59,6 +71,14 @@ export interface TradingViewSite {
   captureChart(
     signal: AbortSignal,
   ): Promise<PackExecutionResult<TradingViewCaptureChartResult>>;
+  addToWatchlist(
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult>;
+  removeFromWatchlist(
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -189,6 +209,20 @@ class ReviewedTradingViewSite implements TradingViewSite {
     return capture.call(this.#source, chart.symbol, signal);
   }
 
+  async addToWatchlist(
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult> {
+    return this.#mutateWatchlist("add", input, signal);
+  }
+
+  async removeFromWatchlist(
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult> {
+    return this.#mutateWatchlist("remove", input, signal);
+  }
+
   subscribe(listener: () => void): () => void {
     if (typeof listener !== "function") {
       throw new TypeError("TradingView listener is invalid");
@@ -284,6 +318,26 @@ class ReviewedTradingViewSite implements TradingViewSite {
       throw new TradingViewPackError("EXECUTION_FAILED", "incompatible_page");
     }
   }
+
+  async #mutateWatchlist(
+    action: "add" | "remove",
+    input: TradingViewWatchlistMutationInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewWatchlistMutationResult> {
+    abortIfNeeded(signal);
+    const mutate =
+      action === "add"
+        ? this.#source.addToWatchlist
+        : this.#source.removeFromWatchlist;
+    if (mutate === undefined) {
+      throw new TradingViewPackError(
+        "TOOL_UNAVAILABLE",
+        "watchlist_action_unavailable",
+      );
+    }
+    extractTradingViewCurrentChart(await this.#read(signal));
+    return mutate.call(this.#source, input, signal);
+  }
 }
 
 function appendOptionalTools(
@@ -292,6 +346,12 @@ function appendOptionalTools(
 ): readonly TradingViewToolName[] {
   return Object.freeze([
     ...tools,
+    ...(source.addToWatchlist === undefined
+      ? []
+      : [TRADINGVIEW_ADD_TO_WATCHLIST]),
+    ...(source.removeFromWatchlist === undefined
+      ? []
+      : [TRADINGVIEW_REMOVE_FROM_WATCHLIST]),
     ...(source.searchSymbols === undefined ? [] : [TRADINGVIEW_SEARCH_SYMBOLS]),
     ...(source.captureChart === undefined ? [] : [TRADINGVIEW_CAPTURE_CHART]),
   ]);
