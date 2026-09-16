@@ -12,7 +12,10 @@ The closed top-level shape is:
 {
   "bundleVersion": 1,
   "manifest": "Pack Manifest v1",
-  "operations": { "operationsVersion": 1, "program": "opaque JSON" },
+  "operations": {
+    "operationsVersion": 1,
+    "program": "Declarative Operations v1"
+  },
   "metadata": {
     "license": "MIT",
     "homepage": "https://example.test/pack",
@@ -160,3 +163,8 @@ bundle version and migration note. Deterministic rebuild evidence belongs in
 metadata.sourceCommit; source-only fixtures and documentation are not runtime
 artifact inputs unless they are represented in the signed operations/manifest
 content.
+
+The fixed program contract is documented in
+[Declarative Operations v1](declarative-operations.md). It is the only location
+for the canonical read-only AST; there is no archive path, module, script, or
+second program file.

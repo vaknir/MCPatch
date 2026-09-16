@@ -1,0 +1,122 @@
+[
+  {
+    "name": "unknown-operation-field",
+    "program": {
+      "version": 1,
+      "operations": [
+        {
+          "kind": "read",
+          "tool": "example.items.current",
+          "availability": {
+            "kind": "present",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "scope": {
+            "kind": "single",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "projection": { "kind": "text" },
+          "css": ".secret"
+        }
+      ]
+    },
+    "issue": {
+      "code": "UNKNOWN_FIELD",
+      "field": "operations.program.operations[0]"
+    },
+    "schemaValid": false
+  },
+  {
+    "name": "duplicate-projection-fields",
+    "program": {
+      "version": 1,
+      "operations": [
+        {
+          "kind": "read",
+          "tool": "example.items.current",
+          "availability": {
+            "kind": "present",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "scope": {
+            "kind": "single",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "projection": {
+            "kind": "object",
+            "fields": [
+              { "key": "value", "value": { "kind": "text" } },
+              { "key": "value", "value": { "kind": "text" } }
+            ]
+          }
+        }
+      ]
+    },
+    "issue": {
+      "code": "CONFLICTING_PROJECTION",
+      "field": "operations.program.operations[0].projection.fields[1].key"
+    },
+    "schemaValid": true
+  },
+  {
+    "name": "dynamic-selector",
+    "program": {
+      "version": 1,
+      "operations": [
+        {
+          "kind": "read",
+          "tool": "example.items.current",
+          "availability": {
+            "kind": "present",
+            "locator": { "kind": "selector", "id": "${input.id}" }
+          },
+          "scope": {
+            "kind": "single",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "projection": { "kind": "text" }
+        }
+      ]
+    },
+    "issue": {
+      "code": "INVALID_SELECTOR",
+      "field": "operations.program.operations[0].availability.locator.id"
+    },
+    "schemaValid": false
+  },
+  {
+    "name": "unsafe-output-attribute",
+    "program": {
+      "version": 1,
+      "operations": [
+        {
+          "kind": "read",
+          "tool": "example.items.current",
+          "availability": {
+            "kind": "present",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "scope": {
+            "kind": "single",
+            "locator": { "kind": "role", "role": "main" }
+          },
+          "projection": { "kind": "attribute", "name": "href" }
+        }
+      ]
+    },
+    "issue": {
+      "code": "INVALID_SELECTOR",
+      "field": "operations.program.operations[0].projection.name"
+    },
+    "schemaValid": false
+  },
+  {
+    "name": "unknown-version",
+    "program": { "version": 2, "operations": [] },
+    "issue": {
+      "code": "UNSUPPORTED_VERSION",
+      "field": "operations.program.version"
+    },
+    "schemaValid": false
+  }
+]

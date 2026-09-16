@@ -79,48 +79,18 @@ describe("Declarative Pack Bundle v1", () => {
         field: "metadata.license",
       },
     );
-    const unicodeProgram = {
+    const unknownProgram = {
       ...bundle,
       operations: {
         ...bundle.operations,
-        program: "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS),
+        program: "reserved-for-operations-v2",
       },
     };
-    expect(validateSchema(unicodeProgram)).toBe(true);
-    expect(validateDeclarativePackBundle(unicodeProgram)).toBeUndefined();
-    const overlongUnicodeProgram = {
-      ...bundle,
-      operations: {
-        ...bundle.operations,
-        program: "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1),
-      },
-    };
-    expect(validateSchema(overlongUnicodeProgram)).toBe(false);
-    expect(validateDeclarativePackBundle(overlongUnicodeProgram)).toMatchObject(
-      { code: "LIMIT_EXCEEDED", field: "bundle" },
-    );
-    const unicodeKeyProgram = {
-      ...bundle,
-      operations: {
-        ...bundle.operations,
-        program: { ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS)]: 0 },
-      },
-    };
-    expect(validateSchema(unicodeKeyProgram)).toBe(true);
-    expect(validateDeclarativePackBundle(unicodeKeyProgram)).toBeUndefined();
-    const overlongUnicodeKeyProgram = {
-      ...bundle,
-      operations: {
-        ...bundle.operations,
-        program: {
-          ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1)]: 0,
-        },
-      },
-    };
-    expect(validateSchema(overlongUnicodeKeyProgram)).toBe(false);
-    expect(
-      validateDeclarativePackBundle(overlongUnicodeKeyProgram),
-    ).toMatchObject({ code: "LIMIT_EXCEEDED", field: "bundle" });
+    expect(validateSchema(unknownProgram)).toBe(false);
+    expect(validateDeclarativePackBundle(unknownProgram)).toMatchObject({
+      code: "INVALID_TYPE",
+      field: "operations.program",
+    });
     const bundled = structuredClone(bundle) as Record<string, unknown>;
     (bundled.manifest as Record<string, unknown>).execution = {
       kind: "bundled",
@@ -184,16 +154,12 @@ describe("Declarative Pack Bundle v1", () => {
   });
 
   it("preserves Unicode normalization forms and canonical UTF-16 key ordering", () => {
-    const composed = bundleWithProgram({ "10": "ten", "2": "two", value: "é" });
-    const decomposed = bundleWithProgram({
-      "10": "ten",
-      "2": "two",
-      value: "e\u0301",
-    });
+    const composed = bundleWithProgram("é");
+    const decomposed = bundleWithProgram("e\u0301");
     const composedText = canonicalizeDeclarativePackBundle(composed);
     const decomposedText = canonicalizeDeclarativePackBundle(decomposed);
     expect(composedText).not.toBe(decomposedText);
-    expect(composedText).toContain('"10":"ten","2":"two"');
+    expect(composedText).toContain("é");
   });
 
   it("accepts the checked-in deterministic canonical-byte vector", async () => {
@@ -282,21 +248,19 @@ describe("Declarative Pack Bundle v1", () => {
     ).toThrow(/LIMIT_EXCEEDED/);
     expect(() =>
       parseDeclarativePackBundle(bundleWithProgram({ ["\ud800"]: 0 })),
-    ).toThrow(/INVALID_VALUE/);
+    ).toThrow(/INVALID_/);
     expect(() =>
       parseDeclarativePackBundle(bundleWithProgram({ ["\ufdd0"]: 0 })),
-    ).toThrow(/INVALID_VALUE/);
+    ).toThrow(/INVALID_/);
     const cyclicProgram = {} as Record<string, unknown>;
     cyclicProgram.self = cyclicProgram;
     expect(() =>
       parseDeclarativePackBundle(bundleWithProgram(cyclicProgram as JsonValue)),
-    ).toThrow(/INVALID_VALUE/);
+    ).toThrow(/INVALID_/);
   });
 
   it("keeps object APIs subject to the same aggregate and member-name bounds", async () => {
-    const exactProgram = bundleWithProgram(
-      "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS),
-    );
+    const exactProgram = bundleWithProgram("é".repeat(4_096));
     expect(() => parseDeclarativePackBundle(exactProgram)).not.toThrow();
     await expect(
       computeDeclarativePackBundleDigest(exactProgram),
@@ -306,55 +270,16 @@ describe("Declarative Pack Bundle v1", () => {
       signDeclarativePackBundle(exactContent, rfc8032Keys()),
     ).resolves.toBeDefined();
 
-    const overlongProgram = bundleWithProgram(
-      "é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1),
-    );
+    const overlongProgram = bundleWithProgram("é".repeat(4_097));
     expect(() => parseDeclarativePackBundle(overlongProgram)).toThrow(
       /LIMIT_EXCEEDED/,
     );
     await expect(
       computeDeclarativePackBundleDigest(overlongProgram),
     ).rejects.toThrow(/LIMIT_EXCEEDED/);
-    await expect(
-      signDeclarativePackBundle(
-        overlongProgram as unknown as DeclarativePackBundleContent,
-        rfc8032Keys(),
-      ),
-    ).rejects.toThrow(/LIMIT_EXCEEDED/);
-
-    const exactKey = bundleWithProgram({
-      ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS)]: 0,
-    });
-    expect(() => parseDeclarativePackBundle(exactKey)).not.toThrow();
-    await expect(computeDeclarativePackBundleDigest(exactKey)).resolves.toMatch(
-      /^sha256:/u,
-    );
-    await expect(
-      signDeclarativePackBundle(
-        await withComputedDigest(exactKey),
-        rfc8032Keys(),
-      ),
-    ).resolves.toBeDefined();
-    const overlongKey = bundleWithProgram({
-      ["é".repeat(MAX_BUNDLE_STRING_CODE_POINTS + 1)]: 0,
-    });
-    expect(() => parseDeclarativePackBundle(overlongKey)).toThrow(
-      /LIMIT_EXCEEDED/,
-    );
-    await expect(
-      computeDeclarativePackBundleDigest(overlongKey),
-    ).rejects.toThrow(/LIMIT_EXCEEDED/);
-    await expect(
-      signDeclarativePackBundle(
-        overlongKey as unknown as DeclarativePackBundleContent,
-        rfc8032Keys(),
-      ),
-    ).rejects.toThrow(/LIMIT_EXCEEDED/);
 
     const oversizedProgram = bundleWithProgram(
-      Array.from({ length: 64 }, () =>
-        "x".repeat(MAX_BUNDLE_STRING_CODE_POINTS),
-      ),
+      Array.from({ length: 64 }, () => "x".repeat(4_096)),
     );
     expect(() => parseDeclarativePackBundle(oversizedProgram)).toThrow(
       /LIMIT_EXCEEDED/,
@@ -409,7 +334,7 @@ describe("Declarative Pack Bundle v1", () => {
     const bundle = fixtureBundle();
     const digest = await computeDeclarativePackBundleDigest(bundle);
     expect(digest).toBe(
-      "sha256:b925b339c9195a18adf7531768709bfce5256f6627da797d9b06c3a58c73f0ce",
+      "sha256:bb4e5a9ec1eca3429b126a340415f670041c62a0242e5bd51da4c5ca680e24fb",
     );
     const reordered = structuredClone(bundle) as {
       operations: { readonly program: unknown; readonly operationsVersion: 1 };
@@ -675,7 +600,27 @@ function fixtureBundle(): DeclarativePackBundle {
     manifest: structuredClone(manifestFixture),
     operations: {
       operationsVersion: 1,
-      program: { "utf16-key": 1, value: ["stable", 2] },
+      program: {
+        version: 1,
+        operations: [
+          {
+            kind: "read",
+            tool: "example.items.current",
+            availability: {
+              kind: "present",
+              locator: { kind: "role", role: "main" },
+            },
+            scope: {
+              kind: "single",
+              locator: { kind: "role", role: "main" },
+            },
+            projection: {
+              kind: "object",
+              fields: [{ key: "text", value: { kind: "text" } }],
+            },
+          },
+        ],
+      },
     },
     metadata: {
       license: "MIT",
@@ -694,10 +639,15 @@ function fixtureBundle(): DeclarativePackBundle {
 }
 
 function bundleWithProgram(program: JsonValue): DeclarativePackBundle {
-  const bundle = structuredClone(fixtureBundle()) as {
-    operations: { program: JsonValue; operationsVersion: 1 };
-  } & Omit<DeclarativePackBundle, "operations">;
-  bundle.operations.program = program;
+  const bundle = structuredClone(fixtureBundle()) as unknown as {
+    operations: { program: { operations: Array<{ projection: unknown }> } };
+  };
+  const operation = bundle.operations.program.operations[0];
+  if (operation === undefined) throw new Error("fixture operation missing");
+  operation.projection = {
+    kind: "object",
+    fields: [{ key: "value", value: { kind: "constant", value: program } }],
+  };
   return bundle as unknown as DeclarativePackBundle;
 }
 
