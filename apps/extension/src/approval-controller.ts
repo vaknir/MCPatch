@@ -254,8 +254,10 @@ export class ApprovalController implements ApprovalSurface {
         approvalId: pending.message.approvalId,
         tool: pending.message.tool,
         origin: pending.message.origin,
+        args: pending.message.args,
         argsHash: pending.message.argsHash,
         expiresAt: pending.message.expiresAt,
+        requester: pending.message.requester,
       };
       try {
         port.postMessage(presentation);

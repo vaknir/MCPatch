@@ -16,7 +16,8 @@ use super::{
 use crate::{
     browser::BrowserConnectionId,
     protocol::{
-        ApprovalDecision, ApprovalRequired, ApprovalResult, JsonObject, Message, PROTOCOL_VERSION,
+        ApprovalDecision, ApprovalRequester, ApprovalRequired, ApprovalResult, JsonObject, Message,
+        PROTOCOL_VERSION,
     },
 };
 
@@ -37,6 +38,7 @@ impl CapabilityRegistry {
         resolved: ResolvedCapability,
         now: OffsetDateTime,
         approval_ttl: Duration,
+        requester: ApprovalRequester,
     ) -> Result<RoutedApproval, RegistryError> {
         let ttl = TimeDuration::try_from(approval_ttl)
             .map_err(|_| RegistryError::new(RegistryErrorCode::InvalidMessage))?;
@@ -59,6 +61,9 @@ impl CapabilityRegistry {
         let expires_at_text = expires_at
             .format(&Rfc3339)
             .map_err(|_| RegistryError::new(RegistryErrorCode::InternalError))?;
+        // The prompt shows the exact arguments the hash binds. They are the
+        // bridge's schema-validated, retained copy — the same values the
+        // extension receives in the tool call once the human approves.
         let message = ApprovalRequired {
             protocol_version: PROTOCOL_VERSION,
             approval_id: approval_id.clone(),
@@ -67,8 +72,10 @@ impl CapabilityRegistry {
             context_revision: resolved.context_revision,
             origin: resolved.origin.clone(),
             tool: invocation.tool.clone(),
+            args: invocation.arguments.clone(),
             args_hash: lower_hex(&args_hash),
             expires_at: expires_at_text,
+            requester,
         };
         Message::ApprovalRequired(message.clone())
             .validate()

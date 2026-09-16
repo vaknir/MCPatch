@@ -7,6 +7,7 @@ mod validate;
 pub use error::{ParseMessageError, ValidationCode, ValidationError};
 pub use negotiation::*;
 pub use types::*;
+pub use validate::valid_display_label;
 
 pub(crate) use strict_json::parse_value as parse_strict_json_value;
 

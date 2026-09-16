@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     browser::BrowserConnectionId,
-    protocol::{Cancel, Message, PROTOCOL_VERSION, ToolCall},
+    protocol::{ApprovalRequester, Cancel, Message, PROTOCOL_VERSION, ToolCall},
 };
 
 impl CapabilityRegistry {
@@ -45,6 +45,7 @@ impl CapabilityRegistry {
         invocation: ToolInvocation,
         now: OffsetDateTime,
         approval_ttl: Duration,
+        requester: ApprovalRequester,
     ) -> Result<CallReservation, RegistryError> {
         self.purge_expired_approvals(now);
         self.validate_reservation(&invocation)?;
@@ -58,7 +59,7 @@ impl CapabilityRegistry {
         self.validate_arguments(&invocation, &resolved)?;
 
         if permission_decision(&resolved.capability) == PermissionDecision::ApprovalRequired {
-            self.reserve_approval(invocation, resolved, now, approval_ttl)
+            self.reserve_approval(invocation, resolved, now, approval_ttl, requester)
                 .map(CallReservation::Approval)
         } else {
             self.reserve_call(invocation, resolved)

@@ -197,6 +197,14 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Readable, attributed approval prompts: `approval_required` now carries the
+  bridge-validated arguments the grant's hash commits to and the requesting MCP
+  client and bridge session, and the trusted approval page renders both as inert
+  text beside the hash. The client name is trimmed and limited to short printable
+  ASCII (else `unknown client`), arguments stay out of every log, and the
+  pre-freeze protocol-v2 addition is recorded in
+  `docs/architecture/protocol-v2-approval-presentation.md`.
+
 ### Changed
 
 - Pack Manifest v1 now requires closed output schemas as well as closed input

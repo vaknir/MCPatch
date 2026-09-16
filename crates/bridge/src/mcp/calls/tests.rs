@@ -7,12 +7,12 @@ use serde_json::{Map, Value, json};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
-use super::{DEFAULT_APPROVAL_TIMEOUT, McpCallRuntime};
+use super::{DEFAULT_APPROVAL_TIMEOUT, McpCallRuntime, UNKNOWN_CLIENT_LABEL, requester_label};
 use crate::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
     protocol::{
-        ApprovalDecision, ApprovalResult, ErrorCode, Message, PROTOCOL_VERSION, Permission, Risk,
-        ToolContent, ToolError, ToolImageContent, ToolResult, parse_message,
+        ApprovalDecision, ApprovalRequester, ApprovalResult, ErrorCode, Message, PROTOCOL_VERSION,
+        Permission, Risk, ToolContent, ToolError, ToolImageContent, ToolResult, parse_message,
     },
     routing::{BrowserToolResponse, SharedCapabilityRegistry, shared_capability_registry},
 };
@@ -234,7 +234,12 @@ async fn rejects_arguments_before_browser_dispatch() {
 
     let error = fixture
         .runtime
-        .execute(request(arguments), CancellationToken::new(), None)
+        .execute(
+            request(arguments),
+            CancellationToken::new(),
+            None,
+            test_requester(),
+        )
         .await
         .unwrap_err();
     assert_eq!(error.code, McpErrorCode::INVALID_PARAMS);
@@ -257,6 +262,7 @@ async fn rejects_missing_and_denied_tools_before_browser_dispatch() {
             request_named("mcpatch.demo.missing", Map::new()),
             CancellationToken::new(),
             None,
+            test_requester(),
         )
         .await
         .unwrap_err();
@@ -270,7 +276,12 @@ async fn rejects_missing_and_denied_tools_before_browser_dispatch() {
     .await;
     let error = denied
         .runtime
-        .execute(request(Map::new()), CancellationToken::new(), None)
+        .execute(
+            request(Map::new()),
+            CancellationToken::new(),
+            None,
+            test_requester(),
+        )
         .await
         .unwrap_err();
     assert_eq!(error.code, McpErrorCode::INVALID_PARAMS);
@@ -286,13 +297,8 @@ async fn elevated_call_dispatches_only_after_the_exact_approval() {
     };
     assert_eq!(approval.tool, "mcpatch.demo.status");
     assert_eq!(approval.origin, "https://demo.mcpatch.invalid");
-    assert!(
-        !serde_json::to_value(&approval)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .contains_key("arguments")
-    );
+    assert_eq!(approval.args, Map::new());
+    assert_eq!(approval.requester, test_requester());
     assert_no_browser_dispatch(&fixture.browser).await;
 
     fixture
@@ -384,7 +390,12 @@ async fn send_failure_consumes_the_pending_request() {
 
     let result = fixture
         .runtime
-        .execute(request(Map::new()), CancellationToken::new(), None)
+        .execute(
+            request(Map::new()),
+            CancellationToken::new(),
+            None,
+            test_requester(),
+        )
         .await
         .unwrap();
     let CallToolResponse::Complete(result) = result else {
@@ -534,6 +545,44 @@ async fn fixture_with_timeouts(
     }
 }
 
+fn test_requester() -> ApprovalRequester {
+    ApprovalRequester {
+        client: "Test Client".to_owned(),
+        session: "session-0001".to_owned(),
+    }
+}
+
+#[test]
+fn requester_label_keeps_short_printable_client_names_and_trims_them() {
+    let label = requester_label(Some("  Claude Code  "), "session-0003");
+    assert_eq!(label.client, "Claude Code");
+    assert_eq!(label.session, "session-0003");
+}
+
+#[test]
+fn requester_label_replaces_missing_or_unprintable_client_names() {
+    assert_eq!(
+        requester_label(None, "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some(""), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some("Claude Code\nApproved by MCPatch"), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some("Cl\u{202e}aude"), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some(&"x".repeat(65)), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+}
+
 fn spawn_call(
     runtime: &McpCallRuntime,
     cancellation: CancellationToken,
@@ -551,7 +600,7 @@ fn spawn_call_with_progress(
     let runtime = runtime.clone();
     tokio::spawn(async move {
         runtime
-            .execute(request(arguments), cancellation, progress)
+            .execute(request(arguments), cancellation, progress, test_requester())
             .await
     })
 }

@@ -3,6 +3,8 @@ mod formats;
 mod messages;
 mod primitives;
 
+pub use messages::valid_display_label;
+
 use super::{Message, ValidationCode, ValidationError};
 
 pub(super) const MAX_CAPABILITIES: usize = 256;

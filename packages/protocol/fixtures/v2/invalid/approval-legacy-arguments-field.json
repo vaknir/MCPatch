@@ -7,9 +7,16 @@
   "contextRevision": 3,
   "origin": "https://jira.example.com",
   "tool": "jira.add_comment",
+  "args": {
+    "issue": "MCP-42"
+  },
   "arguments": {
-    "body": "must-not-cross-the-approval-boundary"
+    "body": "the pre-freeze v1 field name is still unknown"
   },
   "argsHash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
-  "expiresAt": "2026-09-15T12:05:00Z"
+  "expiresAt": "2026-09-15T12:05:00Z",
+  "requester": {
+    "client": "Claude Code",
+    "session": "session-0007"
+  }
 }

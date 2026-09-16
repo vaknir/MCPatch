@@ -53,10 +53,20 @@ rejected, avoiding a cross-language hash that silently loses precision.
 
 ## Approval message
 
-The authenticated extension connection receives only the opaque approval ID,
-request and route identity, tool, canonical argument hash, and expiry. Raw arguments,
-results, credentials, pack objects, browser objects, and exception payloads are not
-approval-message fields and are not logged.
+The authenticated extension connection receives the opaque approval ID, request
+and route identity, tool, the bridge-validated arguments the grant is bound to,
+their canonical hash, expiry, and the requester (the MCP client's self-reported
+name and the bridge-assigned session label). The arguments are the exact
+bridge-retained copy the hash commits to, sent after schema validation and only for
+calls that need a human decision, so the user approves what will run rather than
+an opaque digest. Results, credentials, pack objects, browser objects, and
+exception payloads are not approval-message fields, and the arguments are never
+logged: the bridge's debug output redacts them, and the extension does not record
+them. The requester's client name is untrusted MCP-client input; the bridge trims
+it, keeps only short printable ASCII, and otherwise substitutes `unknown client`
+so nothing in it can imitate a second prompt line. See the
+[protocol v2 approval presentation note](protocol-v2-approval-presentation.md)
+for why this shipped as a pre-freeze addition.
 
 The extension opens its own `chrome-extension://` approval page for a maximum of
 eight concurrent prompts. The service worker binds each page to the exact browser
@@ -64,9 +74,11 @@ tab it created and accepts a decision only from the extension's own ID, exact pa
 URL, top frame, and internal `mcpatch.approval.v1` port. A website frame, content
 script, MCP client, or page opened in another tab cannot answer the prompt.
 
-The page receives only the tool, canonical HTTPS origin, argument hash, expiry, and
-opaque approval ID. It uses closed message shapes and renders values with
-`textContent`; raw arguments, results, request/context identifiers, credentials,
+The page receives only the tool, canonical HTTPS origin, validated arguments,
+argument hash, expiry, requester, and opaque approval ID. It uses closed message
+shapes and renders values with `textContent`; the arguments are pretty-printed as
+JSON into a scrollable block, so markup or instruction-like text inside an
+argument is displayed as data. Results, request/context identifiers, credentials,
 and website text never enter the presentation channel. The user can approve or deny
 once. Tab closure, port disconnect, malformed traffic, UI creation failure, timeout,
 duplicate IDs, overflow, bridge cancellation, and bridge disconnect all fail closed.

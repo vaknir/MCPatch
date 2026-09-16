@@ -120,7 +120,9 @@ impl Drop for CoreLocalBrowserChannel {
 }
 
 enum ConnectionEvent {
-    Adapter(Option<Message>),
+    /// Boxed: protocol messages carry retained approval arguments and dwarf
+    /// the other variants of this short-lived select result.
+    Adapter(Option<Box<Message>>),
     Core(Result<Option<Vec<u8>>, crate::local_ipc::LocalCoreConnectionError>),
     Shutdown,
 }
@@ -141,7 +143,7 @@ async fn run_connection(
                 biased;
                 () = shutdown.cancelled() => ConnectionEvent::Shutdown,
                 payload = &mut receive => ConnectionEvent::Core(payload),
-                message = from_adapter.recv() => ConnectionEvent::Adapter(message),
+                message = from_adapter.recv() => ConnectionEvent::Adapter(message.map(Box::new)),
             };
 
             match event {

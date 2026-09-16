@@ -19,7 +19,7 @@ use crate::{
 
 use super::calls::{
     APPROVAL_TIMEOUT_ENV, APPROVAL_WAIT_MESSAGE, ApprovalProgress, McpCallRuntime,
-    approval_timeout_from,
+    approval_timeout_from, requester_label,
 };
 
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
@@ -30,9 +30,28 @@ const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
 pub struct BridgeMcpServer {
     calls: McpCallRuntime,
     registry: SharedCapabilityRegistry,
+    /// Short bridge-assigned label for this MCP session, shown in approval
+    /// prompts so a user with several clients can tell which one is asking.
+    session: Arc<str>,
 }
 
 impl BridgeMcpServer {
+    /// Derive the handler for one accepted MCP session. Every session shares
+    /// the registry and call runtime; only the display label differs.
+    pub fn for_session(&self, sequence: u64) -> Self {
+        Self {
+            calls: self.calls.clone(),
+            registry: self.registry.clone(),
+            session: Arc::from(format!("session-{sequence:04x}")),
+        }
+    }
+
+    /// The label this handler attaches to approval prompts as the requester
+    /// session.
+    pub fn session_label(&self) -> &str {
+        &self.session
+    }
+
     pub fn new(registry: SharedCapabilityRegistry) -> Self {
         let approval_timeout = match approval_timeout_from(
             std::env::var_os(APPROVAL_TIMEOUT_ENV).as_deref(),
@@ -47,7 +66,11 @@ impl BridgeMcpServer {
             Some(timeout) => McpCallRuntime::with_approval_timeout(registry.clone(), timeout),
             None => McpCallRuntime::new(registry.clone()),
         };
-        Self { calls, registry }
+        Self {
+            calls,
+            registry,
+            session: Arc::from("session-0000"),
+        }
     }
 }
 
@@ -136,7 +159,14 @@ impl ServerHandler for BridgeMcpServer {
                 token,
             }) as Arc<dyn ApprovalProgress>
         });
-        self.calls.execute(request, context.ct, progress).await
+        let client_name = context
+            .peer
+            .peer_info()
+            .map(|info| info.client_info.name.clone());
+        let requester = requester_label(client_name.as_deref(), &self.session);
+        self.calls
+            .execute(request, context.ct, progress, requester)
+            .await
     }
 }
 
@@ -170,6 +200,17 @@ mod tests {
 
     use super::{BridgeMcpServer, project_capability};
     use crate::protocol::{Message, parse_message};
+
+    #[test]
+    fn derives_a_short_hex_session_label_per_accepted_session() {
+        let template = BridgeMcpServer::default();
+        assert_eq!(template.session_label(), "session-0000");
+        assert_eq!(template.for_session(7).session_label(), "session-0007");
+        assert_eq!(
+            template.for_session(0x00ab_cdef).session_label(),
+            "session-abcdef"
+        );
+    }
 
     #[test]
     fn advertises_tools_without_placeholder_tools() {

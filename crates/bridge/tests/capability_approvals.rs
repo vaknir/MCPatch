@@ -3,9 +3,9 @@ use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 use mcpatch_bridge::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
     protocol::{
-        ApprovalDecision, ApprovalResult, Capability, CapabilitySnapshot, CapabilitySource,
-        ContextClosed, ContextClosedReason, JsonObject, Message, PROTOCOL_VERSION, PackReference,
-        Permission, Risk,
+        ApprovalDecision, ApprovalRequester, ApprovalResult, Capability, CapabilitySnapshot,
+        CapabilitySource, ContextClosed, ContextClosedReason, JsonObject, Message,
+        PROTOCOL_VERSION, PackReference, Permission, Risk,
     },
     routing::{
         APPROVAL_DENIAL_COOLDOWN, APPROVAL_DENIALS_BEFORE_COOLDOWN, APPROVAL_PROMPT_BURST,
@@ -20,7 +20,7 @@ use time::OffsetDateTime;
 const ORIGIN: &str = "https://example.com";
 
 #[tokio::test]
-async fn approval_message_is_random_route_bound_and_contains_no_raw_arguments() {
+async fn approval_message_is_random_route_bound_and_carries_validated_arguments() {
     let (mut registry, _id, browser) = action_registry();
     let now = fixed_time();
     let approval = prepare(
@@ -44,12 +44,16 @@ async fn approval_message_is_random_route_bound_and_contains_no_raw_arguments() 
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
     );
-    assert!(
-        !serde_json::to_string(&message)
-            .unwrap()
-            .contains("sensitive-marker")
+    assert_eq!(
+        message.args.get("query").and_then(Value::as_str),
+        Some("sensitive-marker"),
+        "the prompt must show the user exactly what the hash commits to"
     );
-    assert!(!format!("{approval:?}").contains("sensitive-marker"));
+    assert_eq!(message.requester, requester());
+    assert!(
+        !format!("{approval:?}").contains("sensitive-marker"),
+        "retained arguments must stay out of logs"
+    );
 
     let second = prepare(
         &mut registry,
@@ -470,6 +474,7 @@ async fn approval_prompts_are_budgeted_per_site() {
             invocation("request-refused", "demo.action", "burst"),
             now,
             Duration::from_secs(60),
+            requester(),
         )
         .err()
         .expect("the seventh prompt must be refused");
@@ -514,6 +519,7 @@ async fn repeated_denials_put_the_site_in_a_cooldown() {
                 invocation("request-cooldown", "demo.action", "denied"),
                 now,
                 Duration::from_secs(60),
+                requester(),
             )
             .err()
             .expect("a site in cooldown must not prompt")
@@ -586,13 +592,20 @@ fn connection(id: &str) -> (Arc<dyn BrowserConnection>, FakeBrowserPeer) {
     (connection, browser)
 }
 
+fn requester() -> ApprovalRequester {
+    ApprovalRequester {
+        client: "Claude Code".to_owned(),
+        session: "session-0001".to_owned(),
+    }
+}
+
 fn prepare(
     registry: &mut CapabilityRegistry,
     invocation: ToolInvocation,
     now: OffsetDateTime,
 ) -> RoutedApproval {
     match registry
-        .prepare_call(invocation, now, Duration::from_secs(60))
+        .prepare_call(invocation, now, Duration::from_secs(60), requester())
         .unwrap()
     {
         CallReservation::Approval(approval) => approval,

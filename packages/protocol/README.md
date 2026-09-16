@@ -40,8 +40,10 @@ extension's interpreter (`type`, `const`, `enum`, `properties`, `required`,
 `additionalProperties`, `items`, and the numeric and length bounds); any other
 keyword is rejected at its exact path by the JSON Schema and by both runtime
 validators.
-Approval messages contain only a canonical argument hash, never raw arguments or
-results.
+Approval messages carry the bridge-validated arguments a grant is bound to, their
+canonical hash, and the requesting client and session, never results; the
+arguments are the bridge-retained copy the hash commits to, not client input
+forwarded unchecked.
 
 `tool_result.content`, when present, is not opaque. Version 1 permits exactly one
 closed PNG or WebP image block, with dimensions from 1 through 2,048 and no more

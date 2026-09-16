@@ -16,7 +16,7 @@ use serde_json::json;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
-use crate::protocol::ToolContent;
+use crate::protocol::{ApprovalRequester, ToolContent};
 use crate::routing::{
     ApprovalCompletionError, ApprovalGrant, BrowserToolResponse, CallReservation, RegistryError,
     RegistryErrorCode, RoutedCall, RoutedCallCompletionError, SharedCapabilityRegistry,
@@ -35,6 +35,25 @@ const APPROVAL_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 /// notification can never leak what the prompt is about.
 pub(super) const APPROVAL_WAIT_MESSAGE: &str =
     "Waiting for the user to decide in the MCPatch browser prompt.";
+
+/// Shown when a client's declared name is absent, empty, too long, or not
+/// printable ASCII; the label is display-only and never policy.
+pub(super) const UNKNOWN_CLIENT_LABEL: &str = "unknown client";
+
+/// Build the display-only requester label from the client's own `initialize`
+/// name and the bridge-assigned session label. The name is untrusted client
+/// input rendered in the trusted prompt, so anything that is not short
+/// printable ASCII is replaced rather than escaped.
+pub(super) fn requester_label(client_name: Option<&str>, session: &str) -> ApprovalRequester {
+    let client = client_name
+        .map(str::trim)
+        .filter(|name| crate::protocol::valid_display_label(name))
+        .unwrap_or(UNKNOWN_CLIENT_LABEL);
+    ApprovalRequester {
+        client: client.to_owned(),
+        session: session.to_owned(),
+    }
+}
 
 /// Sends bounded progress to the MCP client while a call waits on a human.
 /// Implemented over the rmcp peer in production and by a recorder in tests.
@@ -121,6 +140,7 @@ impl McpCallRuntime {
         request: CallToolRequestParams,
         cancellation: CancellationToken,
         progress: Option<SharedApprovalProgress>,
+        requester: ApprovalRequester,
     ) -> Result<CallToolResponse, McpError> {
         if request.input_responses.is_some() || request.request_state.is_some() {
             return Err(McpError::invalid_params(
@@ -142,6 +162,7 @@ impl McpCallRuntime {
             invocation,
             OffsetDateTime::now_utc(),
             self.approval_timeout,
+            requester,
         ) {
             Ok(reservation) => reservation,
             Err(error) => return map_route_error(error),

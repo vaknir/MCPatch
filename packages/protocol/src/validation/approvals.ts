@@ -1,5 +1,6 @@
 import type { ValidationIssue } from "./error.js";
 import { validateTimestamp } from "./formats.js";
+import { validateJsonObject } from "./json.js";
 import {
   checkClosedObject,
   issue,
@@ -11,6 +12,13 @@ import {
 import { validateTypeAndRoute } from "./routing.js";
 
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
+/**
+ * The requester label is rendered as text in the trusted prompt: short,
+ * printable ASCII with no leading or trailing space, so it can neither hide
+ * a line break nor imitate the prompt's own chrome.
+ */
+const MAX_REQUESTER_CLIENT_CHARS = 64;
+const DISPLAY_LABEL_PATTERN = /^[!-~](?:[ -~]*[!-~])?$/;
 
 export function validateApprovalRequired(
   value: unknown,
@@ -26,8 +34,10 @@ export function validateApprovalRequired(
       "contextRevision",
       "origin",
       "tool",
+      "args",
       "argsHash",
       "expiresAt",
+      "requester",
     ],
     [],
   );
@@ -37,10 +47,37 @@ export function validateApprovalRequired(
     validateTypeAndRoute(message, "approval_required") ??
     validateIdentifier(message.approvalId, "approvalId") ??
     validateToolName(message.tool, "tool") ??
+    validateJsonObject(message.args, "args") ??
     (typeof message.argsHash === "string" && HASH_PATTERN.test(message.argsHash)
       ? undefined
       : issue("INVALID_VALUE", "argsHash")) ??
-    validateTimestamp(message.expiresAt, "expiresAt")
+    validateTimestamp(message.expiresAt, "expiresAt") ??
+    validateRequester(message.requester)
+  );
+}
+
+function validateRequester(value: unknown): ValidationIssue | undefined {
+  const checked = checkClosedObject(
+    value,
+    ["client", "session"],
+    [],
+    "requester",
+  );
+  if (checked.issue !== undefined) return checked.issue;
+  const requester = checked.value as JsonRecord;
+  return (
+    (isDisplayLabel(requester.client)
+      ? undefined
+      : issue("INVALID_VALUE", "requester.client")) ??
+    validateIdentifier(requester.session, "requester.session")
+  );
+}
+
+function isDisplayLabel(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    value.length <= MAX_REQUESTER_CLIENT_CHARS &&
+    DISPLAY_LABEL_PATTERN.test(value)
   );
 }
 

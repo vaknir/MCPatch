@@ -21,7 +21,7 @@ const APPROVAL_ID = "approval.0123456789abcdef0123456789abcdef";
 const BASE_URL = `chrome-extension://${EXTENSION_ID}/approval.html`;
 
 describe("trusted approval controller", () => {
-  it("presents only bridge-bound metadata and resolves an approval once", async () => {
+  it("presents the bridge-bound action, its arguments, and the requester, then resolves once", async () => {
     const state = setup();
     const resolved = vi.fn<(decision: ApprovalDecision) => void>();
 
@@ -36,8 +36,10 @@ describe("trusted approval controller", () => {
         approvalId: APPROVAL_ID,
         tool: "demo.action",
         origin: "https://example.com",
+        args: { query: "flights to Lisbon" },
         argsHash: "a".repeat(64),
         expiresAt: "2026-09-15T00:01:00Z",
+        requester: { client: "Claude Code", session: "session-0001" },
       },
     ]);
     expect(JSON.stringify(port.posted)).not.toContain("request-approval");
@@ -437,8 +439,10 @@ function approvalRequired(
     contextRevision: 1,
     origin: "https://example.com",
     tool: "demo.action",
+    args: { query: "flights to Lisbon" },
     argsHash: "a".repeat(64),
     expiresAt: "2026-09-15T00:01:00Z",
+    requester: { client: "Claude Code", session: "session-0001" },
     ...overrides,
   };
 }

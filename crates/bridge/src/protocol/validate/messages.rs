@@ -3,8 +3,9 @@ use std::collections::HashSet;
 use super::formats::{validate_origin, validate_timestamp};
 use super::{invalid, primitives::*};
 use crate::protocol::{
-    ApprovalRequired, ApprovalResult, Cancel, ConnectionError, ContextClosed, Heartbeat, Hello,
-    HelloAck, ToolCall, ToolContent, ToolError, ToolResult, ValidationCode, ValidationError,
+    ApprovalRequester, ApprovalRequired, ApprovalResult, Cancel, ConnectionError, ContextClosed,
+    Heartbeat, Hello, HelloAck, ToolCall, ToolContent, ToolError, ToolResult, ValidationCode,
+    ValidationError,
 };
 
 const MAX_IMAGE_DIMENSION: u32 = 2_048;
@@ -144,10 +145,34 @@ pub(super) fn validate_approval_required(
     )?;
     validate_identifier(&message.approval_id, "approvalId")?;
     validate_tool_name(&message.tool, "tool")?;
+    validate_object_limit(message.args.len(), "args")?;
     if !valid_lower_hex(&message.args_hash, 64) {
         return Err(invalid(ValidationCode::InvalidValue, "argsHash"));
     }
-    validate_timestamp(&message.expires_at, "expiresAt")
+    validate_timestamp(&message.expires_at, "expiresAt")?;
+    validate_requester(&message.requester)
+}
+
+/// The requester label is rendered as text in the trusted prompt: it must be
+/// short, printable ASCII so it can neither hide a line break nor imitate the
+/// prompt's own chrome.
+pub(super) const MAX_REQUESTER_CLIENT_CHARS: usize = 64;
+
+fn validate_requester(requester: &ApprovalRequester) -> Result<(), ValidationError> {
+    if !valid_display_label(&requester.client) {
+        return Err(invalid(ValidationCode::InvalidValue, "requester.client"));
+    }
+    validate_identifier(&requester.session, "requester.session")
+}
+
+pub fn valid_display_label(value: &str) -> bool {
+    let length = value.chars().count();
+    (1..=MAX_REQUESTER_CLIENT_CHARS).contains(&length)
+        && !value.starts_with(' ')
+        && !value.ends_with(' ')
+        && value
+            .bytes()
+            .all(|byte| byte == b' ' || byte.is_ascii_graphic())
 }
 
 pub(super) fn validate_approval_result(message: &ApprovalResult) -> Result<(), ValidationError> {

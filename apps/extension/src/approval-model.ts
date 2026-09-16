@@ -1,4 +1,9 @@
-import type { ApprovalDecision, ApprovalRequired } from "@mcpatch/protocol";
+import type {
+  ApprovalDecision,
+  ApprovalRequester,
+  ApprovalRequired,
+  JsonObject,
+} from "@mcpatch/protocol";
 
 import type { ChromeEvent } from "./lifecycle.js";
 
@@ -76,11 +81,20 @@ export interface ApprovalWithdrawn {
   readonly approvalId: string;
 }
 
+/**
+ * Everything the trusted page renders. `args` are the bridge-validated,
+ * bridge-retained arguments the hash commits to, so the user approves what
+ * will run rather than an opaque digest; `requester` names the MCP client and
+ * bridge session that asked, so a user running several agents can tell which
+ * one is asking.
+ */
 export interface ApprovalPresentation {
   readonly type: "approval_present";
   readonly approvalId: string;
   readonly tool: string;
   readonly origin: string;
+  readonly args: JsonObject;
   readonly argsHash: string;
   readonly expiresAt: string;
+  readonly requester: ApprovalRequester;
 }
