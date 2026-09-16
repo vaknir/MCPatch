@@ -212,6 +212,14 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Every native WebMCP call now requires an argument-bound one-time approval.
+  A page declares its own tool's risk and permissions, so an allow resting on
+  them was an allow decided by untrusted input: a site whose tool genuinely
+  wrote executed with no human decision because MCPatch had relabelled it a
+  read. The bridge now turns such an allow into an approval, leaves genuine
+  denials denied, and emits no read-only, destructive or idempotent hint for a
+  native tool, so MCPatch no longer vouches to an MCP client for behaviour it
+  has not reviewed. Recorded in ADR 0016.
 - A per-document capability snapshot gate in the extension: publications
   coalesce to at most one per 250 ms, with the first request in an idle window
   running immediately and a flood of any size collapsing into one trailing

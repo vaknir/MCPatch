@@ -13,7 +13,7 @@ use rmcp::{
 
 use crate::{
     PRODUCT_VERSION,
-    protocol::{Capability, Risk},
+    protocol::{Capability, CapabilitySource, Risk},
     routing::{SharedCapabilityRegistry, shared_capability_registry},
 };
 
@@ -171,24 +171,38 @@ impl ServerHandler for BridgeMcpServer {
 }
 
 fn project_capability(capability: Capability) -> Tool {
-    let read_only = capability.risk == Risk::Read;
-    let annotations = if read_only {
-        ToolAnnotations::new()
-            .read_only(true)
-            .destructive(false)
-            .idempotent(true)
-    } else {
-        ToolAnnotations::new().read_only(false)
-    };
     let mut tool = Tool::new(
         capability.name,
         capability.description,
         Arc::new(capability.input_schema),
-    )
-    .with_annotations(annotations);
+    );
+    if let Some(annotations) = tool_annotations(&capability.source, capability.risk) {
+        tool = tool.with_annotations(annotations);
+    }
     tool.title = capability.title;
     tool.output_schema = capability.output_schema.map(Arc::new);
     tool
+}
+
+/// Behavioural hints MCPatch is willing to vouch for.
+///
+/// A reviewed pack's risk was fixed by review, so its hints are ours to state.
+/// A native WebMCP tool's risk is whatever the page said, so MCPatch emits no
+/// hints at all rather than telling a client that page-controlled code is
+/// read-only, non-destructive and safe to retry; a client that auto-approves
+/// on `readOnlyHint` would otherwise run it unattended.
+fn tool_annotations(source: &CapabilitySource, risk: Risk) -> Option<ToolAnnotations> {
+    match source {
+        CapabilitySource::NativeWebMcp => None,
+        CapabilitySource::Pack => Some(if risk == Risk::Read {
+            ToolAnnotations::new()
+                .read_only(true)
+                .destructive(false)
+                .idempotent(true)
+        } else {
+            ToolAnnotations::new().read_only(false)
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -198,8 +212,25 @@ mod tests {
         model::{ProtocolVersion, ToolAnnotations},
     };
 
-    use super::{BridgeMcpServer, project_capability};
-    use crate::protocol::{Message, parse_message};
+    use super::{BridgeMcpServer, project_capability, tool_annotations};
+    use crate::protocol::{CapabilitySource, Message, Risk, parse_message};
+
+    #[test]
+    fn vouches_for_reviewed_pack_hints_and_never_for_native_ones() {
+        let read = tool_annotations(&CapabilitySource::Pack, Risk::Read)
+            .expect("a reviewed read carries hints");
+        assert_eq!(read.read_only_hint, Some(true));
+        assert_eq!(read.destructive_hint, Some(false));
+        assert_eq!(read.idempotent_hint, Some(true));
+
+        let action = tool_annotations(&CapabilitySource::Pack, Risk::Action)
+            .expect("a reviewed action carries hints");
+        assert_eq!(action.read_only_hint, Some(false));
+
+        // The page decides a native tool's risk, so MCPatch states nothing.
+        assert!(tool_annotations(&CapabilitySource::NativeWebMcp, Risk::Read).is_none());
+        assert!(tool_annotations(&CapabilitySource::NativeWebMcp, Risk::Action).is_none());
+    }
 
     #[test]
     fn derives_a_short_hex_session_label_per_accepted_session() {

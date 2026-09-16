@@ -244,6 +244,9 @@ the user or reviewer.
 
 Mitigations:
 
+- require an argument-bound approval for every native WebMCP call, whose risk and
+  permissions are page-declared, and emit no behavioural hints for it
+  ([ADR 0016](docs/adr/0016-native-webmcp-approval.md));
 - derive policy from locally validated manifest fields and operation semantics, not
   descriptions, annotations, or page text;
 - show exact origins/paths, schemas, risk, permissions, network policy, publisher

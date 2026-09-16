@@ -7,7 +7,8 @@ use mcpatch_bridge::{
     },
     protocol::{
         Capability, CapabilitySnapshot, CapabilitySource, ContextClosed, ContextClosedReason,
-        JsonObject, Message, PROTOCOL_VERSION, Permission, Risk, ToolError, ToolResult,
+        JsonObject, Message, PROTOCOL_VERSION, PackReference, Permission, Risk, ToolError,
+        ToolResult,
     },
     routing::{
         BrowserToolResponse, CapabilityRegistry, RegistryErrorCode, RoutedCallCompletionError,
@@ -717,8 +718,13 @@ fn capability(name: &str, risk: Risk, permissions: Vec<Permission>) -> Capabilit
         title: None,
         description: format!("Test capability {name}"),
         origin: "https://example.com".to_owned(),
-        source: CapabilitySource::NativeWebMcp,
-        pack: None,
+        source: CapabilitySource::Pack,
+        pack: Some(PackReference {
+            publisher: "mcpatch".to_owned(),
+            id: "test-pack".to_owned(),
+            version: "0.1.0".to_owned(),
+            digest: format!("sha256:{}", "a".repeat(64)),
+        }),
         risk,
         permissions,
         input_schema: object(json!({
@@ -729,7 +735,7 @@ fn capability(name: &str, risk: Risk, permissions: Vec<Permission>) -> Capabilit
                 "query": {"type": "string", "minLength": 1, "maxLength": 64}
             }
         })),
-        output_schema: None,
+        output_schema: Some(object(json!({"type": "object"}))),
     }
 }
 

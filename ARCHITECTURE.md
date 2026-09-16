@@ -128,6 +128,12 @@ For the active context, the extension resolves capabilities in this order:
    packs—compiled and declarative—whose origin matches exactly.
 3. No capability.
 
+A native WebMCP tool's risk and permissions are declared by the page, so the
+bridge never allows one without a human decision: every native call takes an
+argument-bound one-time approval, and MCPatch emits no read-only, destructive
+or idempotent hint for it, because it has reviewed nothing. See
+[ADR 0016](docs/adr/0016-native-webmcp-approval.md).
+
 A later automation fallback would be a separate, high-risk subsystem with explicit
 permission and approval semantics. It is not part of protocol version 2.
 
