@@ -1,0 +1,63 @@
+{
+  "bundleVersion": 1,
+  "manifest": {
+    "manifestVersion": 1,
+    "publisher": "example",
+    "id": "read-page",
+    "name": "Declarative read example",
+    "description": "Manifest-only example for the reviewed declarative execution tier.",
+    "version": "1.2.3",
+    "digest": "sha256:33ce0def13e51e497508781e065b85c0dacea817c3209cd1426a747807f0ffe1",
+    "compatibility": {
+      "runtime": { "minimum": "0.1.0", "maximumExclusive": "1.0.0" },
+      "bridgeProtocol": { "minimum": 1, "maximum": 1 }
+    },
+    "execution": { "kind": "declarative", "operationsVersion": 1 },
+    "matches": [
+      {
+        "origin": "https://example.com",
+        "paths": [{ "kind": "prefix", "path": "/items/" }]
+      }
+    ],
+    "networkPolicy": { "extensionRequests": "none" },
+    "tools": [
+      {
+        "name": "example.items.current",
+        "description": "Return the current visible item.",
+        "risk": "read",
+        "permissions": ["READ"],
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        },
+        "outputSchema": { "type": "object" }
+      }
+    ],
+    "fixtures": [
+      {
+        "id": "current-item",
+        "tool": "example.items.current",
+        "input": {},
+        "expect": { "kind": "result", "result": { "id": "fixture-item" } }
+      }
+    ]
+  },
+  "operations": {
+    "operationsVersion": 1,
+    "program": { "kind": "reserved-for-operations-v1" }
+  },
+  "metadata": {
+    "license": "MIT",
+    "homepage": "https://example.test/declarative-read",
+    "sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "publisherSignature": {
+    "signatureVersion": 1,
+    "algorithm": "Ed25519",
+    "publisher": "example",
+    "keyId": "ed25519:example:sha256:21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+    "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+    "signature": "useFlum3Es_G5ViBT7nc-iZkjRzcdQztAfZ6KPcOW4tZJI3-cY0hYhNa2xGpxc5BexFu868T5OyvrmQKGjehCA"
+  }
+}

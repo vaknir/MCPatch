@@ -14,15 +14,34 @@ export function validateJsonBounds(
 ): PackManifestValidationIssue | undefined {
   let nodes = 0;
   let bytes = 0;
-  const stack: Array<{ depth: number; field: string; value: unknown }> = [
-    { depth: 0, field: "$", value },
-  ];
+  const active = new WeakSet<object>();
+  const stack: Array<{
+    depth: number;
+    field: string;
+    value: unknown;
+    exit?: boolean;
+  }> = [{ depth: 0, field: "$", value }];
   while (stack.length > 0) {
     const current = stack.pop();
     if (current === undefined) break;
+    if (current.exit) {
+      active.delete(current.value as object);
+      continue;
+    }
     nodes += 1;
     if (nodes > MAX_JSON_NODES || current.depth > MAX_JSON_DEPTH) {
       return issue("LIMIT_EXCEEDED", current.field);
+    }
+    if (typeof current.value === "object" && current.value !== null) {
+      if (active.has(current.value))
+        return issue("INVALID_VALUE", current.field);
+      active.add(current.value);
+      stack.push({
+        depth: current.depth,
+        field: current.field,
+        value: current.value,
+        exit: true,
+      });
     }
     if (typeof current.value === "string") {
       bytes += new TextEncoder().encode(current.value).length;
