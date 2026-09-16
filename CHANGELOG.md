@@ -197,6 +197,17 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Isolated-realm lockdown for compiled packs
+  (`apps/extension/src/realm-lockdown.ts`), installed before any pack code runs:
+  the content-script realm's `fetch` is replaced with an MCPatch-owned wrapper
+  that requires `https:`, allows only the pack's declared request origins, strips
+  `Authorization`/`Cookie` headers, and bounds body size; `XMLHttpRequest`,
+  `WebSocket`, `EventSource`, and `navigator.sendBeacon` are removed; and
+  `document.cookie` throws. Every replacement is frozen and non-configurable, and
+  a lockdown failure publishes no capability snapshot. This turns the
+  declared-origin network bound and the no-cookie bound from review into
+  mechanism for every compiled pack, with no policy change; documented in
+  `docs/architecture/realm-lockdown.md`.
 - Per-tier pack-boundary enforcement-status tables in THREAT_MODEL.md,
   ARCHITECTURE.md, and pack-manifest-v1.md, stating for each compiled-pack claim
   whether it is enforced by mechanism or by review today, with the declarative

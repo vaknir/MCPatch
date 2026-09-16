@@ -12,6 +12,7 @@ import {
 
 import {
   FIXTURE_ORIGIN,
+  FIXTURE_PROBE_TOOL,
   FIXTURE_STATE_TOOL,
   FIXTURE_WAIT_TOOL,
   OTHER_ORIGIN,
@@ -115,8 +116,22 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       demoTool,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     expect(await callState(client)).toEqual({ revision: 1, value: "initial" });
+
+    // The realm lockdown installed before pack code ran must refuse every
+    // network primitive from inside a pack handler, while the credential-free
+    // DOM read above still works.
+    expect(
+      structuredContent(await client.callTool(FIXTURE_PROBE_TOOL).response),
+    ).toEqual({
+      fetchUndeclaredBlocked: true,
+      fetchHttpBlocked: true,
+      xhrBlocked: true,
+      sendBeaconBlocked: true,
+      cookieBlocked: true,
+    });
 
     await page.locator("#fixture-update").click();
     await expect
@@ -138,6 +153,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       demoTool,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
 
     await page.reload();
@@ -145,6 +161,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       demoTool,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     expect(await callState(client)).toEqual({ revision: 1, value: "initial" });
 
@@ -159,6 +176,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       demoTool,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     await page.goto(`${OTHER_ORIGIN}/replacement`);
     await expectTools(client, [demoTool]);
@@ -168,6 +186,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       demoTool,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     await disableFixture(control);
     await expectTools(client, [demoTool]);

@@ -40,6 +40,8 @@ directly against adversarial `getTools()` output and message shapes.
 | A native tool named identically to a pack tool is dropped rather than colliding                                                                      | existing `native WebMCP adapter > omits every ambiguous native name without falling back to either handle` and `page-backed compiled-pack routing > keeps native WebMCP precedence over a colliding page-pack route` |
 | The trusted approval page is unreachable from web content (no `web_accessible_resources`, no `externally_connectable`)                               | `extension manifest > keeps the approval page unreachable from web content`                                                                                                                                          |
 
+| The isolated realm lockdown blocks `fetch` to an undeclared origin, `http`, `XMLHttpRequest`, `WebSocket`, `EventSource`, `navigator.sendBeacon`, and `document.cookie` while preserving declared-origin requests | `realm lockdown` (11 tests in `tests/realm-lockdown.test.ts`); the Chromium fixture `fixture.realm_probe` proves it on a real page |
+
 The Chromium end-to-end fixture (`apps/extension/e2e/`, run with
 `pnpm test:browser`) additionally proves these boundaries against a real page,
 Native Messaging host, and bridge core; see

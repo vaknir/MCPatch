@@ -71,6 +71,18 @@ patterns together with the matched page origin during the user's enable gesture;
 missing or removed authority disables the whole pack. See
 [ADR 0009](../adr/0009-reviewed-read-network-authority.md).
 
+`networkPolicy.extensionRequests` is enforced at runtime by the isolated-world
+realm lockdown (`apps/extension/src/realm-lockdown.ts`), installed before any
+pack code runs. The lockdown replaces the content-script realm's `fetch` with a
+wrapper that requires `https:` and allows only the declared request origins
+(same-origin to the page only when the page origin is declared), strips
+`Authorization` and `Cookie` headers, and bounds body size; it removes
+`XMLHttpRequest`, `WebSocket`, `EventSource`, and `navigator.sendBeacon`, and
+makes `document.cookie` throw. So a pack under `extensionRequests: "none"` has no
+reachable network primitive, and no pack can reach an undeclared origin or read
+cookies, by mechanism rather than review. A lockdown failure publishes no
+capability snapshot for the document.
+
 ## Pack-boundary enforcement status
 
 Several boundaries below are honoured by **review** rather than by a runtime

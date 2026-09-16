@@ -146,7 +146,9 @@ page data, or excessive content through tool output, errors, or logs.
 
 Mitigations:
 
-- no cookie or credential APIs in the pack context;
+- no cookie or credential APIs in the pack context; the isolated-world realm
+  lockdown removes the network primitives and makes `document.cookie` throw for
+  compiled packs ([realm lockdown](docs/architecture/realm-lockdown.md), #187);
 - expose task-specific DOM adapters instead of a document handle where practical;
 - require output schemas and byte limits;
 - use allowlisted structured log fields with opaque identifiers;
@@ -347,17 +349,17 @@ are reviewing. Each enforcement PR flips its row and links its issue; moving a r
 from review to mechanism is a trust-boundary change and needs an ADR
 (CONTRIBUTING.md, "Before implementation" step 2).
 
-| Claim (compiled pack tier)                                 | Enforced by today                                                             |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| No cookies or tokens in results                            | review + closed output schema (#176)                                          |
-| Network only to declared origins                           | host permissions + review; no runtime realm bound yet (#187)                  |
-| No network under `networkPolicy.extensionRequests: "none"` | review; no runtime realm bound yet (#187)                                     |
-| No navigation from `READ` tools                            | review (#188)                                                                 |
-| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                          |
-| Origin binding                                             | mechanism                                                                     |
-| Path binding                                               | extension JavaScript after injection (#180)                                   |
-| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185) |
-| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)            |
+| Claim (compiled pack tier)                                 | Enforced by today                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
+| No navigation from `READ` tools                            | review (#188)                                                                            |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
+| Origin binding                                             | mechanism                                                                                |
+| Path binding                                               | extension JavaScript after injection (#180)                                              |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
 
 The **declarative community tier** is not yet shippable. Its stronger invariants —
 no dynamic selectors, code, navigation, mutation, cookies, storage, or network

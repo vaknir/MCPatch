@@ -173,13 +173,13 @@ invalidates the affected registrations and pending calls.
 
 ## Trust boundaries
 
-| Boundary            | Untrusted input                              | Required controls                                                                        |
-| ------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| MCP client → bridge | method, tool name, arguments, cancellation   | framing limits, protocol validation, schema validation, permission policy                |
-| Extension → bridge  | identity claims, contexts, schemas, results  | native-host allowlist, negotiation, message validation, origin binding, size limits      |
-| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text              |
-| Pack → extension    | code, manifest, schemas, network intent      | installed immutable bundle, signature/trust policy, manifest validation, least privilege |
-| Registry → runtime  | metadata, updates, compatibility claims      | signatures, transparency, explicit install/enable, no runtime code loading               |
+| Boundary            | Untrusted input                              | Required controls                                                                                                 |
+| ------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| MCP client → bridge | method, tool name, arguments, cancellation   | framing limits, protocol validation, schema validation, permission policy                                         |
+| Extension → bridge  | identity claims, contexts, schemas, results  | native-host allowlist, negotiation, message validation, origin binding, size limits                               |
+| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text                                       |
+| Pack → extension    | code, manifest, schemas, network intent      | installed immutable bundle, signature/trust policy, manifest validation, least privilege, isolated-realm lockdown |
+| Registry → runtime  | metadata, updates, compatibility claims      | signatures, transparency, explicit install/enable, no runtime code loading                                        |
 
 ### Pack-boundary enforcement status
 
@@ -191,17 +191,17 @@ are reviewing. Each enforcement PR flips its row and links its issue; moving a r
 from review to mechanism is a trust-boundary change and needs an ADR
 (CONTRIBUTING.md, "Before implementation" step 2).
 
-| Claim (compiled pack tier)                                 | Enforced by today                                                             |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| No cookies or tokens in results                            | review + closed output schema (#176)                                          |
-| Network only to declared origins                           | host permissions + review; no runtime realm bound yet (#187)                  |
-| No network under `networkPolicy.extensionRequests: "none"` | review; no runtime realm bound yet (#187)                                     |
-| No navigation from `READ` tools                            | review (#188)                                                                 |
-| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                          |
-| Origin binding                                             | mechanism                                                                     |
-| Path binding                                               | extension JavaScript after injection (#180)                                   |
-| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185) |
-| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)            |
+| Claim (compiled pack tier)                                 | Enforced by today                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
+| No navigation from `READ` tools                            | review (#188)                                                                            |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
+| Origin binding                                             | mechanism                                                                                |
+| Path binding                                               | extension JavaScript after injection (#180)                                              |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
 
 The **declarative community tier** is not yet shippable. Its stronger invariants —
 no dynamic selectors, code, navigation, mutation, cookies, storage, or network

@@ -36,7 +36,10 @@ The scenario proves:
 - same-origin document reload and fresh context revision;
 - malformed page-channel input without loss of the bridge session;
 - cross-origin navigation revocation; and
-- disable-time script and capability revocation.
+- disable-time script and capability revocation; and
+- realm lockdown blocking every network primitive and `document.cookie` from a
+  pack handler on a real page, via the `fixture.realm_probe` tool, while the
+  credential-free DOM read still succeeds.
 
 All HTTP(S) requests outside two synthetic `.test` origins are aborted. Chromium is
 also launched with a deny-all DNS resolver rule; allowed fixture responses are
