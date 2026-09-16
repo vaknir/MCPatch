@@ -8,7 +8,7 @@ export {
   type NegotiationPhase,
 } from "./negotiation.js";
 export type * from "./types/index.js";
-export { PROTOCOL_VERSION } from "./types/index.js";
+export { NATIVE_TOOL_NAMESPACE, PROTOCOL_VERSION } from "./types/index.js";
 export {
   ProtocolValidationError,
   type ValidationCode,

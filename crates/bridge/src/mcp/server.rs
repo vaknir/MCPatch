@@ -21,6 +21,7 @@ use super::calls::{
     APPROVAL_TIMEOUT_ENV, APPROVAL_WAIT_MESSAGE, ApprovalProgress, McpCallRuntime,
     approval_timeout_from, requester_label,
 };
+use super::native_tools::native_description;
 
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
     &[ProtocolVersion::V_2025_11_25, ProtocolVersion::V_2026_07_28];
@@ -171,15 +172,25 @@ impl ServerHandler for BridgeMcpServer {
 }
 
 fn project_capability(capability: Capability) -> Tool {
+    let native = capability.source == CapabilitySource::NativeWebMcp;
+    // A native tool's description and title are page-authored, so the bridge
+    // publishes its own attributed text rather than forwarding either. This
+    // holds here, at the boundary to the MCP client, so the invariant does not
+    // depend on the extension having sanitised anything.
+    let description = if native {
+        native_description(&capability.origin, &capability.description)
+    } else {
+        capability.description
+    };
     let mut tool = Tool::new(
         capability.name,
-        capability.description,
+        description,
         Arc::new(capability.input_schema),
     );
     if let Some(annotations) = tool_annotations(&capability.source, capability.risk) {
         tool = tool.with_annotations(annotations);
     }
-    tool.title = capability.title;
+    tool.title = if native { None } else { capability.title };
     tool.output_schema = capability.output_schema.map(Arc::new);
     tool
 }

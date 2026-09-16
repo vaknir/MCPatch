@@ -212,6 +212,16 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Native WebMCP tool metadata is now isolated from the agent's context. A
+  page-declared tool is published under the reserved `native` namespace,
+  qualified by its origin, so it can no longer be listed under a reviewed
+  pack's name; the bridge rejects a native capability outside that namespace
+  and a pack capability inside it, and the JSON Schema carries the same rule.
+  The bridge publishes its own attributed description naming the origin and
+  stating that MCPatch has not reviewed the tool, quoting the page's text as
+  bounded, control-character-free data, and drops the page-authored title.
+  A page can therefore no longer hide a reviewed pack tool by claiming its
+  name: the two are listed side by side.
 - Every native WebMCP call now requires an argument-bound one-time approval.
   A page declares its own tool's risk and permissions, so an allow resting on
   them was an allow decided by untrusted input: a site whose tool genuinely

@@ -37,6 +37,10 @@ import {
   sitePack,
 } from "./support/site-pack.js";
 
+/** What the bridge sees: a page-declared tool is published under the reserved
+ * native namespace, qualified by the origin that declared it. */
+const PUBLISHED_SITE_TOOL = `native.example_com.${SITE_TOOL}`;
+
 describe("native session supervisor", () => {
   it("registers lifecycle listeners and opens only the fixed native host", () => {
     const runtime = new FakeRuntime();
@@ -430,14 +434,14 @@ describe("native session supervisor", () => {
       contextId: "page.9",
       contextRevision: 1,
       origin: SITE_ORIGIN,
-      capabilities: [{ name: SITE_TOOL, source: "native_webmcp" }],
+      capabilities: [{ name: PUBLISHED_SITE_TOOL, source: "native_webmcp" }],
     });
 
     bridge.emitMessage(
       toolCall({
         contextId: "page.9",
         origin: SITE_ORIGIN,
-        tool: SITE_TOOL,
+        tool: PUBLISHED_SITE_TOOL,
       }),
     );
     await new Promise((resolve) => setTimeout(resolve, 0));

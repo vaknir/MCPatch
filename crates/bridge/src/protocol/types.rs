@@ -78,6 +78,11 @@ pub struct Capability {
     pub output_schema: Option<JsonObject>,
 }
 
+/// First name segment reserved for tools a page declares through native
+/// WebMCP. Reserving it keeps page-authored names out of the space reviewed
+/// packs publish in, so neither can impersonate the other.
+pub const NATIVE_TOOL_NAMESPACE: &str = "native";
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum CapabilitySource {
     #[serde(rename = "native_webmcp")]
