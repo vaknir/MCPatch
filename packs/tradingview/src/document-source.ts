@@ -3,6 +3,8 @@ import {
   TradingViewPackError,
   type TradingViewChangeSymbolInput,
   type TradingViewChartSemantics,
+  type TradingViewCreatePriceAlertInput,
+  type TradingViewCurrentChartResult,
   type TradingViewSemanticSnapshot,
   type TradingViewWatchlistRowSemantics,
 } from "./model.js";
@@ -17,6 +19,7 @@ import {
   addTradingViewWatchlistSymbol,
   removeTradingViewWatchlistSymbol,
 } from "./watchlist.js";
+import { createTradingViewPriceAlert } from "./alert.js";
 
 const MAX_CHARTS = 4;
 const MAX_CHART_DIVS = 4_096;
@@ -116,6 +119,19 @@ class TradingViewDocumentSource implements TradingViewSnapshotSource {
 
   removeFromWatchlist(input: unknown, signal: AbortSignal) {
     return removeTradingViewWatchlistSymbol(this.#fetchRequest, input, signal);
+  }
+
+  createPriceAlert(
+    chart: TradingViewCurrentChartResult,
+    input: TradingViewCreatePriceAlertInput,
+    signal: AbortSignal,
+  ) {
+    return createTradingViewPriceAlert(
+      this.#fetchRequest,
+      chart,
+      input,
+      signal,
+    );
   }
 
   subscribe(listener: () => void): () => void {

@@ -44,7 +44,7 @@ export interface PackMatch {
 
 export interface PackNetworkRequestPolicy {
   readonly origins: readonly string[];
-  readonly methods: readonly ["GET"];
+  readonly methods: readonly ("GET" | "POST")[];
 }
 
 export interface PackNetworkPolicy {

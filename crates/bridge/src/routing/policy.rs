@@ -22,15 +22,18 @@ pub fn permission_decision(capability: &Capability) -> PermissionDecision {
 
     let permissions: HashSet<_> = capability.permissions.iter().copied().collect();
     if permissions.contains(&Permission::ExternalNetwork) {
-        return if capability.source == CapabilitySource::Pack
-            && capability.pack.is_some()
-            && capability.risk == Risk::Read
-            && permissions.len() == 2
-            && permissions.contains(&Permission::Read)
+        if capability.source != CapabilitySource::Pack
+            || capability.pack.is_none()
+            || permissions.len() != 2
         {
-            PermissionDecision::Allow
-        } else {
-            PermissionDecision::Deny
+            return PermissionDecision::Deny;
+        }
+        return match capability.risk {
+            Risk::Read if permissions.contains(&Permission::Read) => PermissionDecision::Allow,
+            Risk::Action if permissions.contains(&Permission::Action) => {
+                PermissionDecision::ApprovalRequired
+            }
+            _ => PermissionDecision::Deny,
         };
     }
 
@@ -73,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn only_reviewed_pack_reads_may_use_declared_external_network_authority() {
+    fn only_reviewed_pack_reads_and_approved_actions_may_use_network_authority() {
         let mut reviewed = capability(vec![Permission::Read, Permission::ExternalNetwork]);
         reviewed.source = CapabilitySource::Pack;
         reviewed.pack = Some(crate::protocol::PackReference {
@@ -90,6 +93,13 @@ mod tests {
         assert_eq!(permission_decision(&native), PermissionDecision::Deny);
 
         reviewed.risk = Risk::Action;
+        reviewed.permissions = vec![Permission::Action, Permission::ExternalNetwork];
+        assert_eq!(
+            permission_decision(&reviewed),
+            PermissionDecision::ApprovalRequired
+        );
+
+        reviewed.permissions.push(Permission::Read);
         assert_eq!(permission_decision(&reviewed), PermissionDecision::Deny);
     }
 

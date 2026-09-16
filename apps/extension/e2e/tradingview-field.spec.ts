@@ -29,6 +29,7 @@ const demoTool = "mcpatch.demo.status";
 const currentChartTool = "tradingview.current_chart";
 const currentWatchlistTool = "tradingview.current_watchlist";
 const captureChartTool = "tradingview.capture_chart";
+const createPriceAlertTool = "tradingview.create_price_alert";
 const addToWatchlistTool = "tradingview.add_to_watchlist";
 const changeSymbolTool = "tradingview.change_symbol";
 const removeFromWatchlistTool = "tradingview.remove_from_watchlist";
@@ -37,6 +38,7 @@ const fingerprint = "tradingview-chart-semantic-en-v1";
 const tradingViewTools = [
   addToWatchlistTool,
   captureChartTool,
+  createPriceAlertTool,
   changeSymbolTool,
   currentChartTool,
   currentWatchlistTool,
@@ -94,7 +96,7 @@ test("invokes TradingView reads and an approved action through MCP in a disposab
 
     fieldInstruction(
       "ENABLE_REQUIRED",
-      "Click the MCPatch toolbar action for this tab and approve the exact www.tradingview.com and symbol-search.tradingview.com permissions.",
+      "Click the MCPatch toolbar action for this tab and approve the exact www.tradingview.com, symbol-search.tradingview.com, and pricealerts.tradingview.com permissions.",
     );
     await waitFor(
       () => registeredContentScriptCount(worker),

@@ -56,13 +56,17 @@ fragments, control characters, or normalizable dot segments. Prefix paths end in
 [Pack matching and capability resolution](pack-resolution.md).
 
 `networkPolicy.extensionRequests` is required. It is either `none` or a closed,
-bounded authority containing one to eight exact HTTPS origins and the sole method
-`GET`. A non-`none` policy is valid only when at least one tool declares
-`EXTERNAL_NETWORK`, and that permission is invalid without a declared policy.
+bounded authority containing one to eight exact HTTPS origins and a canonical
+non-empty subset of `GET` and `POST`. `GET` requires a `READ + EXTERNAL_NETWORK`
+tool; `POST` requires an `ACTION + EXTERNAL_NETWORK` tool, and the inverse pairings
+are also enforced. Other risks and methods remain invalid.
 
 The policy grants no generic request primitive. A reviewed bundled pack must still
-compile one fixed operation that constructs its own URL, sends no credentials, and
-projects a bounded typed response. The extension requests all declared exact host
+compile one fixed operation that constructs its own URL and projects a bounded
+typed response. Read operations omit credentials. An authenticated action may use
+the browser session only under the stricter reviewed, approved, fixed-request
+contract in [ADR 0012](../adr/0012-reviewed-external-session-actions.md). The
+extension requests all declared exact host
 patterns together with the matched page origin during the user's enable gesture;
 missing or removed authority disables the whole pack. See
 [ADR 0009](../adr/0009-reviewed-read-network-authority.md).

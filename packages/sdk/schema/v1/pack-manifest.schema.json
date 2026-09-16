@@ -93,10 +93,10 @@
                 },
                 "methods": {
                   "type": "array",
-                  "prefixItems": [{ "const": "GET" }],
-                  "items": false,
+                  "items": { "enum": ["GET", "POST"] },
+                  "uniqueItems": true,
                   "minItems": 1,
-                  "maxItems": 1
+                  "maxItems": 2
                 }
               }
             }

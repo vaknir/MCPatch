@@ -8,12 +8,15 @@ import {
   TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_CAPTURE_CHART,
+  TRADINGVIEW_CREATE_PRICE_ALERT,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TradingViewPackError,
   type TradingViewChangeSymbolInput,
   type TradingViewChangeSymbolResult,
   type TradingViewCaptureChartResult,
+  type TradingViewCreatePriceAlertInput,
+  type TradingViewCreatePriceAlertResult,
   type TradingViewCurrentChartResult,
   type TradingViewCurrentWatchlistResult,
   type TradingViewSemanticSnapshot,
@@ -51,6 +54,11 @@ export interface TradingViewSnapshotSource {
     input: TradingViewWatchlistMutationInput,
     signal: AbortSignal,
   ): Promise<TradingViewWatchlistMutationResult>;
+  createPriceAlert?(
+    chart: TradingViewCurrentChartResult,
+    input: TradingViewCreatePriceAlertInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewCreatePriceAlertResult>;
   subscribe?(listener: () => void): () => void;
 }
 
@@ -79,6 +87,10 @@ export interface TradingViewSite {
     input: TradingViewWatchlistMutationInput,
     signal: AbortSignal,
   ): Promise<TradingViewWatchlistMutationResult>;
+  createPriceAlert(
+    input: TradingViewCreatePriceAlertInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewCreatePriceAlertResult>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -94,6 +106,7 @@ class ReviewedTradingViewSite implements TradingViewSite {
   #candidateSignature: string | undefined;
   #capabilitySignature: string | undefined;
   #navigationState: "accepted" | "failed" | "idle" | "running" = "idle";
+  #alertState: "finished" | "idle" | "running" = "idle";
 
   constructor(source: TradingViewSnapshotSource) {
     if (typeof source?.read !== "function") {
@@ -111,7 +124,11 @@ class ReviewedTradingViewSite implements TradingViewSite {
       this.#source.changeSymbol !== undefined &&
         this.#navigationState === "idle",
     );
-    const availableTools = appendOptionalTools(tools, this.#source);
+    const availableTools = appendOptionalTools(
+      tools,
+      this.#source,
+      this.#alertState === "idle",
+    );
     this.#capabilitySignature = signature(availableTools);
     this.#candidateSignature = undefined;
     this.#candidateCount = 0;
@@ -223,6 +240,43 @@ class ReviewedTradingViewSite implements TradingViewSite {
     return this.#mutateWatchlist("remove", input, signal);
   }
 
+  async createPriceAlert(
+    input: TradingViewCreatePriceAlertInput,
+    signal: AbortSignal,
+  ): Promise<TradingViewCreatePriceAlertResult> {
+    abortIfNeeded(signal);
+    const create = this.#source.createPriceAlert;
+    if (create === undefined || this.#alertState !== "idle") {
+      throw new TradingViewPackError(
+        create === undefined ? "TOOL_UNAVAILABLE" : "EXECUTION_FAILED",
+        create === undefined
+          ? "alert_creation_unavailable"
+          : "alert_creation_already_started",
+      );
+    }
+    const chart = extractTradingViewCurrentChart(await this.#read(signal));
+    if (this.#alertState !== "idle") {
+      throw new TradingViewPackError(
+        "EXECUTION_FAILED",
+        "alert_creation_already_started",
+      );
+    }
+    this.#alertState = "running";
+    try {
+      const result = await create.call(this.#source, chart, input, signal);
+      this.#alertState = "finished";
+      return result;
+    } catch (error) {
+      this.#alertState = "finished";
+      if (error instanceof TradingViewPackError) throw error;
+      abortIfNeeded(signal);
+      throw new TradingViewPackError(
+        "EXECUTION_FAILED",
+        "alert_creation_unavailable",
+      );
+    }
+  }
+
   subscribe(listener: () => void): () => void {
     if (typeof listener !== "function") {
       throw new TypeError("TradingView listener is invalid");
@@ -277,6 +331,7 @@ class ReviewedTradingViewSite implements TradingViewSite {
               this.#navigationState === "idle",
           ),
           this.#source,
+          this.#alertState === "idle",
         ),
       );
     } catch (error) {
@@ -343,6 +398,7 @@ class ReviewedTradingViewSite implements TradingViewSite {
 function appendOptionalTools(
   tools: readonly TradingViewToolName[],
   source: TradingViewSnapshotSource,
+  alertAvailable: boolean,
 ): readonly TradingViewToolName[] {
   return Object.freeze([
     ...tools,
@@ -352,6 +408,9 @@ function appendOptionalTools(
     ...(source.removeFromWatchlist === undefined
       ? []
       : [TRADINGVIEW_REMOVE_FROM_WATCHLIST]),
+    ...(source.createPriceAlert === undefined || !alertAvailable
+      ? []
+      : [TRADINGVIEW_CREATE_PRICE_ALERT]),
     ...(source.searchSymbols === undefined ? [] : [TRADINGVIEW_SEARCH_SYMBOLS]),
     ...(source.captureChart === undefined ? [] : [TRADINGVIEW_CAPTURE_CHART]),
   ]);

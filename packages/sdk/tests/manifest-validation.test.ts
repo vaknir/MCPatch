@@ -95,7 +95,7 @@ describe("Pack Manifest v1 runtime validation", () => {
     });
   });
 
-  it("accepts only bounded exact HTTPS GET authority paired with a tool permission", () => {
+  it("accepts bounded exact HTTPS methods paired with matching tool risks", () => {
     const candidate = structuredClone(valid);
     candidate.networkPolicy = {
       extensionRequests: {
@@ -111,9 +111,22 @@ describe("Pack Manifest v1 runtime validation", () => {
       candidate.networkPolicy,
     );
 
+    const action = structuredClone(valid);
+    action.networkPolicy = {
+      extensionRequests: {
+        origins: ["https://actions.example.com"],
+        methods: ["POST"],
+      },
+    };
+    const actionTool = first(action.tools as Array<Record<string, unknown>>);
+    actionTool.risk = "action";
+    actionTool.permissions = ["ACTION", "EXTERNAL_NETWORK"];
+    expect(validatePackManifest(action)).toBeUndefined();
+
     for (const requests of [
       { origins: ["https://*.example.com"], methods: ["GET"] },
-      { origins: ["https://search.example.com"], methods: ["POST"] },
+      { origins: ["https://search.example.com"], methods: ["POST", "GET"] },
+      { origins: ["https://search.example.com"], methods: ["PUT"] },
       { origins: [], methods: ["GET"] },
     ]) {
       const malformed = structuredClone(candidate);
@@ -141,6 +154,29 @@ describe("Pack Manifest v1 runtime validation", () => {
       },
     };
     expect(validatePackManifest(unusedPolicy)).toEqual({
+      code: "INVALID_PERMISSION",
+      field: "networkPolicy.extensionRequests",
+    });
+
+    const mismatchedMethod = structuredClone(valid);
+    first(
+      mismatchedMethod.tools as Array<Record<string, unknown>>,
+    ).permissions = ["READ", "EXTERNAL_NETWORK"];
+    mismatchedMethod.networkPolicy = {
+      extensionRequests: {
+        origins: ["https://actions.example.com"],
+        methods: ["POST"],
+      },
+    };
+    expect(validatePackManifest(mismatchedMethod)).toEqual({
+      code: "INVALID_PERMISSION",
+      field: "networkPolicy.extensionRequests",
+    });
+
+    const mixedAuthority = structuredClone(actionManifest());
+    first(mixedAuthority.tools as Array<Record<string, unknown>>).permissions =
+      ["ACTION", "EXTERNAL_NETWORK", "READ"];
+    expect(validatePackManifest(mixedAuthority)).toEqual({
       code: "INVALID_PERMISSION",
       field: "networkPolicy.extensionRequests",
     });
@@ -209,6 +245,20 @@ function apply(
   } else {
     Object.assign(target, change);
   }
+}
+
+function actionManifest(): Record<string, unknown> {
+  const candidate = structuredClone(valid);
+  candidate.networkPolicy = {
+    extensionRequests: {
+      origins: ["https://actions.example.com"],
+      methods: ["POST"],
+    },
+  };
+  const tool = first(candidate.tools as Array<Record<string, unknown>>);
+  tool.risk = "action";
+  tool.permissions = ["ACTION", "EXTERNAL_NETWORK"];
+  return candidate;
 }
 
 function origin(value: string): Record<string, unknown> {

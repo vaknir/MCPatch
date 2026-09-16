@@ -5,9 +5,11 @@ import {
   TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
   TRADINGVIEW_CAPTURE_CHART,
+  TRADINGVIEW_CREATE_PRICE_ALERT,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_PRICE_ALERTS_ORIGIN,
   TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
@@ -24,12 +26,20 @@ describe("TradingView reviewed pack manifest", () => {
     ]);
     expect(tradingViewPack.manifest.networkPolicy).toEqual({
       extensionRequests: {
-        origins: [TRADINGVIEW_SYMBOL_SEARCH_ORIGIN],
-        methods: ["GET"],
+        origins: [
+          TRADINGVIEW_PRICE_ALERTS_ORIGIN,
+          TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
+        ],
+        methods: ["GET", "POST"],
       },
     });
     expect(tradingViewPack.manifest.tools).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          name: TRADINGVIEW_CREATE_PRICE_ALERT,
+          risk: "action",
+          permissions: ["ACTION", "EXTERNAL_NETWORK"],
+        }),
         expect.objectContaining({
           name: TRADINGVIEW_ADD_TO_WATCHLIST,
           risk: "action",
@@ -80,8 +90,8 @@ describe("TradingView reviewed pack manifest", () => {
     if (!result.ok) return;
     expect(result.evidence.passed).toBe(true);
     expect(result.evidence.summary).toEqual({
-      total: 7,
-      passed: 7,
+      total: 8,
+      passed: 8,
       failed: 0,
       skipped: 0,
     });

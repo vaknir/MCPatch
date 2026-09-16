@@ -21,14 +21,14 @@ the tool, origin, or arguments after the user approves, or replay the decision.
 Permissions are non-exclusive and assigned by the accepted installed pack metadata,
 then validated against actual tool behavior:
 
-| Permission            | Meaning                                     | Version 1 default           |
-| --------------------- | ------------------------------------------- | --------------------------- |
-| `READ`                | Read bounded, task-specific page state      | May run for an enabled pack |
-| `ACTION`              | Change website or account state             | One-time approval per call  |
-| `SENSITIVE`           | Read or change private/high-impact data     | One-time approval per call  |
-| `CREDENTIAL`          | Access authentication/session material      | Always denied               |
-| `EXTERNAL_NETWORK`    | Request to a declared exact external origin | Reviewed pack reads only    |
-| `ARBITRARY_EXECUTION` | Generic script or browser automation        | Always denied               |
+| Permission            | Meaning                                     | Version 1 default                     |
+| --------------------- | ------------------------------------------- | ------------------------------------- |
+| `READ`                | Read bounded, task-specific page state      | May run for an enabled pack           |
+| `ACTION`              | Change website or account state             | One-time approval per call            |
+| `SENSITIVE`           | Read or change private/high-impact data     | One-time approval per call            |
+| `CREDENTIAL`          | Access authentication/session material      | Always denied                         |
+| `EXTERNAL_NETWORK`    | Request to a declared exact external origin | Reviewed pack read or approved action |
+| `ARBITRARY_EXECUTION` | Generic script or browser automation        | Always denied                         |
 
 All permission checks default to deny. Missing, unknown, contradictory, or
 unsupported permissions reject pack activation or tool dispatch. `READ` does not
@@ -36,12 +36,15 @@ mean harmless: a tool that reads private or high-impact content must also declar
 `SENSITIVE`.
 
 `READ + EXTERNAL_NETWORK` is allowed only for an installed pack capability with a
-pack identity and a reviewed non-empty GET-only network policy. The extension
+pack identity and reviewed GET authority. `ACTION + EXTERNAL_NETWORK` is allowed
+only for the same reviewed-pack identity with declared POST authority and requires
+one-time approval. The extension
 requires the user to grant every exact external origin with the site origin before
-it publishes the pack. Native WebMCP capabilities, actions, sensitive operations,
-credentials, arbitrary execution, undeclared origins, non-GET requests, and mixed
-permission sets remain denied. The narrower construction and response rules are in
-[ADR 0009](0009-reviewed-read-network-authority.md).
+it publishes the pack. Native WebMCP capabilities, sensitive operations,
+credentials, arbitrary execution, undeclared origins, unsupported methods, and
+mixed permission sets remain denied. The narrower construction and response rules
+are in [ADR 0009](0009-reviewed-read-network-authority.md) and
+[ADR 0012](0012-reviewed-external-session-actions.md).
 
 Version 1 origins are exact normalized HTTPS origins: scheme, ASCII host, and
 effective port. Path matching is a separate activation constraint and never widens

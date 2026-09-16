@@ -1,6 +1,6 @@
 # TradingView MCP field report — 2026-09-16
 
-Status: **read, bounded image, constrained symbol search, and approved action paths passed locally**
+Status: **eight-tool discovery, reads, bounded image, constrained symbol search, and approved navigation passed locally**
 
 Environment:
 
@@ -13,15 +13,19 @@ Typed tools discovered through MCP:
 
 - `tradingview.current_chart`
 - `tradingview.current_watchlist`
+- `tradingview.add_to_watchlist`
+- `tradingview.remove_from_watchlist`
+- `tradingview.create_price_alert`
 - `tradingview.capture_chart`
 - `tradingview.search_symbols`
 - `tradingview.change_symbol`
 
 Evidence:
 
-- the user enabled only the exact optional `https://www.tradingview.com/*` and
-  `https://symbol-search.tradingview.com/*` permissions in the disposable profile;
-- the MCP client discovered all five capabilities from the compatible live chart;
+- the user enabled only the exact optional `https://www.tradingview.com/*`,
+  `https://symbol-search.tradingview.com/*`, and
+  `https://pricealerts.tradingview.com/*` permissions in the disposable profile;
+- the MCP client discovered all eight capabilities from the compatible live chart;
 - `tradingview.current_chart` returned a schema-valid canonical chart identity,
   interval, finite OHLC/current-price fields, and the expected fingerprint;
 - `tradingview.current_watchlist` returned between one and 64 schema-valid visible
@@ -47,9 +51,12 @@ Security limits:
   endpoints were read or transported; the search request used a fixed public
   first-party GET with `credentials: "omit"`;
 - no live prices, watchlist contents, chart images, raw tool outputs, request logs,
-  or browser profile were retained; and
+  or browser profile were retained;
 - the pack exposed no generic browser, DOM, JavaScript, fetch, screenshot, or
-  request-replay capability.
+  request-replay capability; and
+- account-authenticated watchlist and alert writes were not invoked in this
+  signed-out run; their real mutation policy requires a separate disposable
+  signed-in account and explicit cleanup.
 
 Bounded image contract:
 

@@ -86,26 +86,68 @@ export function validatePackManifest(
 
   const tools = validateTools(manifest.tools, manifest.publisher as string);
   if ("issue" in tools) return tools.issue;
-  const externalTools = (manifest.tools as readonly unknown[]).some(
-    (tool) =>
-      typeof tool === "object" &&
-      tool !== null &&
-      Array.isArray((tool as { permissions?: unknown }).permissions) &&
-      (tool as { permissions: unknown[] }).permissions.includes(
-        "EXTERNAL_NETWORK",
-      ),
-  );
-  if (
-    externalTools !==
-    (typeof manifest.networkPolicy === "object" &&
-      manifest.networkPolicy !== null &&
-      (manifest.networkPolicy as { extensionRequests?: unknown })
-        .extensionRequests !== "none")
-  ) {
+  const externalIssue = validateExternalNetworkPairing(manifest);
+  if (externalIssue !== undefined) return externalIssue;
+  return validateFixtures(manifest.fixtures, tools.names);
+}
+
+function validateExternalNetworkPairing(
+  manifest: Record<string, unknown>,
+): PackManifestValidationIssue | undefined {
+  const tools = manifest.tools as ReadonlyArray<{
+    readonly risk?: unknown;
+    readonly permissions?: unknown;
+  }>;
+  let read = false;
+  let action = false;
+  for (const tool of tools) {
+    if (
+      !Array.isArray(tool.permissions) ||
+      !tool.permissions.includes("EXTERNAL_NETWORK")
+    ) {
+      continue;
+    }
+    if (
+      tool.risk === "read" &&
+      tool.permissions.length === 2 &&
+      tool.permissions.includes("READ")
+    ) {
+      read = true;
+    } else if (
+      tool.risk === "action" &&
+      tool.permissions.length === 2 &&
+      tool.permissions.includes("ACTION")
+    ) {
+      action = true;
+    } else {
+      return {
+        code: "INVALID_PERMISSION",
+        field: "networkPolicy.extensionRequests",
+      };
+    }
+  }
+  const requests = (
+    manifest.networkPolicy as { readonly extensionRequests?: unknown }
+  ).extensionRequests;
+  if (requests === "none") {
+    return read || action
+      ? { code: "INVALID_PERMISSION", field: "networkPolicy.extensionRequests" }
+      : undefined;
+  }
+  if (typeof requests !== "object" || requests === null) {
     return {
       code: "INVALID_PERMISSION",
       field: "networkPolicy.extensionRequests",
     };
   }
-  return validateFixtures(manifest.fixtures, tools.names);
+  const methods = (requests as { readonly methods?: unknown }).methods;
+  if (!Array.isArray(methods)) {
+    return {
+      code: "INVALID_PERMISSION",
+      field: "networkPolicy.extensionRequests",
+    };
+  }
+  return methods.includes("GET") === read && methods.includes("POST") === action
+    ? undefined
+    : { code: "INVALID_PERMISSION", field: "networkPolicy.extensionRequests" };
 }

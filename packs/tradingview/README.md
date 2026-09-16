@@ -1,6 +1,6 @@
 # TradingView MCPatch pack
 
-This reviewed bundled pack exposes seven capabilities on exact
+This reviewed bundled pack exposes eight capabilities on exact
 `https://www.tradingview.com/chart/` pages:
 
 - `tradingview.current_chart` reads one active chart's canonical symbol,
@@ -15,7 +15,10 @@ This reviewed bundled pack exposes seven capabilities on exact
   one bounded WebP MCP image; and
 - `tradingview.add_to_watchlist` and `tradingview.remove_from_watchlist` mutate
   one exact canonical symbol in the current custom watchlist after an
-  argument-bound one-time approval.
+  argument-bound one-time approval; and
+- `tradingview.create_price_alert` creates one alert for the exact current chart
+  symbol with explicit condition, threshold, frequency, expiry, and notification
+  behavior after one-time approval.
 
 The pack reads bounded semantic attributes and text already rendered by TradingView.
 It does not use generated CSS class names, cookies, tokens, captured headers,
@@ -33,6 +36,16 @@ issues at most one fixed append/remove request, then re-reads the same list and
 returns only a closed confirmation. Existing desired state is a deterministic
 no-op. Non-custom lists, changed identities, malformed or oversized responses,
 failed authentication, and failed postconditions all fail closed.
+
+Alert creation uses one reviewed cross-origin first-party endpoint. The extension
+grants that exact origin with the pack; the bridge requires `ACTION +
+EXTERNAL_NETWORK` approval, and compiled code fixes the URL, method, payload shape,
+current symbol, and current chart interval. Email, SMS, sound, arbitrary message,
+webhook, script conditions, caller-selected symbols, and generic requests are not
+available. The pack performs one POST and one bounded confirmation read. A server
+ID with an unavailable confirmation is returned as `created_unconfirmed` so an
+agent cannot safely mistake a retry for an idempotent operation; the page lifecycle
+also permits only one creation attempt.
 
 The compatibility fingerprint is `tradingview-chart-semantic-en-v1`. Version 1
 supports one visible English-language chart. Multi-chart layouts fail closed rather
