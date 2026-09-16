@@ -8,6 +8,21 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A reviewed Jira Data Center pack that reaches the core capability surface of an
+  MCP Atlassian server through the user's existing browser session instead of an
+  Atlassian Cloud API token. It exposes bounded `jira.current_context`,
+  `jira.get_issue`, `jira.search_issues`, `jira.list_projects`,
+  `jira.list_comments`, and `jira.list_transitions` reads plus approved
+  `jira.add_comment`, `jira.transition_issue`, `jira.create_issue`, and
+  `jira.link_issues` actions. Every call is one same-origin GET or POST under the
+  fixed `/rest/api/2` prefix, so the pack requests no `EXTERNAL_NETWORK`
+  authority; transitions are validated against the transitions the server
+  currently offers, non-idempotent writes are consumed once per document context,
+  and an unconfirmed write is reported rather than retried. Because Jira Data
+  Center is self-hosted, the shipped build declares one synthetic `.invalid`
+  deployment origin and therefore grants no browser authority until an operator
+  adds their own instance origin to `packs/jira/src/deployment.ts` and the
+  extension manifest together.
 - Declarative Operations v1 (initial pre-release definition): an immutable, closed,
   read-only AST embedded at
   `operations.program`, with one operation per manifest tool, static role and

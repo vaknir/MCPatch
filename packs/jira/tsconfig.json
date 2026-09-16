@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@mcpatch/sdk": ["../../packages/sdk/src/index.ts"],
+      "@mcpatch/sdk/browser": ["../../packages/sdk/src/browser.ts"],
+      "@mcpatch/sdk/runtime": ["../../packages/sdk/src/runtime.ts"]
+    },
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

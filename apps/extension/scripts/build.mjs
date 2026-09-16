@@ -28,6 +28,9 @@ const examplePacksEntry = fileURLToPath(
 const googleFlightsPackEntry = fileURLToPath(
   new URL("../../../packs/google-flights/src/index.ts", import.meta.url),
 );
+const jiraPackEntry = fileURLToPath(
+  new URL("../../../packs/jira/src/index.ts", import.meta.url),
+);
 const tradingViewPackEntry = fileURLToPath(
   new URL("../../../packs/tradingview/src/index.ts", import.meta.url),
 );
@@ -67,6 +70,7 @@ const sharedBuildOptions = {
   alias: {
     "@mcpatch/example-packs": examplePacksEntry,
     "@mcpatch/google-flights-pack": googleFlightsPackEntry,
+    "@mcpatch/jira-pack": jiraPackEntry,
     "@mcpatch/protocol": protocolEntry,
     "@mcpatch/sdk/browser": sdkBrowserEntry,
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,

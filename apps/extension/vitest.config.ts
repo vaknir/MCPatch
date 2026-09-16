@@ -14,6 +14,9 @@ export default defineConfig({
       "@mcpatch/google-flights-pack": fileURLToPath(
         new URL("../../packs/google-flights/src/index.ts", import.meta.url),
       ),
+      "@mcpatch/jira-pack": fileURLToPath(
+        new URL("../../packs/jira/src/index.ts", import.meta.url),
+      ),
       "@mcpatch/protocol": fileURLToPath(
         new URL("../../packages/protocol/src/index.ts", import.meta.url),
       ),
