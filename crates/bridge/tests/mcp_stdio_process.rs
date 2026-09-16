@@ -1,9 +1,13 @@
-use std::{process::Stdio, time::Duration};
+mod stdio_support;
+
+use std::time::Duration;
 
 use mcpatch_bridge::mcp::MAX_MCP_MESSAGE_BYTES;
-use serde_json::Value;
+use stdio_support::{
+    assert_json_lines, bridge_command as command_for, finish, read_json_line, write_json_line,
+};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncWriteExt, BufReader},
     process::{Child, Command},
     time::timeout,
 };
@@ -154,17 +158,7 @@ fn spawn_bridge() -> Child {
 /// Every spawned bridge gets a private runtime directory so the suite does not
 /// depend on a login session exporting `XDG_RUNTIME_DIR`.
 fn bridge_command() -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_mcpatch"));
-    command
-        .arg("mcp-stdio")
-        .env("RUST_LOG", "trace")
-        .env("MCPATCH_LOG", "trace")
-        .env("MCPATCH_RUNTIME_DIR", private_runtime_directory())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    command
+    command_for(private_runtime_directory())
 }
 
 fn private_runtime_directory() -> &'static std::path::Path {
@@ -183,75 +177,4 @@ fn private_runtime_directory() -> &'static std::path::Path {
         std::fs::create_dir(&path).expect("runtime directory must be creatable");
         path
     })
-}
-
-async fn write_json_line(child: &mut Child, line: &str) {
-    let stdin = child.stdin.as_mut().expect("stdin must be piped");
-    stdin
-        .write_all(line.as_bytes())
-        .await
-        .expect("JSON-RPC message must be writable");
-    stdin
-        .write_all(b"\n")
-        .await
-        .expect("newline must be writable");
-    stdin.flush().await.expect("stdin must flush");
-}
-
-async fn read_json_line<R>(reader: &mut BufReader<R>) -> Value
-where
-    R: tokio::io::AsyncRead + Unpin,
-{
-    let mut line = String::new();
-    let bytes = timeout(PROCESS_TIMEOUT, reader.read_line(&mut line))
-        .await
-        .expect("bridge response timed out")
-        .expect("bridge response must be readable");
-    assert!(bytes > 0, "bridge closed stdout before responding");
-    serde_json::from_str(&line).expect("stdout must contain JSON-RPC only")
-}
-
-async fn finish(mut child: Child) -> (std::process::ExitStatus, Vec<u8>, String) {
-    drop(child.stdin.take());
-    let stdout = child.stdout.take();
-    let mut stderr = child.stderr.take().expect("stderr must be piped");
-    let stdout_task = tokio::spawn(async move {
-        let mut bytes = Vec::new();
-        if let Some(mut stdout) = stdout {
-            stdout
-                .read_to_end(&mut bytes)
-                .await
-                .expect("stdout must be readable");
-        }
-        bytes
-    });
-    let stderr_task = tokio::spawn(async move {
-        let mut bytes = Vec::new();
-        stderr
-            .read_to_end(&mut bytes)
-            .await
-            .expect("stderr must be readable");
-        bytes
-    });
-
-    let status = timeout(PROCESS_TIMEOUT, child.wait())
-        .await
-        .expect("bridge did not stop after EOF")
-        .expect("bridge must be waitable");
-    let stdout = stdout_task.await.expect("stdout task must complete");
-    let stderr = stderr_task.await.expect("stderr task must complete");
-    (
-        status,
-        stdout,
-        String::from_utf8(stderr).expect("structured logs must be UTF-8"),
-    )
-}
-
-fn assert_json_lines(stderr: &str) {
-    assert!(!stderr.is_empty());
-    for line in stderr.lines() {
-        let value: Value = serde_json::from_str(line).expect("stderr lines must be JSON");
-        assert_eq!(value["target"], "mcpatch");
-        assert!(value["event"].is_string());
-    }
 }

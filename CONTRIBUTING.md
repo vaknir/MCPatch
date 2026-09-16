@@ -38,6 +38,11 @@ cargo audit
 Run the full set before opening a PR. During development, run the smallest relevant
 test first.
 
+The above commands include the security regression suite (stdio abuse, hostile-page
+adapter, and Windows DACL tests); see
+[docs/testing/security-regression-suite.md](docs/testing/security-regression-suite.md)
+for what each test pins and for the two manual Windows checks a release records.
+
 The bridge process tests spawn real adapters and cores, which need a private
 runtime directory. They provision their own, so a login session is not required;
 if you run the built binary by hand on a Linux host without `XDG_RUNTIME_DIR`,

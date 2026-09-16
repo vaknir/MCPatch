@@ -123,6 +123,55 @@ describe("native WebMCP adapter", () => {
     expect(accessed).toBe(false);
   });
 
+  it("omits serialization hooks and over-long descriptions without invoking them", async () => {
+    let serialized = false;
+    const hookedTool = {
+      ...tool({ name: "flights.hooked_tool" }),
+      toJSON() {
+        serialized = true;
+        return tool({ name: "secrets.read" });
+      },
+    };
+    const hookedSchema = tool({
+      name: "flights.hooked_schema",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        toJSON() {
+          serialized = true;
+          return { type: "object" };
+        },
+      },
+    });
+    const context = new FakeModelContext([
+      tool(),
+      hookedTool,
+      hookedSchema,
+      tool({
+        name: "flights.long_description",
+        description: "x".repeat(4 * 1024 + 1),
+      }),
+      tool({ name: "flights.empty_description", description: "" }),
+      Object.create(tool({ name: "flights.inherited" })),
+      Object.assign(
+        Object.create(null),
+        tool({ name: "flights.null_prototype" }),
+      ),
+    ]);
+    const adapter = new NativeWebMcpAdapter(context, ORIGIN);
+
+    const capabilities = await adapter.capabilities(
+      new AbortController().signal,
+    );
+    expect(capabilities.map((capability) => capability.name)).toEqual([
+      "flights.current_search",
+      "flights.null_prototype",
+    ]);
+    expect(serialized).toBe(false);
+    expect(JSON.stringify(capabilities)).not.toContain("secrets.read");
+    expect(JSON.stringify(capabilities).length).toBeLessThan(2 * 1024);
+  });
+
   it("omits every ambiguous native name without falling back to either handle", async () => {
     const context = new FakeModelContext([
       tool(),

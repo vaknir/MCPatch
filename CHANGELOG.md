@@ -197,6 +197,14 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- A security regression suite that pins red-team findings against regression: a
+  `mcpatch mcp-stdio` abuse test (hostile bytes never leaving the process,
+  frame-abuse termination with a stable code, continuation-state refusal,
+  bounded concurrency, and pinned version negotiation), hostile-page adapter and
+  worker tests (serialization-hook and over-long-description rejection,
+  `toolchange`-flood coalescing, and the approval page being unreachable from web
+  content), and stronger Windows named-pipe/mutex DACL assertions, documented in
+  `docs/testing/security-regression-suite.md`.
 - Readable, attributed approval prompts: `approval_required` now carries the
   bridge-validated arguments the grant's hash commits to and the requesting MCP
   client and bridge session, and the trusted approval page renders both as inert

@@ -262,6 +262,39 @@ describe("page content runtime", () => {
     expect(state.runtime.ports).toHaveLength(1);
   });
 
+  it("collapses a toolchange flood into one snapshot", async () => {
+    let listener: (() => void) | undefined;
+    let discoveries = 0;
+    const adapter = createAdapter({
+      async capabilities() {
+        discoveries += 1;
+        return [CAPABILITY];
+      },
+      subscribe(next) {
+        listener = next;
+        return () => {};
+      },
+    });
+    const state = setup(adapter);
+    const port = ready(state);
+    await settle();
+    // The hello and the first snapshot.
+    expect(port.posted).toHaveLength(2);
+    expect(listener).toBeDefined();
+
+    const flood = 1_000;
+    for (let index = 0; index < flood; index += 1) listener?.();
+    await settle();
+
+    expect(discoveries).toBe(flood + 1);
+    expect(port.posted).toHaveLength(3);
+    expect(posted(port, 2)).toMatchObject({
+      type: "page_capability_snapshot",
+      snapshotRevision: 2,
+      capabilities: [CAPABILITY],
+    });
+  });
+
   it("fails closed when discovery throws synchronously or sends invalid data", async () => {
     const thrown = setup(
       createAdapter({
