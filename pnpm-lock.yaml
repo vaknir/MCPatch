@@ -211,6 +211,9 @@ importers:
       '@mcpatch/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
+      '@mcpatch/tradingview-pack':
+        specifier: workspace:*
+        version: link:../../packs/tradingview
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.3.3
@@ -264,6 +267,16 @@ importers:
         version: 24.13.4
 
   packs/google-flights:
+    dependencies:
+      '@mcpatch/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.4
+        version: 24.13.4
+
+  packs/tradingview:
     dependencies:
       '@mcpatch/sdk':
         specifier: workspace:*

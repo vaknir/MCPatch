@@ -37,7 +37,7 @@ describe("bundled Google Flights production pack", () => {
       PACK_RUNTIME_OPTIONS,
       DECLARED_SITE_ORIGINS,
     );
-    expect(DECLARED_SITE_ORIGINS).toEqual([GOOGLE_FLIGHTS_ORIGIN]);
+    expect(DECLARED_SITE_ORIGINS).toContain(GOOGLE_FLIGHTS_ORIGIN);
     expect(
       catalog.match(`${GOOGLE_FLIGHTS_ORIGIN}${GOOGLE_FLIGHTS_LANDING_PATH}`),
     ).toHaveLength(1);
@@ -52,9 +52,9 @@ describe("bundled Google Flights production pack", () => {
     const manifest = JSON.parse(
       readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
     ) as Record<string, unknown>;
-    expect(manifest["optional_host_permissions"]).toEqual([
+    expect(manifest["optional_host_permissions"]).toContain(
       `${GOOGLE_FLIGHTS_ORIGIN}/*`,
-    ]);
+    );
     expect(manifest).not.toHaveProperty("host_permissions");
   });
 });

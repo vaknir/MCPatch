@@ -28,6 +28,9 @@ const examplePacksEntry = fileURLToPath(
 const googleFlightsPackEntry = fileURLToPath(
   new URL("../../../packs/google-flights/src/index.ts", import.meta.url),
 );
+const tradingViewPackEntry = fileURLToPath(
+  new URL("../../../packs/tradingview/src/index.ts", import.meta.url),
+);
 const manifest = JSON.parse(
   await readFile(new URL("manifest.json", extensionDirectory), "utf8"),
 );
@@ -67,6 +70,7 @@ const sharedBuildOptions = {
     "@mcpatch/protocol": protocolEntry,
     "@mcpatch/sdk/browser": sdkBrowserEntry,
     "@mcpatch/sdk/runtime": sdkRuntimeEntry,
+    "@mcpatch/tradingview-pack": tradingViewPackEntry,
   },
   bundle: true,
   legalComments: "none",

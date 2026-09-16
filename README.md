@@ -61,6 +61,10 @@ The isolated browser suite is documented in
 [docs/testing/chromium-fixtures.md](docs/testing/chromium-fixtures.md).
 The first real-site adapter contract is documented in
 [docs/architecture/google-flights-adapter.md](docs/architecture/google-flights-adapter.md).
+The bundled TradingView adapter exposes the active chart and visible watchlist as
+typed reads and changes charts through one approved canonical-symbol action; its
+contract is documented in
+[docs/architecture/tradingview-adapter.md](docs/architecture/tradingview-adapter.md).
 
 Pack development now has a separately versioned, closed Pack Manifest v1 contract
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
