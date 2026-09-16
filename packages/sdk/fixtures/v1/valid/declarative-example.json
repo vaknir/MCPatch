@@ -32,8 +32,8 @@
       "outputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id"],
-        "properties": { "id": { "type": "string", "maxLength": 128 } }
+        "required": ["text"],
+        "properties": { "text": { "type": "string" } }
       }
     }
   ],
@@ -42,7 +42,7 @@
       "id": "current-item",
       "tool": "example.items.current",
       "input": {},
-      "expect": { "kind": "result", "result": { "id": "fixture-item" } }
+      "expect": { "kind": "result", "result": { "text": "fixture-item" } }
     }
   ]
 }

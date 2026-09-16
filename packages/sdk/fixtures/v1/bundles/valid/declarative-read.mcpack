@@ -7,7 +7,7 @@
     "name": "Declarative read example",
     "description": "Manifest-only example for the reviewed declarative execution tier.",
     "version": "1.2.3",
-    "digest": "sha256:bb4e5a9ec1eca3429b126a340415f670041c62a0242e5bd51da4c5ca680e24fb",
+    "digest": "sha256:71ee26e441ae053582e39e78c3cb339fb92afe960df5a40c6aee979e6a47aa07",
     "compatibility": {
       "runtime": { "minimum": "0.1.0", "maximumExclusive": "1.0.0" },
       "bridgeProtocol": { "minimum": 1, "maximum": 1 }
@@ -31,7 +31,12 @@
           "additionalProperties": false,
           "properties": {}
         },
-        "outputSchema": { "type": "object" }
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text"],
+          "properties": { "text": { "type": "string" } }
+        }
       }
     ],
     "fixtures": [
@@ -39,7 +44,7 @@
         "id": "current-item",
         "tool": "example.items.current",
         "input": {},
-        "expect": { "kind": "result", "result": { "id": "fixture-item" } }
+        "expect": { "kind": "result", "result": { "text": "fixture-item" } }
       }
     ]
   },
@@ -69,6 +74,6 @@
     "publisher": "example",
     "keyId": "ed25519:example:sha256:21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
     "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
-    "signature": "VswRpByJjEEEJbqBvGvVnzxfo-mgdINzgScAqGSS543OQyRq5FUB6uYkAE-Haf8grRTSKYQ8LFpRlxasnKLYAQ"
+    "signature": "E2vNDNhkgRQchw6C540IDT-rUVmd5J_--JEk2rrv-UN_udsqFD8_DL6XoYhYvN1dhGJspa4DdT6DbgHH8WvuAA"
   }
 }
