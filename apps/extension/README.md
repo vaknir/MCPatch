@@ -21,6 +21,12 @@ reviewed origins. Load
 development. The native-host manifest must allow the resulting extension ID. The
 toolbar enablement flow is active for the bundled Google Flights reference pack.
 
+The extension options page provides an explicit local developer mode for
+data-only `.mcpack` artifacts. It previews the exact digest and authority, requests
+only confirmed HTTPS origins, stores bounded trusted-context records, and labels
+every local pack `UNSIGNED_LOCAL_DEVELOPMENT`. See
+[local developer mode](../../docs/local-pack-developer-mode.md).
+
 The committed public `key` fixes unpacked builds to extension ID
 `imbnpameklobbabbkfkalcfcggpjacdi`; it is public identity material, not a signing
 secret. A clean-checkout `pnpm package:local` build records source provenance and
@@ -88,8 +94,10 @@ tab from the `action.onClicked` event itself, so `activeTab` is not declared:
 combined with `scripting`, it would let a click run code on any page, which is a
 capability nothing in the extension uses. The manifest has no permanent
 `host_permissions`, static content scripts, web-accessible resources, or
-externally connectable surface. Each reviewed site is an optional host authority
-that can be requested only from a toolbar click on one of its matching paths.
+externally connectable surface. The optional `https://*/*` declaration grants
+nothing by itself: reviewed sites request their exact closed origin set from a
+matching toolbar click, while local packs request only the exact origins displayed
+in the trusted developer-page confirmation.
 `apps/extension/tests/manifest.test.ts` pins the exact permission set so any
 widening is a deliberate, reviewed change.
 

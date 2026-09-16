@@ -49,6 +49,10 @@ await copyFile(
   new URL("approval.html", extensionDirectory),
   new URL("approval.html", distributionDirectory),
 );
+await copyFile(
+  new URL("developer.html", extensionDirectory),
+  new URL("developer.html", distributionDirectory),
+);
 await writeFile(
   new URL("build-metadata.json", distributionDirectory),
   `${JSON.stringify(
@@ -99,6 +103,9 @@ await build({
     "approval-page": fileURLToPath(
       new URL("src/approval-page.ts", extensionDirectory),
     ),
+    "developer-page": fileURLToPath(
+      new URL("src/developer-page.ts", extensionDirectory),
+    ),
     "service-worker": fileURLToPath(
       new URL("src/service-worker.ts", extensionDirectory),
     ),
@@ -126,6 +133,7 @@ await executeFile(
 for (const artifact of [
   "approval-page.js",
   "content-script.js",
+  "developer-page.js",
   "service-worker.js",
 ]) {
   const source = await readFile(

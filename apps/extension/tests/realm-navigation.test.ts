@@ -77,11 +77,53 @@ describe("realm navigation lockdown", () => {
     expect(location.href).toBe("https://shop.example/current");
   });
 
-  it("returns the captured entry point as the only way left to navigate", () => {
+  it("returns a frozen captured entry point for the action gate", () => {
     const { realm: r } = realm();
     const navigation = removeNavigationPrimitives(r);
     expect(typeof navigation.assign).toBe("function");
     expect(Object.isFrozen(navigation)).toBe(true);
+  });
+
+  it("captures Chromium's unforgeable own Location operation", () => {
+    const assigned: string[] = [];
+    const location = {};
+    Object.defineProperties(location, {
+      assign: {
+        configurable: false,
+        enumerable: true,
+        writable: false,
+        value(url: string) {
+          assigned.push(url);
+        },
+      },
+      href: {
+        configurable: false,
+        enumerable: true,
+        get() {
+          return "https://shop.example/current";
+        },
+        set(url: string) {
+          void url;
+        },
+      },
+      replace: {
+        configurable: false,
+        enumerable: true,
+        writable: false,
+        value(url: string) {
+          void url;
+        },
+      },
+    });
+    const navigation = removeNavigationPrimitives({
+      Location: { prototype: {} },
+      location,
+    });
+
+    expect(() =>
+      navigation.assign("https://shop.example/approved"),
+    ).not.toThrow();
+    expect(assigned).toEqual(["https://shop.example/approved"]);
   });
 
   it("installs stubs that survive delete and redefine", () => {

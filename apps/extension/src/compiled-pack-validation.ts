@@ -1,7 +1,10 @@
 import {
+  computeDeclarativePackBundleDigest,
   packSupportsBridgeProtocol,
   packSupportsRuntime,
+  parseDeclarativePackBundleContent,
   parsePackManifest,
+  type DeclarativePackBundleContent,
   type PackManifest,
   type PackPermission,
   type PackToolHandler,
@@ -36,9 +39,19 @@ export interface CompiledPackSubject {
 }
 
 export interface ValidatedCompiledPack {
+  readonly kind: "compiled";
   readonly manifest: PackManifest;
   readonly handlers: Readonly<Record<string, PackToolHandler>>;
 }
+
+export interface ValidatedDeclarativePack {
+  readonly kind: "declarative";
+  readonly manifest: PackManifest;
+  readonly bundle: DeclarativePackBundleContent;
+}
+
+export type ValidatedRuntimePack =
+  ValidatedCompiledPack | ValidatedDeclarativePack;
 
 export function validateCompiledPacks(
   subjects: readonly CompiledPackSubject[],
@@ -55,6 +68,48 @@ export function validateCompiledPacks(
     if (identities.has(identity)) return undefined;
     identities.add(identity);
     packs.push(pack);
+  }
+  return Object.freeze(packs);
+}
+
+export async function validateDeclarativeRuntimePacks(
+  values: readonly unknown[],
+  options: ValidatedCompiledPackRuntimeOptions,
+): Promise<readonly ValidatedDeclarativePack[] | undefined> {
+  if (!Array.isArray(values) || values.length > MAX_PACKS) return undefined;
+  const allowed = new Set(options.allowedPermissions);
+  const identities = new Set<string>();
+  const packs: ValidatedDeclarativePack[] = [];
+  for (const value of values) {
+    let bundle: DeclarativePackBundleContent;
+    try {
+      bundle = parseDeclarativePackBundleContent(value);
+      if (
+        (await computeDeclarativePackBundleDigest(bundle)) !==
+        bundle.manifest.digest
+      ) {
+        return undefined;
+      }
+    } catch {
+      return undefined;
+    }
+    const manifest = bundle.manifest;
+    if (
+      !packSupportsRuntime(manifest, options.runtimeVersion) ||
+      !packSupportsBridgeProtocol(manifest, options.bridgeProtocolVersion) ||
+      !manifest.tools.every(
+        (tool) =>
+          tool.permissions.every((permission) => allowed.has(permission)) &&
+          supportsRuntimeSchema(tool.inputSchema) &&
+          supportsRuntimeSchema(tool.outputSchema),
+      )
+    ) {
+      return undefined;
+    }
+    const identity = `${manifest.publisher}/${manifest.id}`;
+    if (identities.has(identity)) return undefined;
+    identities.add(identity);
+    packs.push(Object.freeze({ kind: "declarative", manifest, bundle }));
   }
   return Object.freeze(packs);
 }
@@ -113,7 +168,7 @@ function validateCompiledPack(
   const handlers = validateHandlers(definition.handlers, manifest);
   return handlers === undefined
     ? undefined
-    : Object.freeze({ manifest, handlers });
+    : Object.freeze({ kind: "compiled", manifest, handlers });
 }
 
 function validateHandlers(

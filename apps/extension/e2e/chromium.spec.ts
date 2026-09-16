@@ -1,4 +1,12 @@
-import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +19,7 @@ import {
 } from "@playwright/test";
 
 import {
+  FIXTURE_LOCAL_TOOL,
   FIXTURE_ORIGIN,
   FIXTURE_PROBE_TOOL,
   FIXTURE_STATE_TOOL,
@@ -50,10 +59,12 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
   const fixtureHtml = await readFile(fixtureHtmlPath, "utf8");
   const fixtureCss = await readFile(fixtureCssPath, "utf8");
   const profile = testInfo.outputPath("chromium-profile");
+  let runtimeDirectory: string | undefined;
   let context: BrowserContext | undefined;
   let mcp: McpStdioClient | undefined;
 
   try {
+    runtimeDirectory = await mkdtemp(join(tmpdir(), "mcpatch-e2e-"));
     await prepareNativeHostProfile(profile);
     context = await chromium.launchPersistentContext(profile, {
       channel: "chromium",
@@ -63,6 +74,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
         "--host-resolver-rules=MAP * ~NOTFOUND",
         `--load-extension=${extensionPath}`,
       ],
+      env: { ...process.env, MCPATCH_RUNTIME_DIR: runtimeDirectory },
     });
     await installNetworkBoundary(context, fixtureHtml, fixtureCss);
     const worker =
@@ -106,19 +118,30 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     );
     await expect.poll(() => registeredContentScriptCount(worker)).toBe(1);
 
-    const client = await McpStdioClient.connect(bridgePath);
+    const client = await McpStdioClient.connect(bridgePath, [], {
+      MCPATCH_RUNTIME_DIR: runtimeDirectory,
+    });
     mcp = client;
     await expectTools(client, [demoTool]);
 
     const page = await context.newPage();
     await page.goto(`${FIXTURE_ORIGIN}/state`);
+    await expect
+      .poll(() => page.locator("html").getAttribute("data-fixture-runtime"))
+      .toBe("ready");
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
       FIXTURE_PROBE_TOOL,
     ]);
     expect(await callState(client)).toEqual({ revision: 1, value: "initial" });
+    expect(
+      structuredContent(await client.callTool(FIXTURE_LOCAL_TOOL).response),
+    ).toMatchObject({
+      text: expect.stringContaining("Synthetic website state"),
+    });
 
     // The realm lockdown installed before pack code ran must refuse every
     // network primitive from inside a pack handler, while the credential-free
@@ -151,6 +174,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     );
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
       FIXTURE_PROBE_TOOL,
@@ -159,6 +183,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await page.reload();
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
       FIXTURE_PROBE_TOOL,
@@ -174,6 +199,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await page.goto(`${FIXTURE_ORIGIN}/state`);
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
       FIXTURE_PROBE_TOOL,
@@ -184,6 +210,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await page.goto(`${FIXTURE_ORIGIN}/state`);
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
       FIXTURE_PROBE_TOOL,
@@ -195,6 +222,9 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await mcp?.close();
     await context?.close();
     await rm(profile, { recursive: true, force: true });
+    if (runtimeDirectory !== undefined) {
+      await rm(runtimeDirectory, { recursive: true, force: true });
+    }
   }
 });
 

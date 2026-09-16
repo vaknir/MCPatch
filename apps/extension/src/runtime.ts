@@ -40,6 +40,7 @@ export interface ExtensionRuntimeOptions
   readonly pageCallTimeoutMs?: number;
   readonly pageHandshakeTimeoutMs?: number;
   readonly onPageContextOwner?: (owner: PageContextOwner) => void;
+  readonly onPackRuntime?: (runtime: CompiledPackRuntime) => void;
   readonly pageRandomId?: () => string;
   readonly pageScheduler?: SessionScheduler;
 }
@@ -94,6 +95,7 @@ export function startExtensionRuntime(
     options.compiledPackRuntimeOptions ?? PACK_RUNTIME_OPTIONS,
   );
   packState.runtime = packs;
+  options.onPackRuntime?.(packs);
   const supervisorOptions: NativeSessionOptions = {
     ...options,
     onMessage(message) {

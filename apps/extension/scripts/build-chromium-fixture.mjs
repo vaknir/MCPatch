@@ -43,6 +43,7 @@ const manifest = JSON.parse(
 manifest.name = "MCPatch Chromium fixture";
 manifest.description = "Test-only MCPatch fixture runtime; never ship.";
 delete manifest.optional_host_permissions;
+delete manifest.options_ui;
 manifest.host_permissions = [`${fixtureOrigin}/*`];
 await writeFile(
   new URL("manifest.json", distributionDirectory),

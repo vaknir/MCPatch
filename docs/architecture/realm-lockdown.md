@@ -35,16 +35,20 @@ The lockdown installs a fixed, frozen, non-configurable set of replacements:
   removed, so the wrapped `fetch` is the only network channel left.
 - **`Document.prototype.cookie`** becomes a throwing accessor, so pack code can
   neither read nor write cookies.
-- **Navigation** loses every ambient primitive: `location.assign`,
-  `location.replace`, assignment to `location.href`, `window.open`, and
-  `HTMLFormElement.prototype.submit` / `requestSubmit` all throw. `href` keeps
-  its getter, because reading the current URL is an ordinary DOM read. The
-  captured entry point is returned to the caller rather than left reachable.
+- **Mutable navigation entry points** such as `window.open` and
+  `HTMLFormElement.prototype.submit` / `requestSubmit` are replaced. The
+  reviewed adapter receives a captured `location.assign` entry point for its
+  action gate. Chromium exposes `location.assign`, `location.replace`, and the
+  `href` setter as non-configurable own properties, however, so JavaScript
+  cannot replace them. Bundled handlers remain reviewed trusted code for those
+  ambient operations. Unsigned local packs are declarative data and cannot
+  access `Location` or any other JavaScript global.
 
-Every replacement is non-configurable and frozen, so pack code cannot `delete`,
-redefine, or walk a prototype back to the original. The isolated world has its
-own globals and prototypes, so none of this is observable from the page's own
-realm.
+Every replacement MCPatch can install is non-configurable and frozen, so pack
+code cannot `delete`, redefine, or walk a prototype back to the original. The
+isolated world has its own globals and prototypes, so none of this is observable
+from the page's own realm. Unforgeable `Location` properties are detected and
+retained rather than causing every real Chromium content script to fail.
 
 ## Fail-closed
 
@@ -61,21 +65,22 @@ authenticated origin that is state-changing: it can trigger a server action
 through a GET, sign the user out, or move the user to a page the pack then
 reads.
 
-With the ambient primitives gone, the only route left is the entry point
-`lockRealm` returns. The reviewed document adapter wraps it in a
+The reviewed document adapter wraps the captured entry point in a
 `PackNavigationGate` per pack and hands the pack a plain `navigate(url)`. The
-gate refuses unless an approved `ACTION` tool from that pack is running, and
-refuses a target the pack's manifest does not match, so an approved action
-cannot be turned into a trip to an arbitrary page. It authorizes at most one
-navigation per call.
+gate refuses unless an approved `ACTION` tool from that pack is running, rejects
+targets outside the manifest, and authorizes at most one navigation per call.
+This controls the supported SDK route. It does not make Chromium's unforgeable
+ambient `Location` methods disappear from bundled JavaScript, so a bundled
+handler's direct use of those methods is still prohibited by source review.
 
 Authorization happens while the action is running, but the navigation itself is
 deferred to the next task, because it unloads the document and would otherwise
 destroy the page runtime before the tool result reached the client.
 
 In the SDK, `BrowserToolContext` gains `navigate` only for a tool declared
-`risk: "action"`, so a read handler cannot reach for it in typed code and is
-refused at runtime as well.
+`risk: "action"`, so typed pack code cannot use the supported navigation route
+from a read handler and is refused at runtime as well. This type boundary is not
+a sandbox for deliberately hostile bundled JavaScript.
 
 ## Scope
 
@@ -92,7 +97,8 @@ effects from pack code are a separate concern tracked in #188.
   vs. undeclared origin, `https` enforcement, same-origin-to-undeclared-page,
   credential preservation, header stripping, body and response bounds, removal of
   each other primitive, the throwing cookie accessor, non-configurability under
-  `delete`/`defineProperty`, and fail-closed on a missing or malformed input.
+  `delete`/`defineProperty`, Chromium-shaped unforgeable Location descriptors,
+  and fail-closed on a missing or malformed input.
 - The Chromium fixture (`apps/extension/e2e/`) locks the fixture realm and calls a
   `fixture.realm_probe` pack tool that reports whether each primitive is blocked
   from inside a real page's isolated world, while the credential-free DOM read

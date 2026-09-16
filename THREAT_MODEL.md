@@ -352,23 +352,23 @@ are reviewing. Each enforcement PR flips its row and links its issue; moving a r
 from review to mechanism is a trust-boundary change and needs an ADR
 (CONTRIBUTING.md, "Before implementation" step 2).
 
-| Claim (compiled pack tier)                                 | Enforced by today                                                                        |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
-| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
-| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
-| No navigation from `READ` tools                            | realm lockdown plus an action-gated navigator (#188)                                     |
-| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
-| Origin binding                                             | mechanism                                                                                |
-| Path binding                                               | content-script registration from the manifest path rules (#180)                          |
-| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
-| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
+| Claim (compiled pack tier)                                 | Enforced by today                                                                         |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187)  |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                  |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                     |
+| No navigation from `READ` tools                            | review for ambient unforgeable `Location`; action gate for the supported SDK route (#188) |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                      |
+| Origin binding                                             | mechanism                                                                                 |
+| Path binding                                               | content-script registration from the manifest path rules (#180)                           |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)             |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                        |
 
-The **declarative community tier** is not yet shippable. Its stronger invariants —
-no dynamic selectors, code, navigation, mutation, cookies, storage, or network
-primitive — become mechanism as the interpreter and operations schema land
-(#143–#147 under Phase 13, #141). Until then no declarative pack can activate, so
-those rows do not yet describe running code.
+The local developer-mode **declarative community tier** accepts only the bounded
+read operations schema and never loads pack JavaScript. It therefore has no
+route to navigation, mutation, cookies, storage, or network primitives. Registry
+distribution and general dynamic enablement remain unshipped (#149–#154 under
+Phase 13, #141).
 
 ## Permission classes
 

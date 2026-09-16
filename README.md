@@ -99,6 +99,12 @@ Community authors can use the data-only
 and reproducibly build a declarative pack without a browser or executable pack
 module.
 
+Those unsigned artifacts can be exercised through the real extension, bridge, and
+MCP path with the explicit
+[local pack developer mode](docs/local-pack-developer-mode.md). Each import shows
+its exact digest and authority, requests only confirmed origins, and remains
+visibly `UNSIGNED_LOCAL_DEVELOPMENT`.
+
 The browser SDK now lets a pack register its real per-document handlers and export
 one object. It generates page capability routing, discovery, cancellation, safe
 errors, subscriptions, tool lists, and fail-closed service-worker plumbing.

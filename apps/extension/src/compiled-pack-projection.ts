@@ -17,8 +17,8 @@ import type {
   RuntimeRoute,
 } from "./compiled-pack-model.js";
 import type {
-  ValidatedCompiledPack,
   ValidatedCompiledPackRuntimeOptions,
+  ValidatedRuntimePack,
 } from "./compiled-pack-validation.js";
 import { supportsRuntimeSchema } from "./runtime-schema.js";
 
@@ -94,7 +94,7 @@ function isDataRecord(value: unknown): value is Record<string, unknown> {
 export function createRoutes(
   capabilities: readonly ResolvedCapability<
     NativeRuntimeTool,
-    ValidatedCompiledPack
+    ValidatedRuntimePack
   >[],
   pageHandlers?: ReadonlyMap<string, PackToolHandler>,
 ): ReadonlyMap<string, RuntimeRoute> {
@@ -105,7 +105,9 @@ export function createRoutes(
     const execute =
       capability.source === "pack"
         ? pageHandlers === undefined
-          ? capability.value.handlers[capability.name]
+          ? capability.value.kind === "compiled"
+            ? capability.value.handlers[capability.name]
+            : undefined
           : pageHandlers.get(capability.name)
         : capability.value.execute;
     if (execute === undefined)
@@ -123,7 +125,7 @@ export function createRoutes(
 }
 
 export function toProtocolCapability(
-  capability: ResolvedCapability<NativeRuntimeTool, ValidatedCompiledPack>,
+  capability: ResolvedCapability<NativeRuntimeTool, ValidatedRuntimePack>,
 ): Capability {
   const tool =
     capability.source === "pack" ? capability.tool : capability.value.tool;

@@ -11,6 +11,10 @@ import {
   reviewedRealmNetworkPolicy,
 } from "./reviewed-page-adapter.js";
 import { lockRealm } from "./realm-lockdown.js";
+import {
+  CompositePageAdapter,
+  loadLocalPackPageAdapter,
+} from "./local-pack-page-adapter.js";
 
 declare const chrome: { readonly runtime: ChromePageClientRuntimeApi };
 
@@ -18,7 +22,7 @@ declare const chrome: { readonly runtime: ChromePageClientRuntimeApi };
 // declared-origin network bound and the no-cookie bound are enforced by
 // mechanism rather than by review. A failure here is fail-closed: the realm is
 // left without a running adapter and no capability snapshot is published.
-try {
+async function bootstrap(): Promise<void> {
   const navigation = lockRealm(
     globalThis as unknown as Parameters<typeof lockRealm>[0],
     reviewedRealmNetworkPolicy(
@@ -28,7 +32,7 @@ try {
     ),
   );
 
-  const adapter = createReviewedDocumentAdapter(
+  const reviewed = createReviewedDocumentAdapter(
     globalThis.document,
     globalThis.location.href,
     BUNDLED_PAGE_ADAPTERS,
@@ -36,12 +40,20 @@ try {
     navigation,
     createNativeWebMcpAdapter(globalThis.document, globalThis.location.origin),
   );
+  const local = await loadLocalPackPageAdapter(
+    chrome.runtime,
+    globalThis.document,
+    globalThis.location,
+  );
+  const adapter = new CompositePageAdapter([reviewed, local]);
   const runtime = new PageContentRuntime(chrome.runtime, adapter, {
     expectedOrigin: globalThis.location.origin,
     lifecycle: globalThis as unknown as PageLifecycleApi,
   });
   runtime.wake();
-} catch {
+}
+
+void bootstrap().catch(() => {
   // Realm lockdown or adapter construction failed. Publishing nothing is the
   // safe outcome; the page keeps no MCPatch capabilities.
-}
+});

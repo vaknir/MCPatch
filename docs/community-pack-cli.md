@@ -52,9 +52,10 @@ reuses only byte-identical output. A different existing artifact, a symbolic or
 non-file source, or a leftover staging file fails closed.
 
 The Phase 13 build is an `UNSIGNED_LOCAL_DEVELOPMENT` bundle-content artifact.
-It cannot appear as reviewed or registry-signed, and normal installation does not
-accept it. The separate developer-mode issue owns explicit local import and trust
-labeling; publisher signing and submission remain separate issues.
+It cannot appear as reviewed or registry-signed. Import it only through the
+extension's explicit [local developer mode](local-pack-developer-mode.md), which
+shows its exact authority and retains the unsigned trust label; publisher signing
+and submission remain separate workflows.
 
 ## Source contract
 

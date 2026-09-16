@@ -28,10 +28,16 @@ export class McpStdioClient {
   private constructor(
     binary: string,
     forbiddenLogFragments: readonly string[],
+    environment: Readonly<Record<string, string>>,
   ) {
     this.#forbiddenLogFragments = Object.freeze([...forbiddenLogFragments]);
     this.#child = spawn(binary, ["mcp-stdio"], {
-      env: { ...process.env, MCPATCH_LOG: "info", RUST_LOG: "info" },
+      env: {
+        ...process.env,
+        ...environment,
+        MCPATCH_LOG: "info",
+        RUST_LOG: "info",
+      },
       stdio: "pipe",
     });
     createInterface({ input: this.#child.stdout }).on("line", (line) => {
@@ -54,8 +60,13 @@ export class McpStdioClient {
   static async connect(
     binary: string,
     forbiddenLogFragments: readonly string[] = [],
+    environment: Readonly<Record<string, string>> = {},
   ): Promise<McpStdioClient> {
-    const client = new McpStdioClient(binary, forbiddenLogFragments);
+    const client = new McpStdioClient(
+      binary,
+      forbiddenLogFragments,
+      environment,
+    );
     const initialized = await client.request("initialize", {
       protocolVersion: "2025-11-25",
       capabilities: {},
