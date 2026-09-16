@@ -94,6 +94,11 @@ read-only same-origin subset of native `document.modelContext`. It also runs the
 reviewed Google Flights pack through the authorized page channel; service-worker
 fallback handlers cannot produce real-site results.
 
+Community authors can use the data-only
+[community pack CLI](docs/community-pack-cli.md) to create, validate, test, inspect,
+and reproducibly build a declarative pack without a browser or executable pack
+module.
+
 The browser SDK now lets a pack register its real per-document handlers and export
 one object. It generates page capability routing, discovery, cancellation, safe
 errors, subscriptions, tool lists, and fail-closed service-worker plumbing.
