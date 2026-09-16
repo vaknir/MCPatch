@@ -212,6 +212,12 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- A per-document capability snapshot gate in the extension: publications
+  coalesce to at most one per 250 ms, with the first request in an idle window
+  running immediately and a flood of any size collapsing into one trailing
+  publication, and a snapshot whose canonical capability set is unchanged is
+  not republished at all. This completes the per-context half of the snapshot
+  rate bound whose per-connection half already lives in the bridge.
 - Isolated-realm lockdown for compiled packs
   (`apps/extension/src/realm-lockdown.ts`), installed before any pack code runs:
   the content-script realm's `fetch` is replaced with an MCPatch-owned wrapper
