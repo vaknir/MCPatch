@@ -1,8 +1,11 @@
 # Pack enablement reconciliation
 
-Pack enablement is the only path from a reviewed extension-bundled site pack to
-browser host authority. It is not controlled by bridge messages, website content,
-pack arguments, or stored origin strings.
+Pack enablement is the only path from a locally verified bundled or installed
+declarative pack to browser host authority. It is not controlled by bridge
+messages, website content, pack arguments, registry pages, or stored origin
+strings. Community trust tiers, candidate state, and revocation are defined in
+[Community pack lifecycle](community-pack-lifecycle.md); this document describes
+the existing bundled catalog and the shared reconciliation boundary.
 
 ## Closed inputs
 
@@ -14,6 +17,12 @@ mirrored by `optional_host_permissions`. Synthetic `.invalid` packs are excluded
 Wildcards, undeclared origins, duplicate identities, incompatible packs, and
 overlong registration identities reject the catalog before the service worker
 starts.
+
+The future dynamic catalog applies the same checks to each locally verified
+declarative bundle. It may use Chromium's broad optional declaration only to make
+an exact selected origin request expressible; it never treats that declaration or
+an existing browser grant as pack authority. See
+[ADR 0014](../adr/0014-registry-discovery-and-origin-authority.md).
 
 The toolbar action uses the browser-provided clicked tab and `activeTab` grant. It
 enables only when exactly one catalog pack matches that URL. The permission request

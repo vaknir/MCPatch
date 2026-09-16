@@ -31,6 +31,12 @@ Local development packs are compiled into an unpacked development build. Develop
 mode is visibly distinct, uses a separate extension identity and native-host name,
 and is never enabled by a marketplace action.
 
+This foundation ADR deferred third-party remote distribution. The safe signed
+declarative distribution boundary is subsequently defined by
+[ADR 0013](0013-community-pack-trust-and-lifecycle.md) and
+[ADR 0014](0014-registry-discovery-and-origin-authority.md), pending their
+follow-up implementation issues and Chrome Web Store release gate.
+
 The runtime must not use `eval`, `Function`, remotely hosted scripts, downloaded
 WebAssembly, dynamic code generation, or an equivalent mechanism to execute pack
 logic. Registry responses are metadata and signed declarative artifacts, never code.

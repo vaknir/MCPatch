@@ -20,6 +20,10 @@ architectural constraint rather than a user-interface preference.
    expiring one-time grant unless an equally strict policy explicitly permits them.
 6. Installed code is not silently replaced by remote marketplace code.
 7. The bridge has no DOM behavior; packs have no direct MCP client access.
+8. Community pack trust is attached to an immutable publisher/pack/version/digest
+   identity; a browser origin grant is never sufficient pack authority.
+9. Registry discovery is an extension-owned control-plane operation triggered by
+   explicit user activity, not a tab or browsing-history observer.
 
 ## Components
 
@@ -86,21 +90,42 @@ Initially, packs are local development artifacts or verified, installed bundles.
 Marketplace metadata is never executable. Remote code is not downloaded into an
 authenticated page at runtime.
 
+Community declarative packs have separate `OFFICIAL`, `REVIEWED_COMMUNITY`, and
+`UNSIGNED_LOCAL_DEVELOPMENT` trust tiers. The tier, publisher identity, exact
+version, and content digest are retained in every installed/enabled record. A
+candidate is staged and reviewed before it can become active; updates, revocation,
+staleness, incompatibility, and uninstall revoke live contexts before cleanup.
+The state machine and local-override rules are in
+[Community pack lifecycle](docs/architecture/community-pack-lifecycle.md).
+
 The closed, separately versioned contract and its activation boundaries are
 documented in [Pack Manifest version 1](docs/architecture/pack-manifest-v1.md).
 
 ### Registry
 
-The future registry distributes immutable, signed pack releases and compatibility
-evidence. It is not in the trusted call path and cannot silently activate a pack.
-Runtime operation remains possible without the registry.
+The future registry distributes immutable, signed declarative pack releases and
+compatibility evidence from one fixed HTTPS control-plane origin. The extension
+fetches bounded signed metadata only through its own registry client; packs,
+pages, agents, and MCP calls cannot select or invoke that client. Registry metadata
+cannot activate a pack, grant a host permission, or replace active bytes.
+
+Matching uses verified cached metadata against the current page only after an
+explicit extension action. MCPatch does not request `tabs`/`webNavigation` or run a
+background tab observer. For arbitrary HTTPS community origins, Chromium requires
+the platform declaration `https://*/*` in `optional_host_permissions`, but the
+runtime requests only the exact selected origin after the user reviews the pack.
+That declaration and the packaged declarative interpreter are explicit Chrome Web
+Store release gates; see [ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md).
+Runtime operation can continue offline only for a previously verified, fresh, and
+unrevoked cached artifact, with freshness visible to the user.
 
 ## Capability resolution
 
 For the active context, the extension resolves capabilities in this order:
 
 1. Native WebMCP tools exposed by the document.
-2. Explicitly enabled, compatible MCPatch packs whose origin matches exactly.
+2. One unambiguous candidate from all explicitly enabled, compatible MCPatch
+   packs—compiled and declarative—whose origin matches exactly.
 3. No capability.
 
 A later automation fallback would be a separate, high-risk subsystem with explicit
@@ -111,6 +136,14 @@ win, and the collision is recorded without exposing page-controlled metadata as 
 trusted description. Canonical URL matching, collision outcomes, and context binding
 are detailed in
 [Pack matching and capability resolution](docs/architecture/pack-resolution.md).
+
+For community packs, discovery metadata is not capability metadata until the
+selected artifact, signature, digest, compatibility, revocation, enabled identity,
+exact origin/path, and page handshake all pass local validation. For each exact
+tool name, an eligible native WebMCP candidate wins. If no native candidate exists,
+compiled and declarative pack candidates participate in one set: exactly one
+candidate publishes, while two or more candidates are hidden as ambiguous. There
+is no compiled-over-declarative priority.
 
 The bridge does not guess which tab is active in protocol version 2. If the same
 tool name is live in multiple contexts or connections, it is hidden from discovery
@@ -193,6 +226,7 @@ is avoided.
 
 - Generic `execute_js`, cookie, token, page-dump, filesystem, or network tools.
 - Runtime download and execution of arbitrary marketplace JavaScript.
+- Passive discovery through browsing-history or broad tab surveillance.
 - Scraping at scale or bypassing site controls.
 - A public registry, billing system, or reputation algorithm.
 - A Google Flights adapter before the contracts and security boundary are tested.
@@ -207,3 +241,6 @@ system shape; ADRs preserve alternatives and consequences.
 - [MCP 2026-07-28 release](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
 - [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging)
 - [Chrome extension permission declarations](https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions)
+- [Community pack lifecycle](docs/architecture/community-pack-lifecycle.md)
+- [ADR 0013: community pack trust and lifecycle](docs/adr/0013-community-pack-trust-and-lifecycle.md)
+- [ADR 0014: registry discovery and exact-origin authority](docs/adr/0014-registry-discovery-and-origin-authority.md)

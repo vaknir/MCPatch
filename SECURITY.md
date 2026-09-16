@@ -52,6 +52,11 @@ Changes must preserve these rules:
 7. Protocol, schema, and output limits are enforced before expensive processing.
 8. Logs use allowlisted fields and exclude raw arguments, results, page content,
    credentials, and grant material.
+9. Community trust is bound to the exact publisher/pack/version/digest identity;
+   unsigned local development cannot collide with or replace signed authority.
+10. Registry control-plane traffic is fixed-origin, extension-owned, and separate
+    from pack network authority; only the selected exact HTTPS origin may be
+    requested after a user gesture.
 
 ## Dependency and secret handling
 
@@ -79,3 +84,8 @@ extension, or trusted pack signing key is already compromised. It must still lim
 the blast radius of malformed input and a compromised website or untrusted agent.
 
 See [THREAT_MODEL.md](THREAT_MODEL.md) for the detailed model.
+
+The community distribution decisions are recorded in
+[ADR 0013](docs/adr/0013-community-pack-trust-and-lifecycle.md),
+[ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md), and the
+[community pack lifecycle](docs/architecture/community-pack-lifecycle.md).

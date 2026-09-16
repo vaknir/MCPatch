@@ -105,3 +105,12 @@ reject such packs safely. After publication, tightening rejection of data that w
 already invalid or unsafe is allowed in a patch release, while changing accepted
 meaning, permission scope, matching behavior, or compatibility intervals requires
 a new manifest version and migration note.
+
+Manifest syntax does not grant a trust tier. The signed bundle and registry
+attestation carry whether an artifact is `OFFICIAL` or `REVIEWED_COMMUNITY`, while
+the local installer marks an explicitly imported artifact
+`UNSIGNED_LOCAL_DEVELOPMENT`. Consumers must retain that provenance beside the
+manifest identity and must not infer it from the publisher string, name, or
+registry presence. Community declarative version 1 is read-only with
+`networkPolicy.extensionRequests: "none"`; registry control-plane access is not a
+pack permission.

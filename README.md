@@ -54,6 +54,12 @@ before calling that adapter verified.
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
+The Phase 13 community-pack trust, lifecycle, discovery, and exact-origin authority
+decisions are documented in
+[ADR 0013](docs/adr/0013-community-pack-trust-and-lifecycle.md),
+[ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md), and the
+[community pack lifecycle](docs/architecture/community-pack-lifecycle.md).
+
 The supported transport proof is described in
 [docs/local-demo.md](docs/local-demo.md). Local packaging and registration are
 documented in [docs/installation.md](docs/installation.md).
