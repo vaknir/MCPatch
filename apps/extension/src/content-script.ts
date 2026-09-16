@@ -19,7 +19,7 @@ declare const chrome: { readonly runtime: ChromePageClientRuntimeApi };
 // mechanism rather than by review. A failure here is fail-closed: the realm is
 // left without a running adapter and no capability snapshot is published.
 try {
-  lockRealm(
+  const navigation = lockRealm(
     globalThis as unknown as Parameters<typeof lockRealm>[0],
     reviewedRealmNetworkPolicy(
       globalThis.location.href,
@@ -33,6 +33,7 @@ try {
     globalThis.location.href,
     BUNDLED_PAGE_ADAPTERS,
     PACK_RUNTIME_OPTIONS,
+    navigation,
     createNativeWebMcpAdapter(globalThis.document, globalThis.location.origin),
   );
   const runtime = new PageContentRuntime(chrome.runtime, adapter, {

@@ -35,6 +35,11 @@ The lockdown installs a fixed, frozen, non-configurable set of replacements:
   removed, so the wrapped `fetch` is the only network channel left.
 - **`Document.prototype.cookie`** becomes a throwing accessor, so pack code can
   neither read nor write cookies.
+- **Navigation** loses every ambient primitive: `location.assign`,
+  `location.replace`, assignment to `location.href`, `window.open`, and
+  `HTMLFormElement.prototype.submit` / `requestSubmit` all throw. `href` keeps
+  its getter, because reading the current URL is an ordinary DOM read. The
+  captured entry point is returned to the caller rather than left reachable.
 
 Every replacement is non-configurable and frozen, so pack code cannot `delete`,
 redefine, or walk a prototype back to the original. The isolated world has its
@@ -47,6 +52,30 @@ realm.
 declared origin — it rethrows, and the content script publishes no capability
 snapshot for the document. A document with a partially locked realm therefore
 exposes no MCPatch capabilities.
+
+## Navigation
+
+Navigation is a side effect with no permission class of its own, so before this
+any handler, including one declared `risk: "read"`, could move the page. On an
+authenticated origin that is state-changing: it can trigger a server action
+through a GET, sign the user out, or move the user to a page the pack then
+reads.
+
+With the ambient primitives gone, the only route left is the entry point
+`lockRealm` returns. The reviewed document adapter wraps it in a
+`PackNavigationGate` per pack and hands the pack a plain `navigate(url)`. The
+gate refuses unless an approved `ACTION` tool from that pack is running, and
+refuses a target the pack's manifest does not match, so an approved action
+cannot be turned into a trip to an arbitrary page. It authorizes at most one
+navigation per call.
+
+Authorization happens while the action is running, but the navigation itself is
+deferred to the next task, because it unloads the document and would otherwise
+destroy the page runtime before the tool result reached the client.
+
+In the SDK, `BrowserToolContext` gains `navigate` only for a tool declared
+`risk: "action"`, so a read handler cannot reach for it in typed code and is
+refused at runtime as well.
 
 ## Scope
 

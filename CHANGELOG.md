@@ -212,6 +212,15 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Navigation is now an approved-action capability. The isolated realm loses
+  `location.assign`, `location.replace`, assignment to `location.href`,
+  `window.open` and form submission, so a `read` tool has no side effect left
+  beyond reading the DOM. The single captured entry point is handed to a pack
+  through a gate that refuses unless one of that pack's approved `ACTION` tools
+  is running and the target is a page its manifest matches, and that authorizes
+  one navigation per call. In the SDK an action tool's context gains
+  `navigate`, which a read tool's context does not have. Google Flights and
+  TradingView now navigate through it instead of touching `location` directly.
 - Content scripts are now registered for the paths a pack declares instead of
   its whole origin, so the reviewed Google Flights bundle runs on
   `/travel/flights` and `/travel/flights/search` rather than on every page of

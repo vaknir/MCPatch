@@ -114,7 +114,7 @@ from review to mechanism is a trust-boundary change and needs an ADR
 | No cookies or tokens in results                            | review + closed output schema (#176)                                        |
 | Network only to declared origins                           | host permissions + review; no runtime realm bound yet (#187)                |
 | No network under `networkPolicy.extensionRequests: "none"` | review; no runtime realm bound yet (#187)                                   |
-| No navigation from `READ` tools                            | review (#188)                                                               |
+| No navigation from `READ` tools                            | realm lockdown plus an action-gated navigator (#188)                        |
 | Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                        |
 | Origin binding                                             | mechanism                                                                   |
 | Path binding                                               | content-script registration from the manifest path rules (#180)             |
