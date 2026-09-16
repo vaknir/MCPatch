@@ -59,6 +59,23 @@ describe("Declarative Pack Bundle v1", () => {
     const bundle = fixtureBundle();
     expect(validateSchema(bundle)).toBe(true);
     expect(validateDeclarativePackBundle(bundle)).toBeUndefined();
+    const unicodeLicense = {
+      ...bundle,
+      metadata: { ...bundle.metadata, license: "é".repeat(128) },
+    };
+    expect(validateSchema(unicodeLicense)).toBe(true);
+    expect(validateDeclarativePackBundle(unicodeLicense)).toBeUndefined();
+    const overlongUnicodeLicense = {
+      ...bundle,
+      metadata: { ...bundle.metadata, license: "é".repeat(129) },
+    };
+    expect(validateSchema(overlongUnicodeLicense)).toBe(false);
+    expect(validateDeclarativePackBundle(overlongUnicodeLicense)).toMatchObject(
+      {
+        code: "INVALID_VALUE",
+        field: "metadata.license",
+      },
+    );
     const bundled = structuredClone(bundle) as Record<string, unknown>;
     (bundled.manifest as Record<string, unknown>).execution = {
       kind: "bundled",
@@ -339,6 +356,39 @@ describe("Declarative Pack Bundle v1", () => {
     await expect(
       ed25519.verifyAsync(signature, message, publicKey, { zip215: false }),
     ).resolves.toBe(false);
+  });
+
+  it("rejects a ZIP-215-only small-order publisher signature through the public verifier", async () => {
+    const content = await withComputedDigest(fixtureBundle());
+    const signed = await signDeclarativePackBundle(content, rfc8032Keys());
+    const smallOrderPublicKey = hexToBytes(
+      "0100000000000000000000000000000000000000000000000000000000000000",
+    );
+    const smallOrderSignature = hexToBytes(
+      "0100000000000000000000000000000000000000000000000000000000000000" +
+        "0000000000000000000000000000000000000000000000000000000000000000",
+    );
+    const publicKey = encodeBase64Url(smallOrderPublicKey);
+    const zip215Bundle = {
+      ...signed,
+      publisherSignature: {
+        ...signed.publisherSignature,
+        keyId: await publisherKeyId("example", publicKey),
+        publicKey,
+        signature: encodeBase64Url(smallOrderSignature),
+      },
+    };
+    await expect(
+      verifyDeclarativePackBundle(
+        serializeDeclarativePackBundle(zip215Bundle),
+        {
+          trustedPublicKey: publicKey,
+        },
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      issue: { code: "INVALID_SIGNATURE" },
+    });
   });
 
   it("keeps registry review attestation in a separate signing domain", async () => {

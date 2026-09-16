@@ -119,14 +119,14 @@ export function validateBundleContent(
   if (
     typeof metadata.license !== "string" ||
     metadata.license.length === 0 ||
-    utf8Length(metadata.license) > MAX_METADATA_LICENSE_LENGTH
+    Array.from(metadata.license).length > MAX_METADATA_LICENSE_LENGTH
   ) {
     return bundleIssue("INVALID_VALUE", "metadata.license");
   }
   if (
     metadata.homepage !== undefined &&
     (typeof metadata.homepage !== "string" ||
-      utf8Length(metadata.homepage) > MAX_METADATA_HOMEPAGE_LENGTH ||
+      Array.from(metadata.homepage).length > MAX_METADATA_HOMEPAGE_LENGTH ||
       !isCanonicalHomepage(metadata.homepage))
   ) {
     return bundleIssue("INVALID_VALUE", "metadata.homepage");
@@ -347,10 +347,6 @@ export function isCanonicalTimestamp(value: unknown): value is string {
     return false;
   const time = Date.parse(value);
   return Number.isFinite(time) && new Date(time).toISOString() === value;
-}
-
-function utf8Length(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
 }
 
 function contentOf(value: BundleRecord): DeclarativePackBundleContent {
