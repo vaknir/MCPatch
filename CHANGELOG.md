@@ -14,6 +14,11 @@ All notable MCPatch changes are documented here. The format follows
   tab/document/origin/path/context/digest binding, and revoke-before-cleanup
   cancellation without changing compiled pack behavior.
 
+- A browser-free declarative authoring entrypoint with branded locator, scope, and
+  projection builders; explicit read authority and fixture coverage; deterministic,
+  deeply frozen bundle build inputs; and a synthetic-document runner boundary for
+  the bounded declarative interpreter.
+
 - Declarative Operations v1 (initial pre-release definition): an immutable, closed,
   read-only AST embedded at
   `operations.program`, with one operation per manifest tool, static role and

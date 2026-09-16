@@ -22,6 +22,14 @@
       "types": "./dist/browser.d.ts",
       "import": "./dist/browser.js"
     },
+    "./declarative": {
+      "types": "./dist/declarative.d.ts",
+      "import": "./dist/declarative.js"
+    },
+    "./declarative-fixtures": {
+      "types": "./dist/declarative-fixtures.d.ts",
+      "import": "./dist/declarative-fixtures.js"
+    },
     "./schema/v1/*": "./schema/v1/*"
   },
   "scripts": {
