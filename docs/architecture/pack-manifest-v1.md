@@ -76,9 +76,10 @@ missing or removed authority disables the whole pack. See
 Every tool declares a description, risk, permission set, closed object input JSON
 Schema, closed object output JSON Schema, and at least one inline deterministic
 fixture. The risk must have its corresponding `READ`, `ACTION`, or `SENSITIVE`
-permission. Tool and fixture IDs are unique, fixture tool references must resolve,
-and all collections, text, JSON depth, JSON node count, and total content are
-bounded.
+permission, and reviewers classify each read against
+[ADR 0015](../adr/0015-sensitive-read-classification.md). Tool and fixture IDs
+are unique, fixture tool references must resolve, and all collections, text, JSON
+depth, JSON node count, and total content are bounded.
 
 ### Closed schemas
 

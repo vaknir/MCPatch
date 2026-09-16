@@ -152,7 +152,10 @@ Mitigations:
 - use allowlisted structured log fields with opaque identifiers;
 - never log raw arguments, results, page text, grants, or transport frames; and
 - classify tools that can read sensitive page content as `SENSITIVE` even if they
-  do not mutate state.
+  do not mutate state, using the rules in
+  [ADR 0015](docs/adr/0015-sensitive-read-classification.md): rendered content
+  and credential-free network reads are `READ`; undisplayed account data and
+  high-impact content are `SENSITIVE`.
 
 Content-level secret detection can reduce accidents but is not the primary boundary;
 the capability API must make credential access unavailable.

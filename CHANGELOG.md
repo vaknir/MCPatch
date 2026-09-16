@@ -173,6 +173,13 @@ All notable MCPatch changes are documented here. The format follows
   generated or browser message sent. The extension opens a prompt without
   stealing focus when a denial was seen in the last minute.
 
+- ADR 0015 defines when a read is `SENSITIVE`: content the user has already
+  rendered in the current document and credential-free network reads are
+  `READ`; undisplayed account data and high-impact content such as credentials
+  or private correspondence are `SENSITIVE`. The shipped TradingView and Google
+  Flights reads are classified by that rule, the review checklist cites it, and
+  the bundled permission ceiling is unchanged.
+
 ### Changed
 
 - Pack Manifest v1 now requires closed output schemas as well as closed input

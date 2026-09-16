@@ -34,6 +34,11 @@ All permission checks default to deny. Missing, unknown, contradictory, or
 unsupported permissions reject pack activation or tool dispatch. `READ` does not
 mean harmless: a tool that reads private or high-impact content must also declare
 `SENSITIVE`.
+_Amended 2026-09-16 ([ADR 0015](0015-sensitive-read-classification.md)):_ the
+rule for deciding what counts as private or high-impact is defined there. In
+short, content the user has already rendered in the current document is `READ`;
+undisplayed account data and high-impact content are `SENSITIVE`; credential-free
+network reads are `READ`.
 
 `READ + EXTERNAL_NETWORK` is allowed only for an installed pack capability with a
 pack identity and reviewed GET authority. `ACTION + EXTERNAL_NETWORK` is allowed

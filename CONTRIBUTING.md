@@ -91,7 +91,11 @@ changes, verify:
 - malformed, denied, expired, replayed, and stale-state cases;
 - exact origin, context, tool, pack, and argument binding;
 - size, complexity, timeout, cancellation, and concurrency limits;
-- absence of credentials and sensitive content from results and logs; and
+- absence of credentials and sensitive content from results and logs;
+- each tool's risk class against the rules in
+  [ADR 0015](docs/adr/0015-sensitive-read-classification.md): rendered content
+  and credential-free network reads are `READ`; undisplayed account data and
+  high-impact content are `SENSITIVE`; and
 - cross-language fixture agreement.
 
 ## Release changes
