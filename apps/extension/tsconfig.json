@@ -8,7 +8,9 @@
         "../../packs/google-flights/src/index.ts"
       ],
       "@mcpatch/protocol": ["../../packages/protocol/src/index.ts"],
-      "@mcpatch/sdk/runtime": ["../../packages/sdk/src/runtime.ts"]
+      "@mcpatch/sdk/browser": ["../../packages/sdk/src/browser.ts"],
+      "@mcpatch/sdk/runtime": ["../../packages/sdk/src/runtime.ts"],
+      "@mcpatch/tradingview-pack": ["../../packs/tradingview/src/index.ts"]
     },
     "types": ["node", "vitest/globals"]
   },

@@ -8,6 +8,11 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A reviewed TradingView pack with bounded `tradingview.current_chart` and
+  `tradingview.current_watchlist` reads plus an argument-bound
+  `tradingview.change_symbol` action using canonical `EXCHANGE:TICKER` identities,
+  exact optional-origin enablement, native-first resolution, and fail-closed
+  English single-chart compatibility checks.
 - A one-object browser pack SDK at `@mcpatch/sdk/browser` that registers real typed
   page handlers and generates capability discovery, routing, cancellation, safe
   errors, subscriptions, tool lists, and fail-closed compiled fallbacks, with safe

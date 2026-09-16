@@ -15,7 +15,8 @@
     "@mcpatch/example-packs": "workspace:*",
     "@mcpatch/google-flights-pack": "workspace:*",
     "@mcpatch/protocol": "workspace:*",
-    "@mcpatch/sdk": "workspace:*"
+    "@mcpatch/sdk": "workspace:*",
+    "@mcpatch/tradingview-pack": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
