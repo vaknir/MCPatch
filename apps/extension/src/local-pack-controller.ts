@@ -1,21 +1,18 @@
 import {
   MAX_DECLARATIVE_BUNDLE_BYTES,
   canonicalizePageLocation,
-  computeDeclarativePackBundleDigest,
   packMatchesLocation,
-  packSupportsBridgeProtocol,
-  packSupportsRuntime,
   parseDeclarativePackBundleContentBytes,
-  type DeclarativePackBundleContent,
 } from "@mcpatch/sdk/runtime";
 
-import { contentScriptMatches } from "./content-script-matches.js";
-import {
-  CONTENT_SCRIPT_FILE,
-  type ChromeRegisteredContentScript,
-} from "./enablement-model.js";
 import type { CompiledPackRuntimeOptions } from "./compiled-pack-validation.js";
-import { supportsRuntimeSchema } from "./runtime-schema.js";
+import {
+  decodeLocalPackBase64,
+  isLocalPackMessage,
+  isLocalPackRequest,
+  localPackFailure as failure,
+  localPackSuccess as success,
+} from "./local-pack-messages.js";
 import {
   LOCAL_CANDIDATE_TTL_MS,
   LOCAL_PACK_STORAGE_KEY,
@@ -26,7 +23,6 @@ import {
   type ChromeMessageSender,
   type LocalPackCandidateSummary,
   type LocalPackControllerRuntime,
-  type LocalPackErrorCode,
   type LocalPackRecord,
   type LocalPackRequest,
   type LocalPackResult,
@@ -35,20 +31,26 @@ import {
   type LocalPackSummary,
   type ValidatedLocalPack,
 } from "./local-pack-model.js";
+import { reconcileLocalContentScripts } from "./local-pack-registration.js";
 import {
   createLocalPackState,
   EMPTY_LOCAL_PACK_STATE,
   localPackRecord,
   parseLocalPackState,
 } from "./local-pack-storage.js";
+import {
+  LocalBundleError,
+  localPackIdentity,
+  permissionPatterns,
+  recordPermissionPatterns,
+  summarizeLocalPack,
+  summarizeLocalRecord,
+  validateLocalBundle,
+} from "./local-pack-validation.js";
 import type {
   PageAuthorization,
   PageSenderIdentity,
 } from "./page-context-model.js";
-
-const LOCAL_REGISTRATION_PREFIX = "mcpatch-local-v1-";
-const BASE64 =
-  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
 interface Candidate {
   readonly token: string;
@@ -61,15 +63,6 @@ interface Candidate {
 interface EffectiveRecord {
   readonly record: LocalPackRecord;
   readonly pack: ValidatedLocalPack;
-}
-
-class LocalBundleError extends Error {
-  readonly code: "DIGEST_MISMATCH" | "INCOMPATIBLE";
-
-  constructor(code: LocalBundleError["code"]) {
-    super(code);
-    this.code = code;
-  }
 }
 
 export interface LocalPackControllerOptions {
@@ -202,21 +195,22 @@ export class LocalPackController implements LocalPackControllerRuntime {
     }
     let pack: ValidatedLocalPack;
     try {
-      const bytes = decodeBase64(base64);
+      const bytes = decodeLocalPackBase64(base64);
       if (bytes.byteLength > MAX_DECLARATIVE_BUNDLE_BYTES) {
         return failure("TOO_LARGE", "bundle");
       }
       const bundle = parseDeclarativePackBundleContentBytes(bytes);
-      pack = await this.#validateBundle(bundle);
+      pack = await validateLocalBundle(bundle, this.#options.runtime);
     } catch (error) {
       if (error instanceof LocalBundleError) return failure(error.code);
       return failure("INVALID_BUNDLE", "bundle");
     }
-    if (this.#options.reviewedIdentities.has(identity(pack.bundle))) {
+    if (this.#options.reviewedIdentities.has(localPackIdentity(pack.bundle))) {
       return failure("COLLISION", "manifest");
     }
     const existing = this.#state.packs.find(
-      (record) => identity(record.bundle) === identity(pack.bundle),
+      (record) =>
+        localPackIdentity(record.bundle) === localPackIdentity(pack.bundle),
     );
     if (existing === undefined && this.#state.packs.length >= MAX_LOCAL_PACKS) {
       return failure("TOO_LARGE", "packs");
@@ -233,7 +227,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
     });
     this.#candidates.set(token, candidate);
     return success({
-      ...summary(candidate.pack, false),
+      ...summarizeLocalPack(candidate.pack, false),
       candidateToken: token,
       replacement: candidate.replacement,
     });
@@ -270,7 +264,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
     return installed === undefined
       ? failure("STORAGE_INVALID")
       : success(
-          summary(
+          summarizeLocalPack(
             await this.#validatedRecord(installed),
             true,
             installed.installId,
@@ -327,7 +321,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
     return updated === undefined
       ? failure("STORAGE_INVALID")
       : success(
-          summary(
+          summarizeLocalPack(
             await this.#validatedRecord(updated),
             updated.enabled,
             installId,
@@ -376,7 +370,9 @@ export class LocalPackController implements LocalPackControllerRuntime {
     try {
       for (const record of stored.packs) {
         const pack = await this.#validatedRecord(record);
-        if (this.#options.reviewedIdentities.has(identity(record.bundle))) {
+        if (
+          this.#options.reviewedIdentities.has(localPackIdentity(record.bundle))
+        ) {
           throw new Error("reviewed identity collision");
         }
         valid.push({ record, pack });
@@ -388,7 +384,10 @@ export class LocalPackController implements LocalPackControllerRuntime {
     const effective = stored.developerMode
       ? await this.#granted(valid.filter(({ record }) => record.enabled))
       : [];
-    await this.#reconcileScripts(effective);
+    await reconcileLocalContentScripts(
+      this.#api.scripting,
+      effective.map(({ pack }) => pack),
+    );
     const final = await this.#granted(effective);
     const accepted = await this.#hooks.replaceBundles?.(
       final.map(({ pack }) => pack.bundle),
@@ -427,42 +426,8 @@ export class LocalPackController implements LocalPackControllerRuntime {
     throw new Error("local pack storage invalid");
   }
 
-  async #validateBundle(
-    bundle: DeclarativePackBundleContent,
-  ): Promise<ValidatedLocalPack> {
-    const digest = await computeDeclarativePackBundleDigest(bundle);
-    if (digest !== bundle.manifest.digest) {
-      throw new LocalBundleError("DIGEST_MISMATCH");
-    }
-    if (
-      !packSupportsRuntime(
-        bundle.manifest,
-        this.#options.runtime.runtimeVersion,
-      ) ||
-      !packSupportsBridgeProtocol(
-        bundle.manifest,
-        this.#options.runtime.bridgeProtocolVersion,
-      ) ||
-      bundle.manifest.tools.some(
-        (tool) =>
-          tool.permissions.some(
-            (permission) =>
-              !this.#options.runtime.allowedPermissions.includes(permission),
-          ) ||
-          !supportsRuntimeSchema(tool.inputSchema) ||
-          !supportsRuntimeSchema(tool.outputSchema),
-      )
-    ) {
-      throw new LocalBundleError("INCOMPATIBLE");
-    }
-    const origins = Object.freeze(
-      [...new Set(bundle.manifest.matches.map((match) => match.origin))].sort(),
-    );
-    return Object.freeze({ bundle, manifest: bundle.manifest, origins });
-  }
-
   #validatedRecord(record: LocalPackRecord): Promise<ValidatedLocalPack> {
-    return this.#validateBundle(record.bundle);
+    return validateLocalBundle(record.bundle, this.#options.runtime);
   }
 
   async #granted<T extends { readonly pack: ValidatedLocalPack }>(
@@ -483,35 +448,6 @@ export class LocalPackController implements LocalPackControllerRuntime {
     } catch {
       return false;
     }
-  }
-
-  async #reconcileScripts(
-    records: readonly { readonly pack: ValidatedLocalPack }[],
-  ): Promise<void> {
-    const desired = localRegistrations(records.map(({ pack }) => pack));
-    const current = await this.#api.scripting.getRegisteredContentScripts();
-    const managed = current.filter((script) =>
-      script.id.startsWith(LOCAL_REGISTRATION_PREFIX),
-    );
-    const remove = managed
-      .filter((script) => {
-        const expected = desired.get(script.id);
-        return expected === undefined || !sameRegistration(script, expected);
-      })
-      .map((script) => script.id)
-      .sort();
-    if (remove.length > 0) {
-      await this.#api.scripting.unregisterContentScripts({ ids: remove });
-    }
-    const retained = new Set(
-      managed
-        .filter((script) => !remove.includes(script.id))
-        .map((script) => script.id),
-    );
-    const add = [...desired.values()].filter(
-      (script) => !retained.has(script.id),
-    );
-    if (add.length > 0) await this.#api.scripting.registerContentScripts(add);
   }
 
   #authorize(identityValue: PageSenderIdentity): PageAuthorization | undefined {
@@ -574,7 +510,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
       developerMode: this.#state.developerMode,
       packs: Object.freeze(
         this.#state.packs.map((record) => ({
-          ...summaryForRecord(record),
+          ...summarizeLocalRecord(record),
           installId: record.installId,
         })),
       ),
@@ -643,7 +579,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
       // Page authority and contexts have already been revoked.
     }
     try {
-      await this.#reconcileScripts([]);
+      await reconcileLocalContentScripts(this.#api.scripting, []);
     } catch {
       // No local authority remains even if script cleanup is delayed.
     }
@@ -687,220 +623,6 @@ export class LocalPackController implements LocalPackControllerRuntime {
       if (candidate.expiresAt <= now) this.#candidates.delete(token);
     }
   }
-}
-
-function localRegistrations(
-  packs: readonly ValidatedLocalPack[],
-): ReadonlyMap<string, ChromeRegisteredContentScript> {
-  const origins = new Map<string, Set<string>>();
-  for (const pack of packs) {
-    for (const match of pack.manifest.matches) {
-      const patterns = origins.get(match.origin) ?? new Set<string>();
-      for (const pattern of contentScriptMatches(match)) patterns.add(pattern);
-      origins.set(match.origin, patterns);
-    }
-  }
-  return new Map(
-    [...origins]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([origin, patterns]) => [
-        localRegistrationId(origin),
-        Object.freeze({
-          id: localRegistrationId(origin),
-          matches: Object.freeze([...patterns].sort()),
-          js: Object.freeze([CONTENT_SCRIPT_FILE]),
-          allFrames: false as const,
-          persistAcrossSessions: true as const,
-          runAt: "document_start" as const,
-          world: "ISOLATED" as const,
-        }),
-      ]),
-  );
-}
-
-function localRegistrationId(origin: string): string {
-  const encoded = [...new TextEncoder().encode(origin)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  return `${LOCAL_REGISTRATION_PREFIX}${encoded}`;
-}
-
-function sameRegistration(
-  left: ChromeRegisteredContentScript,
-  right: ChromeRegisteredContentScript,
-): boolean {
-  return (
-    left.id === right.id &&
-    left.allFrames === right.allFrames &&
-    left.persistAcrossSessions === right.persistAcrossSessions &&
-    left.runAt === right.runAt &&
-    left.world === right.world &&
-    JSON.stringify([...left.matches].sort()) ===
-      JSON.stringify([...right.matches].sort()) &&
-    left.js.length === 1 &&
-    left.js[0] === CONTENT_SCRIPT_FILE
-  );
-}
-
-function summary(
-  pack: ValidatedLocalPack,
-  enabled: boolean,
-  installId?: string,
-): LocalPackSummary {
-  return Object.freeze({
-    ...(installId === undefined ? {} : { installId }),
-    publisher: pack.manifest.publisher,
-    id: pack.manifest.id,
-    name: pack.manifest.name,
-    version: pack.manifest.version,
-    digest: pack.manifest.digest,
-    trust: LOCAL_PACK_TRUST,
-    origins: pack.origins,
-    tools: Object.freeze(
-      pack.manifest.tools.map((tool) =>
-        Object.freeze({
-          name: tool.name,
-          description: tool.description,
-          risk: tool.risk,
-          permissions: Object.freeze([...tool.permissions]),
-        }),
-      ),
-    ),
-    enabled,
-  });
-}
-
-function summaryForRecord(record: LocalPackRecord): LocalPackSummary {
-  const origins = Object.freeze(
-    [
-      ...new Set(record.bundle.manifest.matches.map((match) => match.origin)),
-    ].sort(),
-  );
-  return summary(
-    Object.freeze({
-      bundle: record.bundle,
-      manifest: record.bundle.manifest,
-      origins,
-    }),
-    record.enabled,
-    record.installId,
-  );
-}
-
-function identity(bundle: DeclarativePackBundleContent): string {
-  return `${bundle.manifest.publisher}/${bundle.manifest.id}`;
-}
-
-function permissionPatterns(origins: readonly string[]): readonly string[] {
-  return Object.freeze(origins.map((origin) => `${origin}/*`));
-}
-
-function decodeBase64(value: string): Uint8Array {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > Math.ceil(MAX_DECLARATIVE_BUNDLE_BYTES / 3) * 4 + 4 ||
-    !BASE64.test(value)
-  ) {
-    throw new TypeError("invalid base64");
-  }
-  const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  if (btoa(binary) !== value) throw new TypeError("noncanonical base64");
-  return bytes;
-}
-
-function isLocalPackRequest(value: unknown): value is LocalPackRequest {
-  if (!plainDataObject(value) || typeof value.type !== "string") return false;
-  switch (value.type) {
-    case "local_pack_content_config":
-    case "local_pack_list":
-      return exactFields(value, ["type"]);
-    case "local_pack_set_developer_mode":
-      return (
-        exactFields(value, ["type", "enabled"]) &&
-        typeof value.enabled === "boolean"
-      );
-    case "local_pack_preview":
-      return (
-        exactFields(value, ["type", "base64"]) &&
-        typeof value.base64 === "string"
-      );
-    case "local_pack_install":
-      return (
-        exactFields(value, ["type", "candidateToken"]) &&
-        typeof value.candidateToken === "string"
-      );
-    case "local_pack_set_enabled":
-      return (
-        exactFields(value, ["type", "installId", "enabled"]) &&
-        typeof value.installId === "string" &&
-        typeof value.enabled === "boolean"
-      );
-    case "local_pack_uninstall":
-      return (
-        exactFields(value, ["type", "installId"]) &&
-        typeof value.installId === "string"
-      );
-    default:
-      return false;
-  }
-}
-
-function isLocalPackMessage(value: unknown): boolean {
-  return (
-    plainDataObject(value) &&
-    typeof value.type === "string" &&
-    value.type.startsWith("local_pack_")
-  );
-}
-
-function recordPermissionPatterns(record: LocalPackRecord): readonly string[] {
-  return Object.freeze(
-    [
-      ...new Set(
-        record.bundle.manifest.matches.map((match) => `${match.origin}/*`),
-      ),
-    ].sort(),
-  );
-}
-
-function plainDataObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return false;
-  }
-  const prototype = Object.getPrototypeOf(value) as unknown;
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Reflect.ownKeys(value).every((key) => {
-    if (typeof key !== "string") return false;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return descriptor !== undefined && "value" in descriptor;
-  });
-}
-
-function exactFields(
-  value: Record<string, unknown>,
-  fields: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === fields.length &&
-    fields.every((field) => Object.hasOwn(value, field))
-  );
-}
-
-function success<T>(value: T): LocalPackResult<T> {
-  return Object.freeze({ ok: true, value });
-}
-
-function failure<T = never>(
-  code: LocalPackErrorCode,
-  field?: string,
-): LocalPackResult<T> {
-  return Object.freeze({
-    ok: false,
-    error: Object.freeze({ code, ...(field === undefined ? {} : { field }) }),
-  });
 }
 
 function randomHexId(): string {
