@@ -337,6 +337,34 @@ Mitigations:
 - signed releases and pack bundles before external distribution; and
 - key rotation and revocation procedures before the first public release.
 
+## Pack-boundary enforcement status
+
+Several boundaries below are honoured by **review** rather than by a runtime
+mechanism for the compiled (bundled) pack tier — every reviewed pack until the
+declarative interpreter exists. The table states, per claim, what enforces it
+today, so a reviewer never trusts a control that is not there for the tier they
+are reviewing. Each enforcement PR flips its row and links its issue; moving a row
+from review to mechanism is a trust-boundary change and needs an ADR
+(CONTRIBUTING.md, "Before implementation" step 2).
+
+| Claim (compiled pack tier)                                 | Enforced by today                                                             |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176)                                          |
+| Network only to declared origins                           | host permissions + review; no runtime realm bound yet (#187)                  |
+| No network under `networkPolicy.extensionRequests: "none"` | review; no runtime realm bound yet (#187)                                     |
+| No navigation from `READ` tools                            | review (#188)                                                                 |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                          |
+| Origin binding                                             | mechanism                                                                     |
+| Path binding                                               | extension JavaScript after injection (#180)                                   |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185) |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)            |
+
+The **declarative community tier** is not yet shippable. Its stronger invariants —
+no dynamic selectors, code, navigation, mutation, cookies, storage, or network
+primitive — become mechanism as the interpreter and operations schema land
+(#143–#147 under Phase 13, #141). Until then no declarative pack can activate, so
+those rows do not yet describe running code.
+
 ## Permission classes
 
 The policy vocabulary begins with these non-exclusive classes:

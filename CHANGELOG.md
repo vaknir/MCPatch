@@ -197,6 +197,11 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Per-tier pack-boundary enforcement-status tables in THREAT_MODEL.md,
+  ARCHITECTURE.md, and pack-manifest-v1.md, stating for each compiled-pack claim
+  whether it is enforced by mechanism or by review today, with the declarative
+  tier marked not-yet-shippable; CONTRIBUTING.md now requires an ADR to move a row
+  from review to mechanism, and the README status links the tables.
 - A security regression suite that pins red-team findings against regression: a
   `mcpatch mcp-stdio` abuse test (hostile bytes never leaving the process,
   frame-abuse termination with a stable code, continuation-state refusal,

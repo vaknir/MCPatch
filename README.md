@@ -55,6 +55,8 @@ verifies that adapter is recorded in
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
 
+Which pack-boundary claims are enforced by mechanism and which by review today is stated per tier in the enforcement-status tables in [THREAT_MODEL.md](THREAT_MODEL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [docs/architecture/pack-manifest-v1.md](docs/architecture/pack-manifest-v1.md).
+
 The Phase 13 community-pack trust, lifecycle, discovery, and exact-origin authority
 decisions are documented in
 [ADR 0013](docs/adr/0013-community-pack-trust-and-lifecycle.md),

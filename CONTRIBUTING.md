@@ -7,6 +7,9 @@ easier to understand, test, and maintain.
 
 1. Find or create a focused issue with acceptance criteria and security impact.
 2. For a material architecture or trust-boundary change, propose an ADR first.
+   Moving a pack-boundary enforcement-status row (in THREAT_MODEL.md,
+   ARCHITECTURE.md, or pack-manifest-v1.md) from review to mechanism is such a
+   change and requires an ADR.
 3. Branch from an up-to-date `main` using `<type>/<issue>-<short-name>`, for example
    `feat/10-protocol-schemas` or `fix/42-origin-check`.
 4. Add a failing test before important behavior, especially validation, policy,
