@@ -68,7 +68,17 @@ fn validate_capability(
     }
 
     match (capability.source, &capability.pack) {
-        (CapabilitySource::Pack, Some(pack)) => validate_pack(pack, prefix)?,
+        (CapabilitySource::Pack, Some(pack)) => {
+            // A pack result reaches the MCP client only through its declared
+            // output schema, so a pack capability without one has no allowlist.
+            if capability.output_schema.is_none() {
+                return Err(invalid(
+                    ValidationCode::InvalidCapability,
+                    format!("{prefix}.outputSchema"),
+                ));
+            }
+            validate_pack(pack, prefix)?;
+        }
         (CapabilitySource::NativeWebMcp, None) => {}
         _ => {
             return Err(invalid(

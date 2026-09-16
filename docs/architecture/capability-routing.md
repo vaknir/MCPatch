@@ -51,7 +51,9 @@ compiled into the bridge, so a pack schema cannot trigger bridge-originated netw
 or filesystem reads.
 
 Responses are accepted only from the original connection with the exact request,
-context, revision, and origin. Declared output schemas are enforced. A valid result,
+context, revision, and origin. Declared output schemas are enforced, and a pack
+capability must declare one or its snapshot is rejected; only native WebMCP
+capabilities, whose draft surface advertises no result schema, may omit it. A valid result,
 tool error, invalid result, cancellation, context replacement, or disconnect consumes
 the pending request once. Completion data is delivered directly to the reserving
 call; no polling or shared response buffer is used.

@@ -155,6 +155,11 @@ function validateSource(
     if (!Object.hasOwn(capability, "pack")) {
       return issue("INVALID_CAPABILITY", `${prefix}.pack`);
     }
+    // A pack result crosses to the MCP client only through its declared
+    // output schema, so a pack capability without one has no allowlist.
+    if (!Object.hasOwn(capability, "outputSchema")) {
+      return issue("INVALID_CAPABILITY", `${prefix}.outputSchema`);
+    }
     return validatePack(capability.pack, `${prefix}.pack`);
   }
   if (capability.source === "native_webmcp") {

@@ -176,6 +176,9 @@ All notable MCPatch changes are documented here. The format follows
   The output schema is the only allowlist between page content and the MCP
   client, so an open output schema is now a manifest error rather than a review
   concern.
+- Bridge protocol v1 capability snapshots now reject a `source: "pack"`
+  capability that omits `outputSchema`, in the JSON Schema and in both the Rust
+  and TypeScript validators. Native WebMCP capabilities may still omit it.
 
 ### Fixed
 
