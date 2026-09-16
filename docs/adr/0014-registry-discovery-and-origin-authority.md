@@ -35,6 +35,15 @@ against verified cached metadata. It does not register a global tab observer, re
 browsing history, use `tabs`/`webNavigation`, or watch arbitrary pages in the
 background. No match or stale cache means no install prompt and no authority.
 
+All index/bundle fetches, signature and digest verification, compatibility checks,
+and review-data staging complete before the authority-granting gesture. The
+extension-owned review surface renders only the staged record. A separate
+user-facing confirmation button then runs a synchronous handler that computes no
+new network data and calls `permissions.request` for the already-selected exact
+origin; it does not await fetch, index refresh, bundle download, or any other
+network work before that call. The promise result is reconciled after the browser
+decision, and denial or any mismatch leaves the candidate disabled.
+
 ### Host authority
 
 For arbitrary HTTPS community origins, the Chromium MV3 build declares the
@@ -44,9 +53,19 @@ and must never be requested as a grant. After the user has selected one verified
 pack on one current page and reviewed it, MCPatch calls the permissions API with
 only `https://selected-host[:port]/*` for that pack's exact origin (plus any
 separately reviewed external origins, which community read-only packs initially
-do not have). The request occurs in the same explicit user-gesture flow. The
-service worker then proves the exact enabled manifest path itself because the
-browser grant is origin-wide.
+do not have). The request occurs in the synchronous confirmation handler after
+the staged review is complete. The service worker then proves the exact enabled
+manifest path itself because the browser grant is origin-wide.
+
+`permissions.contains` is not sufficient proof: a broader granted pattern can
+satisfy an exact-looking query. Reconciliation must read the complete
+`permissions.getAll()` origins inventory and require the canonical selected-origin
+pattern itself, while rejecting covering patterns such as `https://*/*`,
+`<all_urls>`, or a wildcard subdomain. If a browser only reports a broader covering
+grant, MCPatch must remove that managed grant when safe and reconcile again; if it
+cannot prove and reduce the grant to the exact pattern, the community pack remains
+disabled. The same check applies to every declared external origin in a future
+reviewed tier.
 
 Before the browser prompt, MCPatch shows: trust tier; publisher signing identity;
 pack ID, version, and digest; exact origin and paths; tool names and schemas;

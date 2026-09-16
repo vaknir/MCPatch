@@ -35,9 +35,14 @@ The following are always untrusted:
 - bridge and extension messages before authentication and validation; and
 - files, environment values, and local IPC peers not created by the trusted install.
 
-A pack is executable code. It becomes trusted only for the exact immutable version,
-publisher, origins, permissions, and runtime policy that the user installed and
-enabled. Popularity or marketplace presence does not confer trust.
+A compiled pack contains executable code and is trusted only as part of the exact
+reviewed extension artifact. A community declarative bundle is untrusted data
+interpreted by packaged MCPatch code; the bundle and its metadata do not become
+trusted merely because they are present locally or in a registry. A declarative
+artifact becomes eligible only for its exact immutable version, publisher, digest,
+trust tier, origins, permissions, and runtime policy after local verification and
+explicit user enablement. Popularity or marketplace presence does not confer
+trust.
 
 ## Trusted computing base
 

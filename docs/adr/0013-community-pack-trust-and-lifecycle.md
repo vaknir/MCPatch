@@ -55,6 +55,14 @@ origin/path. Chromium's origin-wide grant is treated as a prerequisite, not as
 pack authority. This preserves attribution when several packs share an origin and
 ensures uninstall removes MCPatch authority before attempting browser cleanup.
 
+Revocation and cleanup are ordered: (1) mark the pack unavailable and block new
+publication/dispatch; (2) close affected contexts and cancel page/bridge calls,
+extension work, and pending approvals; (3) publish the old context tombstone and
+allow any replacement only at a fresh higher revision; then (4) update storage,
+unregister scripts, and remove no-longer-needed permissions. Unregistering a
+content script is cleanup, not revocation, because an already injected script can
+remain in a live document until its context is closed.
+
 ## Consequences
 
 - Users can distinguish maintainer trust, independent review, and local unsigned

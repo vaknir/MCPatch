@@ -54,6 +54,22 @@ not permit a local record to replace a signed record. A changed digest, manifest
 operation, schema, origin/path, risk, permission, or trust tier is a new candidate
 and requires explicit confirmation.
 
+### Shared origins and aggregate contexts
+
+The browser grant is an aggregate origin resource, while MCPatch authority remains
+per installed identity. Distinct packs targeting one exact origin may coexist and
+contribute different tool names. Removing or disabling one pack revokes only that
+pack's tools; the aggregate browser grant and content registration remain while at
+least one other enabled identity still needs the origin. Cleanup removes the grant
+only after the last dependent identity is gone.
+
+Same-name community packs are ambiguous and hidden. A same-name community pack and
+reviewed compiled pack are also hidden rather than selected by arrival order. An
+eligible native WebMCP tool wins either collision, as specified by the existing
+native-first resolver. Any change to the aggregate enabled identity set closes the
+old context, cancels its work, and publishes a fresh context revision containing
+the newly resolved set; an old revision cannot retain tools from a removed pack.
+
 ## State machine
 
 The registry and installer keep candidate state separate from active authority.
@@ -99,6 +115,27 @@ Install, update, and uninstall are transactional from the authority perspective:
 stage and validate first, publish no live capability until all checks pass, and
 revoke before deleting or replacing anything. An interrupted operation resumes as
 disabled/candidate state, never as guessed active state.
+
+### Revocation-before-cleanup sequence
+
+Every disable, uninstall, permission loss, incompatible update, stale transition,
+revocation, and aggregate-origin change follows this order:
+
+1. Atomically mark the affected pack identity unavailable in memory so no new
+   publication or dispatch can reserve it.
+2. Close affected page and bridge contexts and cancel their in-flight page/bridge
+   calls, extension work, and pending approval records.
+3. Publish a context tombstone/closure for the old revision. A replacement
+   aggregate is allowed only under a fresh higher revision after all identity,
+   permission, and artifact checks pass.
+4. Only after the old authority is closed, update persistent install/enablement
+   records and unregister managed content scripts or remove no-longer-needed
+   browser permissions.
+
+Unregistering a content script is cleanup, not revocation: an already injected
+script can remain in a live document until the context is closed. The in-memory
+availability mark, context closure, call/approval cancellation, and tombstone are
+therefore mandatory before asynchronous browser or storage cleanup.
 
 ## Freshness, offline, and revocation
 
