@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Architecture for safe community pack distribution: separate official,
+  reviewed-community, and unsigned-local trust tiers; attributable install and
+  update state transitions; fixed-origin registry control-plane discovery without
+  tab surveillance; exact-origin user-gesture authority; offline freshness and
+  revocation rules; and a Chrome Web Store/MV3 release gate for remote-data
+  interpreters and arbitrary-origin optional host declarations.
 - A reviewed TradingView pack with bounded `tradingview.current_chart` and
   `tradingview.current_watchlist` reads, canvas-scoped bounded
   `tradingview.capture_chart` native MCP image results, constrained canonical

@@ -1,9 +1,9 @@
 # MCPatch threat model
 
 - Status: Initial foundation model
-- Updated: 2026-09-15
-- Review trigger: any new transport, permission, pack distribution path, write tool,
-  or credential-handling feature
+- Updated: 2026-09-16
+- Review trigger: any new transport, permission, pack distribution path, trust-tier
+  change, write tool, or credential-handling feature
 
 ## Security objective
 
@@ -29,6 +29,8 @@ The following are always untrusted:
 - MCP clients, agents, models, and tool arguments;
 - website DOM, scripts, events, text, and native WebMCP metadata;
 - pack manifests, schemas, fixtures, implementation input, and marketplace data;
+- publisher claims, publisher keys, registry attestations, cached indexes, and
+  revocation metadata;
 - tool results before validation;
 - bridge and extension messages before authentication and validation; and
 - files, environment values, and local IPC peers not created by the trusted install.
@@ -42,12 +44,15 @@ enabled. Popularity or marketplace presence does not confer trust.
 - the installed MCPatch bridge binary and native-host manifest;
 - the installed MCPatch extension package and fixed production extension identity;
 - deterministic policy, schema validation, and canonicalization code;
+- the packaged declarative operation interpreter and its bounded page adapter;
 - operating-system user isolation and browser extension isolation;
 - explicitly trusted pack signing keys and immutable installed pack bytes; and
 - the user making an approval decision in trusted MCPatch UI.
 
 The registry is outside the runtime trusted computing base. It may distribute signed
-artifacts and evidence, but runtime verification and explicit enablement are local.
+artifacts and evidence, but runtime verification, trust-tier assignment, revocation
+handling, and explicit enablement are local. A publisher signature proves control of
+keyed bytes; it does not prove that MCPatch reviewed the authority.
 
 ## Assumptions
 
@@ -165,8 +170,80 @@ Mitigations:
 - make permission increases an explicit reinstall/reapproval event; and
 - maintain revocation and local disable controls before a public marketplace.
 
-The first implementation permits only local development packs and repository-built
-first-party packs. Third-party remote distribution is out of scope.
+The community design admits only bounded declarative data to the packaged
+interpreter. `OFFICIAL`, `REVIEWED_COMMUNITY`, and `UNSIGNED_LOCAL_DEVELOPMENT`
+are separate trust tiers, and unsigned local identities cannot collide with signed
+publisher/pack identities. Third-party code is still never downloaded or executed.
+
+### Malicious publisher and dependency confusion
+
+A publisher impersonates a popular pack, reuses another publisher's ID, transfers
+an ID without proof, or supplies a local bundle that looks like a reviewed release.
+
+Mitigations:
+
+- bind trust to publisher key, publisher/pack ID, version, digest, and tier rather
+  than display name, logo, link, or popularity;
+- require publisher proof and independent MCPatch registry attestation for trusted
+  tiers, with separated signing and review roles;
+- make unsigned development identities use a local-only namespace that cannot equal
+  an official or reviewed-community identity;
+- reject cross-publisher replacement, identity reuse, ambiguous duplicate records,
+  and key/transfer changes without an explicit verified relationship; and
+- preserve visible trust and signing history through updates and revocation.
+
+### Compromised registry metadata or bundle delivery
+
+An attacker controls an index, cache, CDN object, redirect, content type, or
+publisher-facing metadata and attempts substitution, truncation, rollback, stale
+replay, or silent authority expansion.
+
+Mitigations:
+
+- fetch only bounded objects from the fixed MCPatch registry origin with no
+  credentials and no caller-selected URL or redirect;
+- verify index and bundle signatures, digest, identity, content type, size,
+  publication sequence, compatibility, and revocation locally before presentation;
+- keep registry control-plane traffic separate from pack `EXTERNAL_NETWORK`
+  authority; community read-only packs cannot invoke it;
+- stage candidates separately from active bytes and require explicit review for any
+  digest or authority change; and
+- reject invalid, conflicting, rolled-back, or partial records before installation.
+
+### Stale packs and revocation gaps
+
+An installed pack is used after the registry has revoked it, after compatibility has
+expired, or while the client is offline and cannot learn of an emergency event.
+
+Mitigations:
+
+- bind active use to a signed freshness deadline and a verified unrevoked record;
+- allow offline use only for a previously verified, compatible, fresh artifact and
+  show the last verification sequence/time;
+- when freshness expires, revoke existing community contexts and deny new calls;
+- apply a verified revocation to current and rollback candidates before script or
+  storage cleanup; and
+- never treat a stale cache, failed network request, or browser grant as evidence of
+  continued safety.
+
+### Deceptive schemas and marketplace metadata
+
+A pack uses friendly descriptions, titles, schemas, fixtures, or labels to hide a
+dangerous read, an unexpected origin, sensitive fields, or a confusing action from
+the user or reviewer.
+
+Mitigations:
+
+- derive policy from locally validated manifest fields and operation semantics, not
+  descriptions, annotations, or page text;
+- show exact origins/paths, schemas, risk, permissions, network policy, publisher
+  key, digest, compatibility, and verification state before host permission;
+- require closed schemas and fixed declarative operations with no dynamic selectors,
+  code, navigation, mutation, cookies, storage, or network primitive;
+- treat fixture success and marketplace evidence as bounded, untrusted evidence;
+  they do not grant authority; and
+- fail closed on schema/operation mismatch, omitted fields, unsupported keywords,
+  oversized or ambiguous data, and changes requiring re-review.
 
 ### Malicious website and prompt injection
 
@@ -268,6 +345,11 @@ The policy vocabulary begins with these non-exclusive classes:
 Risk labels shown to users are derived from permissions and reviewed metadata. They
 do not replace enforcement.
 
+Community declarative packs begin with `READ` only and
+`networkPolicy.extensionRequests: "none"`. Declarative actions and external
+network methods require their own future ADR and cannot be smuggled in through
+registry metadata or a schema.
+
 ## Residual risks
 
 - A trusted pack may contain a logic bug that returns more data than intended.
@@ -275,6 +357,12 @@ do not replace enforcement.
 - Browser extension isolation defects can invalidate the trust model.
 - A user can approve a misleading but accurately displayed action.
 - Website changes can cause a pack to select the wrong user-visible data.
+- A registry outage or delayed revocation check leaves a fresh cached community
+  artifact usable until its bounded freshness deadline.
+- Chrome Web Store policy may reject the broad optional declaration needed to
+  express arbitrary runtime-discovered HTTPS origins or may classify an overly
+  expressive remote-data interpreter as remote logic; distribution must stop rather
+  than weaken the runtime boundary.
 
 Compatibility fixtures, publisher accountability, precise approval UX, and rapid
 disable/revocation reduce these risks but do not eliminate them.
@@ -292,3 +380,9 @@ Before the relevant feature can merge, tests must cover:
 - forged, subframe, stale-document, and permission-revoked content ports;
 - schema complexity and output-size limits; and
 - redaction/absence of sensitive data in structured logs.
+- signed index/bundle substitution, replay, rollback, duplicate identity, stale
+  cache, revocation, and offline freshness behavior;
+- trust-tier collisions, publisher key/transfer changes, deceptive metadata and
+  schemas, and unsigned local replacement attempts; and
+- exact-origin permission prompts, denial, permission loss, shared-origin record
+  attribution, and absence of any broad runtime host grant.
