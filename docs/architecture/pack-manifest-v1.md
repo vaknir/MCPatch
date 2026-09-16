@@ -74,10 +74,32 @@ missing or removed authority disables the whole pack. See
 ## Tools and fixtures
 
 Every tool declares a description, risk, permission set, closed object input JSON
-Schema, output JSON Schema, and at least one inline deterministic fixture. The risk
-must have its corresponding `READ`, `ACTION`, or `SENSITIVE` permission. Tool and
-fixture IDs are unique, fixture tool references must resolve, and all collections,
-text, JSON depth, JSON node count, and total content are bounded.
+Schema, closed object output JSON Schema, and at least one inline deterministic
+fixture. The risk must have its corresponding `READ`, `ACTION`, or `SENSITIVE`
+permission. Tool and fixture IDs are unique, fixture tool references must resolve,
+and all collections, text, JSON depth, JSON node count, and total content are
+bounded.
+
+### Closed schemas
+
+The output schema is the only boundary between page content and the MCP client:
+the bridge validates every result against it and there is no separate scrubbing
+step. Both schemas are therefore required to be closed, which means every value
+they accept is fully described by the pack author:
+
+- the root is `type: "object"` with `additionalProperties` set to `false` or to a
+  closed subschema;
+- every subschema declares `type`, `const`, or `enum`;
+- every nested `type: "object"` subschema is closed the same way;
+- every `type: "array"` subschema declares closed `items`; and
+- `not` never appears, because a schema that rejects everything ships a tool that
+  can never succeed.
+
+Draft 2020-12 applicators such as `allOf` only narrow what a schema accepts and
+cannot reopen a closed schema, so validation leaves them to the runtime support
+check described below. `validatePackManifest` reports the first violation as
+`INVALID_SCHEMA` at the exact subschema path, for example
+`tools[0].outputSchema.properties.rows.items`.
 
 Fixtures are untrusted test data. They are part of the pack artifact and identity,
 not runtime authority. The

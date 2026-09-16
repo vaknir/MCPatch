@@ -29,7 +29,12 @@
         "additionalProperties": false,
         "properties": {}
       },
-      "outputSchema": { "type": "object" }
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": { "id": { "type": "string", "maxLength": 128 } }
+      }
     }
   ],
   "fixtures": [

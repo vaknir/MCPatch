@@ -233,7 +233,14 @@
             "additionalProperties": { "const": false }
           }
         },
-        "outputSchema": { "type": "object" }
+        "outputSchema": {
+          "type": "object",
+          "required": ["type", "additionalProperties"],
+          "properties": {
+            "type": { "const": "object" },
+            "additionalProperties": { "const": false }
+          }
+        }
       }
     },
     "fixture": {

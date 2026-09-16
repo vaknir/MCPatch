@@ -163,8 +163,10 @@ result-binding rules are detailed in
 7. If an approval is required, execution pauses until a deterministic grant matches
    the canonical argument hash, tool, origin, expiry, and unused nonce.
 8. The extension invokes the bound native capability or installed pack operation.
-9. The result is validated, size-limited, stripped of forbidden data, and returned
-   to the MCP client.
+9. The result is validated against the tool's closed output schema, size-limited,
+   and returned to the MCP client. The closed schema is the allowlist; no
+   separate scrubbing step exists, so content the schema does not name never
+   leaves the browser.
 
 Navigation, tab closure, pack disablement, disconnect, timeout, or cancellation
 invalidates the affected registrations and pending calls.

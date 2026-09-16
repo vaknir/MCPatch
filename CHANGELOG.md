@@ -166,6 +166,17 @@ All notable MCPatch changes are documented here. The format follows
   exact SDK matching, native WebMCP precedence, bounded schema interpretation,
   typed calls, result validation, cancellation, and lifecycle revocation.
 
+### Changed
+
+- Pack Manifest v1 now requires closed output schemas as well as closed input
+  schemas: the root is an object with `additionalProperties` set to `false` or to
+  a closed subschema, every subschema declares `type`, `const`, or `enum`, nested
+  objects are closed, arrays declare `items`, and `not` is rejected.
+  `validatePackManifest` reports the first violation at the exact subschema path.
+  The output schema is the only allowlist between page content and the MCP
+  client, so an open output schema is now a manifest error rather than a review
+  concern.
+
 ### Fixed
 
 - Protocol and SDK JSON value types now agree on immutable array values, allowing
