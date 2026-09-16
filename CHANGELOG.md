@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A bounded read-only declarative pack interpreter for the extension, using
+  opaque document handles, static packaged DOM traversal, strict scalar parsing,
+  incremental node/byte budgets, schema-valid output, exact
+  tab/document/origin/path/context/digest binding, and revoke-before-cleanup
+  cancellation without changing compiled pack behavior.
+
 - Declarative Operations v1 (initial pre-release definition): an immutable, closed,
   read-only AST embedded at
   `operations.program`, with one operation per manifest tool, static role and

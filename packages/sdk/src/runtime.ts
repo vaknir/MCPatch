@@ -48,3 +48,18 @@ export type {
   PackImageContent,
   PackToolReturn,
 } from "./tool-result.js";
+export {
+  computeDeclarativePackBundleDigest,
+  parseDeclarativePackBundle,
+  validateDeclarativePackBundle,
+} from "./declarative-bundle.js";
+export type * from "./declarative-bundle-types.js";
+export {
+  MAX_ATTRIBUTE_CHARS,
+  MAX_NODE_VISITS,
+  MAX_OPERATION_DEADLINE_MS,
+  MAX_OUTPUT_BYTES,
+  MAX_OUTPUT_NODES,
+  MAX_TEXT_CHARS,
+} from "./declarative-operations-limits.js";
+export type * from "./declarative-operations-types.js";

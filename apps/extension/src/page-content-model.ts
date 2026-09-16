@@ -12,6 +12,7 @@ export interface ChromePageClientRuntimeApi {
 export interface PageAdapter {
   authorizePackTools?(tools: readonly string[]): void;
   capabilities(signal: AbortSignal): Promise<readonly PageCapability[]>;
+  close?(): void;
   execute(
     tool: string,
     args: JsonObject,
