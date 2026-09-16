@@ -214,7 +214,7 @@ class ReviewedDocumentAdapter implements PageAdapter {
     // Navigation is permitted only while an approved action is running, and
     // withdrawn again however the call ends.
     const pack = this.#packs.find((candidate) => candidate.adapter === adapter);
-    if (pack?.actions.has(tool) === true) pack.gate.arm();
+    if (pack?.actions.has(tool) === true) pack.gate.arm(signal);
     try {
       return await adapter.execute(tool, args, signal);
     } catch (error) {

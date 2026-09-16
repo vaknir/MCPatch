@@ -34,7 +34,7 @@ describe("pack navigation gate", () => {
 
   it("navigates once while armed and refuses a second attempt", () => {
     const { gate: g, assign, run } = gate();
-    g.arm();
+    g.arm(new AbortController().signal);
     g.navigate(SEARCH_URL);
     // Deferred until the call returns, so the tool result is sent first.
     expect(assign).not.toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe("pack navigation gate", () => {
       "http://www.google.com/travel/flights",
       "not a url",
     ]) {
-      g.arm();
+      g.arm(new AbortController().signal);
       expect(() => g.navigate(target)).toThrow(/outside the pack's matches/);
     }
     expect(assign).not.toHaveBeenCalled();
@@ -60,7 +60,7 @@ describe("pack navigation gate", () => {
 
   it("stops navigating once disarmed", () => {
     const { gate: g, assign, run } = gate();
-    g.arm();
+    g.arm(new AbortController().signal);
     g.disarm();
     expect(() => g.navigate(SEARCH_URL)).toThrow(/approved MCPatch action/);
     run();
@@ -69,12 +69,22 @@ describe("pack navigation gate", () => {
 
   it("still performs a navigation authorized before the call ended", () => {
     const { gate: g, assign, run } = gate();
-    g.arm();
+    g.arm(new AbortController().signal);
     g.navigate(SEARCH_URL);
     // The adapter disarms when the call returns; the authorized navigation
     // was already decided and still happens.
     g.disarm();
     run();
     expect(assign).toHaveBeenCalledWith(SEARCH_URL);
+  });
+
+  it("does not navigate when the call was cancelled after authorization", () => {
+    const { gate: g, assign, run } = gate();
+    const controller = new AbortController();
+    g.arm(controller.signal);
+    g.navigate(SEARCH_URL);
+    controller.abort();
+    run();
+    expect(assign).not.toHaveBeenCalled();
   });
 });

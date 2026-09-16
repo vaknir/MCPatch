@@ -212,6 +212,13 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- The Google Flights search action no longer navigates after a cancelled call:
+  the deferred navigation checks the call's abort signal, so a late cancel is
+  honoured instead of the timer firing regardless. An unauthorized target now
+  fails during the call rather than silently afterwards. The opaque `tfs`
+  parameter gained a decoder and a golden round-trip test, so a change to the
+  encoder's field numbers is visible in review instead of sending a user to a
+  search they did not approve.
 - Navigation is now an approved-action capability. The isolated realm loses
   `location.assign`, `location.replace`, assignment to `location.href`,
   `window.open` and form submission, so a `read` tool has no side effect left

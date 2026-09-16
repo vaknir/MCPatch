@@ -19,7 +19,7 @@ export class PackNavigationGate {
   readonly #manifest: PackManifest;
   readonly #navigation: RealmNavigation;
   readonly #defer: (run: () => void) => void;
-  #armed = false;
+  #armed: AbortSignal | undefined;
 
   constructor(
     manifest: PackManifest,
@@ -31,14 +31,18 @@ export class PackNavigationGate {
     this.#defer = defer;
   }
 
-  /** Permit one navigation while an approved action runs. */
-  arm(): void {
-    this.#armed = true;
+  /**
+   * Permit one navigation while an approved action runs. The call's signal is
+   * kept so a navigation authorized just before a cancellation does not still
+   * happen after it.
+   */
+  arm(signal: AbortSignal): void {
+    this.#armed = signal;
   }
 
   /** Withdraw permission, whether or not the action navigated. */
   disarm(): void {
-    this.#armed = false;
+    this.#armed = undefined;
   }
 
   /**
@@ -52,14 +56,18 @@ export class PackNavigationGate {
    * client.
    */
   navigate(url: string): void {
-    if (!this.#armed) {
+    const signal = this.#armed;
+    if (signal === undefined) {
       throw new TypeError("navigation requires an approved MCPatch action");
     }
-    this.#armed = false;
+    this.#armed = undefined;
     if (!this.#matches(url)) {
       throw new TypeError("navigation target is outside the pack's matches");
     }
     this.#defer(() => {
+      // A call cancelled between authorization and the deferred navigation
+      // must not still move the page.
+      if (signal.aborted) return;
       this.#navigation.assign(url);
     });
   }
