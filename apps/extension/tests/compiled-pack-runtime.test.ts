@@ -21,7 +21,7 @@ import {
 const demoSnapshot = JSON.parse(
   readFileSync(
     new URL(
-      "../../../packages/protocol/fixtures/v1/valid/demo-capability-snapshot.json",
+      "../../../packages/protocol/fixtures/v2/valid/demo-capability-snapshot.json",
       import.meta.url,
     ),
     "utf8",
@@ -44,7 +44,7 @@ describe("compiled pack extension integration", () => {
     await flushPromises();
 
     expect(parsePosted(port, 2)).toEqual({
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: "tool_result",
       requestId: "request-1",
       contextId: DEMO_CONTEXT_ID,
@@ -97,7 +97,7 @@ describe("compiled pack extension integration", () => {
       await flushPromises();
 
       expect(sent[1]).toEqual({
-        protocolVersion: 1,
+        protocolVersion: 2,
         type: "tool_error",
         requestId: call.requestId,
         contextId,
@@ -126,7 +126,7 @@ describe("compiled pack extension integration", () => {
 
     supervisor.stop();
     expect(parsePosted(second, 2)).toEqual({
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: "context_closed",
       contextId: DEMO_CONTEXT_ID,
       contextRevision: 2,

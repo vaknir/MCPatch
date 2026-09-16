@@ -41,3 +41,15 @@ export {
 } from "./validation/manifest.js";
 export { PACK_MANIFEST_VERSION } from "./types.js";
 export type * from "./types.js";
+export {
+  imageResult,
+  isPackExecutionResult,
+  MAX_PACK_IMAGE_BYTES,
+  MAX_PACK_IMAGE_DIMENSION,
+  structuredResult,
+} from "./tool-result.js";
+export type {
+  PackExecutionResult,
+  PackImageContent,
+  PackToolReturn,
+} from "./tool-result.js";

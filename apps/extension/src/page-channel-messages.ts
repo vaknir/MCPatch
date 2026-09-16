@@ -1,4 +1,5 @@
 import { validateCapabilities } from "./page-channel-capabilities.js";
+import { validateToolContent } from "@mcpatch/protocol";
 import {
   BINDING_FIELDS,
   exact,
@@ -143,15 +144,37 @@ function validateCall(message: Record<string, unknown>): void {
 }
 
 function validateResult(message: Record<string, unknown>): void {
-  exact(message, [
-    "pageProtocolVersion",
-    "type",
-    ...BINDING_FIELDS,
-    "requestId",
-    "tool",
-    "result",
-  ]);
+  exact(
+    message,
+    [
+      "pageProtocolVersion",
+      "type",
+      ...BINDING_FIELDS,
+      "requestId",
+      "tool",
+      "result",
+    ],
+    ["content"],
+  );
   validateBoundRequest(message);
+  if (Object.hasOwn(message, "content")) {
+    const issue = validateToolContent(message.content);
+    if (issue !== undefined) {
+      const code = [
+        "INVALID_TYPE",
+        "INVALID_VALUE",
+        "LIMIT_EXCEEDED",
+        "UNKNOWN_FIELD",
+      ].includes(issue.code)
+        ? issue.code
+        : "INVALID_VALUE";
+      throw new PageProtocolValidationError(
+        code as
+          "INVALID_TYPE" | "INVALID_VALUE" | "LIMIT_EXCEEDED" | "UNKNOWN_FIELD",
+        issue.field,
+      );
+    }
+  }
 }
 
 function validateError(message: Record<string, unknown>): void {

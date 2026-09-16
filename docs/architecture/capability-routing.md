@@ -22,7 +22,7 @@ for that connection.
 Tool names are sorted for stable discovery. A name is visible only when it resolves
 to exactly one live context. If two tabs or connections advertise the same name,
 the bridge hides it and rejects calls as ambiguous; update arrival order never picks
-a winner. Protocol version 1 does not infer an active tab.
+a winner. Protocol version 2 does not infer an active tab.
 
 Native WebMCP versus pack precedence is resolved by the extension before it sends a
 complete snapshot. Duplicate names inside one snapshot are invalid protocol data.

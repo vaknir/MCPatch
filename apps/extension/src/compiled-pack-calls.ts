@@ -1,4 +1,7 @@
-import { PackToolExecutionError } from "@mcpatch/sdk/runtime";
+import {
+  isPackExecutionResult,
+  PackToolExecutionError,
+} from "@mcpatch/sdk/runtime";
 import {
   PROTOCOL_VERSION,
   type JsonValue,
@@ -107,7 +110,10 @@ export class CompiledPackCallDispatcher {
       .then(
         (result) => {
           if (!this.#isPending(call.requestId, pending)) return;
-          if (!matchesRuntimeSchema(route.outputSchema, result)) {
+          const execution = isPackExecutionResult(result)
+            ? result
+            : { result, content: undefined };
+          if (!matchesRuntimeSchema(route.outputSchema, execution.result)) {
             this.#send(toolError(call, "RESULT_INVALID"));
             return;
           }
@@ -118,7 +124,10 @@ export class CompiledPackCallDispatcher {
             contextId: call.contextId,
             contextRevision: call.contextRevision,
             origin: call.origin,
-            result: structuredClone(result) as JsonValue,
+            result: structuredClone(execution.result) as JsonValue,
+            ...(execution.content === undefined
+              ? {}
+              : { content: structuredClone([...execution.content]) }),
           };
           this.#send(response);
         },

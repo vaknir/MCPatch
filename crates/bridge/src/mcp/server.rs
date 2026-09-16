@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn projects_only_the_public_typed_capability_contract() {
         let message = parse_message(include_bytes!(
-            "../../../../packages/protocol/fixtures/v1/valid/demo-capability-snapshot.json"
+            "../../../../packages/protocol/fixtures/v2/valid/demo-capability-snapshot.json"
         ))
         .unwrap();
         let Message::CapabilitySnapshot(snapshot) = message else {

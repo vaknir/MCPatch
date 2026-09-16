@@ -3,13 +3,13 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const schemaDirectory = fileURLToPath(
-  new URL("../schema/v1/", import.meta.url),
+  new URL("../schema/v2/", import.meta.url),
 );
 export const validDirectory = fileURLToPath(
-  new URL("../fixtures/v1/valid/", import.meta.url),
+  new URL("../fixtures/v2/valid/", import.meta.url),
 );
 export const invalidDirectory = fileURLToPath(
-  new URL("../fixtures/v1/invalid/", import.meta.url),
+  new URL("../fixtures/v2/invalid/", import.meta.url),
 );
 
 export function readJson(path: string): unknown {

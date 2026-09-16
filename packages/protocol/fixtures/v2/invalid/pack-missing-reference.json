@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 2,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://www.google.com",
+  "capabilities": [
+    {
+      "name": "flights.current_search",
+      "description": "Return current search.",
+      "origin": "https://www.google.com",
+      "source": "pack",
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object"
+      }
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import {
+  imageResult,
   PackToolExecutionError,
   type JsonObject,
   type PackExecutionContext,
@@ -80,12 +81,16 @@ function pageExecution(
 ) {
   return async (context: PackExecutionContext, input: JsonObject) => {
     try {
-      return await invoker.invoke(
+      const execution = await invoker.invoke(
         snapshot.binding.contextId,
         tool,
         input as unknown as ProtocolJsonObject,
         context.signal,
       );
+      const image = execution.content?.[0];
+      return image === undefined
+        ? execution.result
+        : imageResult(execution.result, image);
     } catch (error) {
       if (error instanceof PageInvocationError) {
         throw new PackToolExecutionError(toPackErrorCode(error.code));

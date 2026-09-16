@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpatch.dev/protocol/v2/lifecycle.schema.json",
+  "title": "MCPatch protocol v2 lifecycle messages",
+  "$defs": {
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "heartbeatId", "sentAt"],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "heartbeat"
+        },
+        "heartbeatId": {
+          "$ref": "common.schema.json#/$defs/identifier"
+        },
+        "sentAt": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    },
+    "connectionError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "code", "message", "fatal"],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "common.schema.json#/$defs/protocolVersion"
+        },
+        "type": {
+          "const": "connection_error"
+        },
+        "code": {
+          "$ref": "common.schema.json#/$defs/errorCode"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "fatal": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

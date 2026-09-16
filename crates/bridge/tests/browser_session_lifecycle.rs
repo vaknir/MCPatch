@@ -25,7 +25,7 @@ async fn applies_snapshots_and_context_closure_with_cancellation() {
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut client, vec![1]).await;
+    negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     send_message(&mut client, Message::CapabilitySnapshot(snapshot())).await;
     wait_for_capabilities(&registry, 1).await;
 
@@ -64,7 +64,7 @@ async fn authenticated_session_completes_an_exact_one_time_approval() {
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut client, vec![1]).await;
+    negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     let mut elevated = snapshot();
     let capability = &mut elevated.capabilities[0];
     capability.source = CapabilitySource::Pack;
@@ -134,7 +134,7 @@ async fn accepts_only_route_bound_results_and_errors() {
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut client, vec![1]).await;
+    negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     send_message(&mut client, Message::CapabilitySnapshot(snapshot())).await;
     wait_for_capabilities(&registry, 1).await;
 
@@ -153,6 +153,7 @@ async fn accepts_only_route_bound_results_and_errors() {
             context_revision: 1,
             origin: "https://example.com".to_owned(),
             result: json!({"ok": true}),
+            content: vec![],
         }),
     )
     .await;
@@ -190,7 +191,7 @@ async fn mismatched_response_revokes_only_the_offending_session() {
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut client, vec![1]).await;
+    negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     send_message(&mut client, Message::CapabilitySnapshot(snapshot())).await;
     wait_for_capabilities(&registry, 1).await;
     let routed = route(&registry, "request-1").await;
@@ -210,6 +211,7 @@ async fn mismatched_response_revokes_only_the_offending_session() {
             context_revision: 1,
             origin: "https://attacker.example".to_owned(),
             result: json!({"ok": true}),
+            content: vec![],
         }),
     )
     .await;
@@ -222,7 +224,7 @@ async fn mismatched_response_revokes_only_the_offending_session() {
     assert_eq!(registry.lock().await.connection_count(), 0);
 
     let (mut replacement, replacement_task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut replacement, vec![1]).await;
+    negotiate(&mut replacement, vec![PROTOCOL_VERSION]).await;
     assert!(!replacement_task.is_finished());
     drop(replacement);
     assert_eq!(join(replacement_task).await, Ok(()));
@@ -233,7 +235,7 @@ async fn stale_snapshot_uses_the_common_disconnect_cleanup() {
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut client, vec![1]).await;
+    negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     let mut current = snapshot();
     current.context_revision = 2;
     send_message(&mut client, Message::CapabilitySnapshot(current)).await;

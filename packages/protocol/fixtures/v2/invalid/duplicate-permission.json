@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 2,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://example.com",
+  "capabilities": [
+    {
+      "name": "example.read",
+      "description": "Read a synthetic value.",
+      "origin": "https://example.com",
+      "source": "native_webmcp",
+      "risk": "read",
+      "permissions": ["READ", "READ"],
+      "inputSchema": {
+        "type": "object"
+      }
+    }
+  ]
+}

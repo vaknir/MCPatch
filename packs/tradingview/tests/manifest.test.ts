@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TRADINGVIEW_CHANGE_SYMBOL,
+  TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_ORIGIN,
@@ -27,6 +28,11 @@ describe("TradingView reviewed pack manifest", () => {
     });
     expect(tradingViewPack.manifest.tools).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          name: TRADINGVIEW_CAPTURE_CHART,
+          risk: "read",
+          permissions: ["READ"],
+        }),
         expect.objectContaining({
           name: TRADINGVIEW_SEARCH_SYMBOLS,
           risk: "read",
@@ -54,7 +60,7 @@ describe("TradingView reviewed pack manifest", () => {
   it("keeps every service-worker handler fail closed", async () => {
     const result = await verifyPackFixtures(tradingViewPack, {
       runtimeVersion: "0.1.0",
-      bridgeProtocolVersion: 1,
+      bridgeProtocolVersion: 2,
       allowedPermissions: ["READ", "ACTION", "EXTERNAL_NETWORK"],
     });
 
@@ -62,8 +68,8 @@ describe("TradingView reviewed pack manifest", () => {
     if (!result.ok) return;
     expect(result.evidence.passed).toBe(true);
     expect(result.evidence.summary).toEqual({
-      total: 4,
-      passed: 4,
+      total: 5,
+      passed: 5,
       failed: 0,
       skipped: 0,
     });

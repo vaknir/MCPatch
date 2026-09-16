@@ -41,14 +41,16 @@ registry lock, and projects only the public typed contract: name, title, descrip
 input schema, optional output schema, and conservative MCP annotations. Internal
 connection/context identifiers, origins, pack identities, and permission records are
 not exposed as tool metadata. Ordering follows the registry's stable tool-name order.
-The bounded version-1 registry fits in one response, so cursors are rejected and each
+The bounded version-2 registry fits in one response, so cursors are rejected and each
 new list request observes the latest snapshot, context closure, and disconnect state.
 
 `tools/call` validates arguments against the selected capability before browser
 dispatch, creates a bridge-owned correlation ID, and waits on that exact registry
 reservation. The browser response must match the authenticated connection, context,
 revision, and origin, and any declared output schema. Valid results become MCP
-structured content; typed browser errors remain tool errors. Policy denial, invalid
+structured content. One independently validated bounded protocol image, when
+present, becomes a standard MCP image content block while its typed metadata stays
+in structured content; typed browser errors remain tool errors. Policy denial, invalid
 output, disconnect, cancellation, and the 30-second deadline fail closed without
 returning route metadata or rejected browser data. Cancellation and timeout consume
 the reservation before a best-effort `cancel` message is sent to the browser.

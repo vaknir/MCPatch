@@ -19,7 +19,7 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
 const DEMO_SNAPSHOT: &[u8] =
-    include_bytes!("../../../packages/protocol/fixtures/v1/valid/demo-capability-snapshot.json");
+    include_bytes!("../../../packages/protocol/fixtures/v2/valid/demo-capability-snapshot.json");
 
 #[tokio::test]
 async fn core_routes_a_tool_call_and_returns_only_the_validated_result() {
@@ -65,6 +65,7 @@ async fn core_routes_a_tool_call_and_returns_only_the_validated_result() {
         context_revision: call.context_revision,
         origin: call.origin,
         result: json!({"status": "ready"}),
+        content: vec![],
     });
     browser
         .write_json(&serde_json::to_vec(&result).unwrap())

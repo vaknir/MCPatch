@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject, JsonValue, ToolContent } from "@mcpatch/protocol";
 
 import type { ChromeEvent } from "./lifecycle.js";
 import type {
@@ -97,5 +97,10 @@ export interface PageInvoker {
     tool: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue>;
+  ): Promise<PageInvocationResult>;
+}
+
+export interface PageInvocationResult {
+  readonly result: JsonValue;
+  readonly content?: ToolContent[];
 }

@@ -1,3 +1,4 @@
+export { captureTradingViewChartImage } from "./chart-image.js";
 export {
   collectTradingViewSemanticSnapshot,
   createTradingViewDocumentSource,
@@ -12,6 +13,7 @@ export {
 export { tradingViewBrowserPack, tradingViewPack } from "./manifest.js";
 export {
   TRADINGVIEW_CHANGE_SYMBOL,
+  TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
@@ -25,6 +27,7 @@ export {
 export type {
   TradingViewChangeSymbolInput,
   TradingViewChangeSymbolResult,
+  TradingViewCaptureChartResult,
   TradingViewAssetType,
   TradingViewChartSemantics,
   TradingViewCurrentChartResult,

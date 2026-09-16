@@ -40,7 +40,7 @@ export function packRuntime(
     definitions,
     {
       runtimeVersion: "0.1.0",
-      bridgeProtocolVersion: 1,
+      bridgeProtocolVersion: 2,
       allowedPermissions: ["READ", "ACTION"],
     },
   );

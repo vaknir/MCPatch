@@ -1,6 +1,7 @@
 import { PackToolExecutionError } from "./fixture-harness-types.js";
 import type { MCPatchDefinition } from "./mcpatch.js";
 import type { JsonObject, JsonValue, PackFixture } from "./types.js";
+import type { PackToolReturn } from "./tool-result.js";
 
 const BROWSER_ERROR_CODES = new Set<BrowserToolErrorCode>([
   "CANCELLED",
@@ -35,7 +36,7 @@ export type BrowserToolHandler<
 > = (
   input: TInput,
   context: BrowserToolContext<TSite>,
-) => TOutput | Promise<TOutput>;
+) => PackToolReturn<TOutput> | Promise<PackToolReturn<TOutput>>;
 
 export type BrowserToolAvailability<TSite> = (
   context: BrowserToolContext<TSite>,
@@ -68,7 +69,7 @@ export interface BrowserPageAdapter {
     tool: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue>;
+  ): Promise<PackToolReturn>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -162,7 +163,7 @@ class GeneratedBrowserPageAdapter<TSite> implements BrowserPageAdapter {
     toolName: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue> {
+  ): Promise<PackToolReturn> {
     abortIfNeeded(signal);
     const tool = this.#routes.get(toolName);
     if (tool === undefined) {

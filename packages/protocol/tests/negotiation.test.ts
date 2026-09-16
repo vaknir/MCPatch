@@ -70,7 +70,7 @@ describe("protocol version negotiation", () => {
     }
     expect(() =>
       verifySelectedVersion(
-        [1],
+        [2],
         acknowledgement.supportedProtocolVersions,
         acknowledgement.selectedProtocolVersion,
       ),
@@ -87,7 +87,7 @@ describe("protocol version negotiation", () => {
   });
 
   it("gates application messages until hello", () => {
-    const negotiation = new AcceptorNegotiation([1]);
+    const negotiation = new AcceptorNegotiation([2]);
     const cancel = parseMessage(readFixture(validDirectory, "cancel.json"));
     expectNegotiationCode(
       () => negotiation.receive(cancel),
@@ -97,28 +97,28 @@ describe("protocol version negotiation", () => {
   });
 
   it("accepts application messages after selecting a version", () => {
-    const negotiation = new AcceptorNegotiation([1]);
+    const negotiation = new AcceptorNegotiation([2]);
     const hello = parseMessage(readFixture(validDirectory, "hello.json"));
     const cancel = parseMessage(readFixture(validDirectory, "cancel.json"));
 
     expect(negotiation.receive(hello)).toEqual({
       type: "send_hello_ack",
-      selectedProtocolVersion: 1,
+      selectedProtocolVersion: 2,
     });
     expect(negotiation.phase).toEqual({
       state: "ack_pending",
-      protocolVersion: 1,
+      protocolVersion: 2,
     });
     negotiation.acknowledgementSent();
     expect(negotiation.phase).toEqual({
       state: "ready",
-      protocolVersion: 1,
+      protocolVersion: 2,
     });
     expect(negotiation.receive(cancel)).toEqual({ type: "message_accepted" });
   });
 
   it("gates application messages until acknowledgement delivery", () => {
-    const negotiation = new AcceptorNegotiation([1]);
+    const negotiation = new AcceptorNegotiation([2]);
     const hello = parseMessage(readFixture(validDirectory, "hello.json"));
     const cancel = parseMessage(readFixture(validDirectory, "cancel.json"));
     negotiation.receive(hello);

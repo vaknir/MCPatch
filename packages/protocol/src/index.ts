@@ -19,3 +19,4 @@ export {
   validateMessage,
   validationIssue,
 } from "./validation/messages.js";
+export { validateToolContent } from "./validation/calls.js";

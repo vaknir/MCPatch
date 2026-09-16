@@ -1,6 +1,6 @@
 # TradingView MCP field report — 2026-09-16
 
-Status: **read, constrained symbol search, and approved action paths passed locally**
+Status: **read, bounded image, constrained symbol search, and approved action paths passed locally**
 
 Environment:
 
@@ -13,6 +13,7 @@ Typed tools discovered through MCP:
 
 - `tradingview.current_chart`
 - `tradingview.current_watchlist`
+- `tradingview.capture_chart`
 - `tradingview.search_symbols`
 - `tradingview.change_symbol`
 
@@ -20,11 +21,13 @@ Evidence:
 
 - the user enabled only the exact optional `https://www.tradingview.com/*` and
   `https://symbol-search.tradingview.com/*` permissions in the disposable profile;
-- the MCP client discovered all four capabilities from the compatible live chart;
+- the MCP client discovered all five capabilities from the compatible live chart;
 - `tradingview.current_chart` returned a schema-valid canonical chart identity,
   interval, finite OHLC/current-price fields, and the expected fingerprint;
 - `tradingview.current_watchlist` returned between one and 64 schema-valid visible
   rows with canonical exchange-qualified symbols and finite quote fields;
+- `tradingview.capture_chart` returned schema-valid active-symbol metadata and one
+  native MCP WebP image within 1,600 × 1,200 and 160-KiB bounds;
 - `tradingview.search_symbols` resolved a company-name query through MCP and
   returned `NYSE:IBM` with an explicit stock asset type inside the requested
   five-result bound;
@@ -43,10 +46,20 @@ Security limits:
 - no cookies, tokens, captured headers, browser storage, HAR data, or private
   endpoints were read or transported; the search request used a fixed public
   first-party GET with `credentials: "omit"`;
-- no live prices, watchlist contents, screenshots, raw tool outputs, request logs,
+- no live prices, watchlist contents, chart images, raw tool outputs, request logs,
   or browser profile were retained; and
 - the pack exposed no generic browser, DOM, JavaScript, fetch, screenshot, or
   request-replay capability.
+
+Bounded image contract:
+
+- capture accepted no selector, rectangle, URL, tab, or browser-surface argument;
+- the reviewed page adapter composited only visible canvases fully contained by the
+  one compatible active chart region;
+- the SDK, page protocol, bridge protocol, and MCP projection preserved one closed
+  image block separately from structured metadata; and
+- the harness validated the MIME, canonical base64, dimensions, and decoded byte
+  bound in memory, then deleted the disposable profile without writing the image.
 
 Approved action contract:
 

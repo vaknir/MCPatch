@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject } from "@mcpatch/protocol";
 
 import {
   PAGE_PROTOCOL_VERSION,
@@ -14,6 +14,7 @@ import {
   type PageContextOwnerOptions,
   type PageContextSnapshot,
   type PageInvoker,
+  type PageInvocationResult,
   type PageOwnerCloseReason,
   type PagePort,
   type PageSenderIdentity,
@@ -102,7 +103,7 @@ export class PageContextOwner implements PageInvoker {
     tool: string,
     args: JsonObject,
     signal: AbortSignal,
-  ): Promise<JsonValue> {
+  ): Promise<PageInvocationResult> {
     const session = this.#contexts.get(contextId);
     const authorization =
       session === undefined ? undefined : this.#authorize(session.identity);

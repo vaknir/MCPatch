@@ -160,6 +160,8 @@ Mitigations:
 - request optional host permission only when a user enables a pack;
 - dynamically register only the enabled origin's top-level isolated content bundle;
 - isolate pack APIs and deny ambient cookies, arbitrary fetch, and extension APIs;
+- require media-producing tools to define a reviewed semantic capture scope and
+  enforce shared MIME, dimension, count, and decoded-byte limits at every boundary;
 - make permission increases an explicit reinstall/reapproval event; and
 - maintain revocation and local disable controls before a public marketplace.
 

@@ -10,7 +10,11 @@ import {
   type Worker,
 } from "@playwright/test";
 
-import { McpStdioClient, structuredContent } from "./mcp-client.js";
+import {
+  McpStdioClient,
+  mcpImageContent,
+  structuredContent,
+} from "./mcp-client.js";
 
 const extensionPath = fileURLToPath(
   new URL("../../../apps/extension/dist/", import.meta.url),
@@ -24,10 +28,12 @@ const unsupportedUrl = "https://www.tradingview.com/markets/";
 const demoTool = "mcpatch.demo.status";
 const currentChartTool = "tradingview.current_chart";
 const currentWatchlistTool = "tradingview.current_watchlist";
+const captureChartTool = "tradingview.capture_chart";
 const changeSymbolTool = "tradingview.change_symbol";
 const searchSymbolsTool = "tradingview.search_symbols";
 const fingerprint = "tradingview-chart-semantic-en-v1";
 const tradingViewTools = [
+  captureChartTool,
   changeSymbolTool,
   currentChartTool,
   currentWatchlistTool,
@@ -126,6 +132,8 @@ test("invokes TradingView reads and an approved action through MCP in a disposab
       ),
       "NYSE:IBM",
     );
+    const captured = await client.callTool(captureChartTool).response;
+    validateChartCapture(captured, "NASDAQ:AAPL");
 
     const nextSymbol = "NYSE:IBM";
     const change = client.callTool(
@@ -266,6 +274,35 @@ function validateChangeAccepted(value: unknown, expectedSymbol: string): void {
     Object.keys(accepted).length !== 3
   ) {
     throw new Error("TradingView change-symbol acknowledgement changed");
+  }
+}
+
+function validateChartCapture(
+  response: Awaited<ReturnType<McpStdioClient["request"]>>,
+  expectedSymbol: string,
+): void {
+  const result = dataObject(structuredContent(response));
+  const image = mcpImageContent(response);
+  if (
+    result?.["fingerprint"] !== fingerprint ||
+    result["symbol"] !== expectedSymbol ||
+    result["mimeType"] !== "image/webp" ||
+    typeof result["width"] !== "number" ||
+    !Number.isSafeInteger(result["width"]) ||
+    result["width"] < 1 ||
+    result["width"] > 1_600 ||
+    typeof result["height"] !== "number" ||
+    !Number.isSafeInteger(result["height"]) ||
+    result["height"] < 1 ||
+    result["height"] > 1_200 ||
+    image.mimeType !== "image/webp" ||
+    image.data.length < 4 ||
+    image.data.length > 218_456 ||
+    image.data.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/u.test(image.data) ||
+    Buffer.from(image.data, "base64").byteLength > 160 * 1_024
+  ) {
+    throw new Error("TradingView chart-image contract changed");
   }
 }
 

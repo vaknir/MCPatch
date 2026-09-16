@@ -13,7 +13,7 @@ pub(crate) use strict_json::parse_value as parse_strict_json_value;
 /// Maximum encoded protocol frame accepted before JSON parsing.
 pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
 /// The bridge protocol version implemented by these types.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 pub(crate) fn valid_identifier(value: &str, maximum: usize) -> bool {
     let bytes = value.as_bytes();

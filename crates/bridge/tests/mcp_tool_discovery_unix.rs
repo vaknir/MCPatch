@@ -22,7 +22,7 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
 const DEMO_SNAPSHOT: &[u8] =
-    include_bytes!("../../../packages/protocol/fixtures/v1/valid/demo-capability-snapshot.json");
+    include_bytes!("../../../packages/protocol/fixtures/v2/valid/demo-capability-snapshot.json");
 
 #[tokio::test]
 async fn core_lists_only_the_live_browser_capability_contract() {

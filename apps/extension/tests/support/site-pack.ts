@@ -99,7 +99,7 @@ export function testCatalog(
 export function runtimeOptions() {
   return {
     runtimeVersion: "0.1.0",
-    bridgeProtocolVersion: 1,
+    bridgeProtocolVersion: 2,
     allowedPermissions: ["READ"] as const,
   };
 }

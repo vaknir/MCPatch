@@ -15,6 +15,7 @@ import type {
   PackManifest,
   PackManifestValidationIssue,
 } from "./types.js";
+import type { PackToolReturn } from "./tool-result.js";
 import {
   cloneAndFreeze,
   issue,
@@ -65,7 +66,7 @@ export type MCPatchToolHandler<
 > = (
   input: TInput,
   context: PackExecutionContext,
-) => TOutput | Promise<TOutput>;
+) => PackToolReturn<TOutput> | Promise<PackToolReturn<TOutput>>;
 
 export interface MCPatchBuildOptions {
   readonly fixtures: readonly PackFixture[];

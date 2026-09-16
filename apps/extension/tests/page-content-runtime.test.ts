@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import { imageResult } from "@mcpatch/sdk/runtime";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -117,6 +118,45 @@ describe("page content runtime", () => {
       code: "TOOL_UNAVAILABLE",
     });
     expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it("returns one SDK-produced image through the validated page channel", async () => {
+    const state = setup(
+      createAdapter({
+        async execute() {
+          return imageResult(
+            { symbol: "NASDAQ:AAPL", width: 2, height: 1 },
+            {
+              type: "image",
+              mimeType: "image/webp",
+              data: "UklGRg==",
+              width: 2,
+              height: 1,
+            },
+          );
+        },
+      }),
+    );
+    const port = ready(state);
+    await settle();
+
+    port.emitMessage(call("request-image", {}));
+    await settle();
+
+    expect(posted(port, 2)).toMatchObject({
+      type: "page_tool_result",
+      requestId: "request-image",
+      result: { symbol: "NASDAQ:AAPL", width: 2, height: 1 },
+      content: [
+        {
+          type: "image",
+          mimeType: "image/webp",
+          data: "UklGRg==",
+          width: 2,
+          height: 1,
+        },
+      ],
+    });
   });
 
   it("rejects unsafe adapter output without invoking accessors", async () => {

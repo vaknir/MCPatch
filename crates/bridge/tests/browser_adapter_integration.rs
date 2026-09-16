@@ -109,7 +109,7 @@ async fn reject_wrong_version(fixture: &TestDirectory) {
     write_raw_json(
         &mut host,
         &json!({
-            "protocolVersion": 2,
+            "protocolVersion": PROTOCOL_VERSION + 1,
             "type": "heartbeat",
             "heartbeatId": "private-wrong-version-marker",
             "sentAt": "2026-09-15T00:00:00Z"

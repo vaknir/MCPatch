@@ -23,7 +23,7 @@ async fn negotiates_heartbeat_liveness_and_unique_connection_ids() {
     let shutdown = CancellationToken::new();
     let (mut first_client, first_task) = start_session(&manager, shutdown.clone());
 
-    let first_id = negotiate(&mut first_client, vec![2, 1]).await;
+    let first_id = negotiate(&mut first_client, vec![PROTOCOL_VERSION, 1]).await;
     wait_for_connections(&registry, 1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
     send_message(&mut first_client, heartbeat("heartbeat-1")).await;
@@ -35,7 +35,7 @@ async fn negotiates_heartbeat_liveness_and_unique_connection_ids() {
     wait_for_connections(&registry, 0).await;
 
     let (mut second_client, second_task) = start_session(&manager, shutdown.clone());
-    let second_id = negotiate(&mut second_client, vec![1]).await;
+    let second_id = negotiate(&mut second_client, vec![PROTOCOL_VERSION]).await;
     assert_ne!(first_id, second_id);
 
     shutdown.cancel();
@@ -47,7 +47,7 @@ async fn negotiates_heartbeat_liveness_and_unique_connection_ids() {
 async fn rejects_no_common_version_wrong_first_message_and_wrong_role() {
     let cases = [
         (
-            hello(vec![2], Role::Extension),
+            hello(vec![PROTOCOL_VERSION + 1], Role::Extension),
             BrowserSessionErrorCode::NegotiationFailed,
         ),
         (
@@ -55,7 +55,7 @@ async fn rejects_no_common_version_wrong_first_message_and_wrong_role() {
             BrowserSessionErrorCode::ProtocolViolation,
         ),
         (
-            hello(vec![1], Role::Bridge),
+            hello(vec![PROTOCOL_VERSION], Role::Bridge),
             BrowserSessionErrorCode::InvalidRole,
         ),
     ];
@@ -81,7 +81,7 @@ async fn rejects_no_common_version_wrong_first_message_and_wrong_role() {
 #[tokio::test]
 async fn rejects_wrong_version_direction_and_unknown_approval_results() {
     let wrong_version = json!({
-        "protocolVersion": 2,
+        "protocolVersion": PROTOCOL_VERSION + 1,
         "type": "heartbeat",
         "heartbeatId": "wrong-version",
         "sentAt": "2026-09-15T00:00:00Z"
@@ -139,7 +139,7 @@ async fn handshake_and_heartbeat_deadlines_are_finite() {
     );
 
     let (mut ready_client, ready_task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut ready_client, vec![1]).await;
+    negotiate(&mut ready_client, vec![PROTOCOL_VERSION]).await;
     wait_for_connections(&registry, 1).await;
     assert_eq!(
         join(ready_task).await.unwrap_err().code(),
@@ -153,7 +153,7 @@ async fn disconnect_removes_registry_state_and_revokes_pending_calls() {
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    let connection_id = negotiate(&mut client, vec![1]).await;
+    let connection_id = negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     wait_for_connections(&registry, 1).await;
 
     let (routed, revocation) = {
@@ -196,7 +196,7 @@ async fn assert_ready_violation(payload: Vec<u8>, expected: BrowserSessionErrorC
     let registry = shared_capability_registry();
     let manager = manager(registry.clone(), Duration::from_secs(1));
     let (mut client, task) = start_session(&manager, CancellationToken::new());
-    negotiate(&mut client, vec![1]).await;
+    negotiate(&mut client, vec![PROTOCOL_VERSION]).await;
     wait_for_connections(&registry, 1).await;
     write_json_frame(&mut client.writer, &payload)
         .await

@@ -4,7 +4,7 @@ use mcpatch_bridge::protocol::{MAX_MESSAGE_BYTES, Message, ParseMessageError, pa
 
 fn fixture_directory(kind: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../packages/protocol/fixtures/v1")
+        .join("../../packages/protocol/fixtures/v2")
         .join(kind)
 }
 

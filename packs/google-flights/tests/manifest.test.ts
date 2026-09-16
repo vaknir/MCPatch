@@ -66,7 +66,7 @@ describe("Google Flights reviewed pack manifest", () => {
   it("keeps bundled fallback handlers fail closed and validates every schema", async () => {
     const result = await verifyPackFixtures(googleFlightsPack, {
       runtimeVersion: "0.1.0",
-      bridgeProtocolVersion: 1,
+      bridgeProtocolVersion: 2,
       allowedPermissions: ["READ", "ACTION"],
     });
 

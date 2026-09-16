@@ -14,6 +14,7 @@ use serde_json::json;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
+use crate::protocol::ToolContent;
 use crate::routing::{
     ApprovalCompletionError, ApprovalGrant, BrowserToolResponse, CallReservation, RegistryError,
     RegistryErrorCode, RoutedCall, RoutedCallCompletionError, SharedCapabilityRegistry,
@@ -248,7 +249,15 @@ fn map_completion(
     completion: Result<BrowserToolResponse, RoutedCallCompletionError>,
 ) -> CallToolResponse {
     match completion {
-        Ok(BrowserToolResponse::Result(result)) => CallToolResult::structured(result.result).into(),
+        Ok(BrowserToolResponse::Result(result)) => {
+            let mut response = CallToolResult::structured(result.result);
+            response
+                .content
+                .extend(result.content.into_iter().map(|content| match content {
+                    ToolContent::Image(image) => ContentBlock::image(image.data, image.mime_type),
+                }));
+            response.into()
+        }
         Ok(BrowserToolResponse::Error(error)) => CallToolResult::structured_error(json!({
             "code": error.code,
             "message": error.message,

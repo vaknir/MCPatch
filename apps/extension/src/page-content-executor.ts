@@ -1,4 +1,8 @@
-import type { JsonObject, JsonValue } from "@mcpatch/protocol";
+import type { JsonObject } from "@mcpatch/protocol";
+import {
+  isPackExecutionResult,
+  type PackToolReturn,
+} from "@mcpatch/sdk/runtime";
 
 import {
   encodePageToWorkerMessage,
@@ -82,19 +86,22 @@ export class PageCallExecutor {
   #result(
     call: PageToolCall,
     pending: PendingPageCall,
-    result: JsonValue,
+    value: PackToolReturn,
   ): void {
     if (!this.#isPending(call.requestId, pending)) return;
     this.#pending.delete(call.requestId);
     let frame: string;
     try {
+      const execution = isPackExecutionResult(value)
+        ? { result: value.result, content: [...value.content] }
+        : { result: value };
       frame = encodePageToWorkerMessage({
         pageProtocolVersion: PAGE_PROTOCOL_VERSION,
         type: "page_tool_result",
         ...callBinding(call),
         requestId: call.requestId,
         tool: call.tool,
-        result,
+        ...execution,
       });
     } catch {
       this.#sendError(call, "RESULT_INVALID");

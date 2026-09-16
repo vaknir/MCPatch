@@ -6,6 +6,7 @@ import {
   type PackFixtureVerificationCode,
 } from "./fixture-harness-types.js";
 import type { JsonValue, PackFixture } from "./types.js";
+import { structuredResult } from "./tool-result.js";
 import { isRecord, validateJsonBounds } from "./validation/primitives.js";
 
 interface ExecutionValidators {
@@ -68,7 +69,7 @@ async function invokeHandler(
   const execution = Promise.resolve()
     .then(() => handler(context, fixture.input))
     .then<ExecutionOutcome, ExecutionOutcome>(
-      (value) => ({ kind: "result", value }),
+      (value) => ({ kind: "result", value: structuredResult(value) }),
       (error: unknown) => ({ kind: "error", error }),
     );
   let timer: ReturnType<typeof setTimeout> | undefined;
