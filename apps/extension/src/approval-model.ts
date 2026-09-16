@@ -34,7 +34,7 @@ export interface ApprovalTab {
 export interface ChromeApprovalTabsApi {
   readonly onRemoved: ChromeEvent<[number]>;
   create(properties: {
-    readonly active: true;
+    readonly active: boolean;
     readonly url: string;
   }): Promise<ApprovalTab>;
   remove(tabId: number): Promise<void>;

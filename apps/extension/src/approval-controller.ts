@@ -14,6 +14,12 @@ import {
 
 const MAX_PENDING_APPROVALS = 8;
 const MAX_APPROVAL_LIFETIME_MS = 5 * 60 * 1_000;
+/**
+ * After a denial, further prompts open in the background for this long so a
+ * looping caller cannot keep yanking focus; the user pulls the next prompt
+ * from the toolbar instead of having it pushed at them.
+ */
+const RECENT_DENIAL_WINDOW_MS = 60 * 1_000;
 
 interface PendingApproval {
   readonly message: ApprovalRequired;
@@ -50,6 +56,7 @@ export class ApprovalController implements ApprovalSurface {
   readonly #pendingByApproval = new Map<string, PendingApproval>();
   readonly #approvalByRequest = new Map<string, string>();
   readonly #approvalByTab = new Map<number, string>();
+  #lastDenialAt: number | undefined;
 
   constructor(
     runtime: ChromeApprovalRuntimeApi,
@@ -94,8 +101,11 @@ export class ApprovalController implements ApprovalSurface {
     );
     this.#pendingByApproval.set(message.approvalId, pending);
     this.#approvalByRequest.set(message.requestId, message.approvalId);
+    const active =
+      this.#lastDenialAt === undefined ||
+      now - this.#lastDenialAt >= RECENT_DENIAL_WINDOW_MS;
     try {
-      void this.#tabs.create({ active: true, url }).then(
+      void this.#tabs.create({ active, url }).then(
         (tab) => this.#tabCreated(message.approvalId, pending, tab.id),
         () => this.#finish(message.approvalId, "denied"),
       );
@@ -280,6 +290,9 @@ export class ApprovalController implements ApprovalSurface {
   #finish(approvalId: string, decision: ApprovalDecision): void {
     const pending = this.#take(approvalId);
     if (pending === undefined) return;
+    if (decision === "denied") {
+      this.#lastDenialAt = this.#scheduler.now().getTime();
+    }
     try {
       pending.resolve(decision);
     } finally {

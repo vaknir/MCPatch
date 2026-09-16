@@ -240,6 +240,9 @@ fn map_route_error(error: RegistryError) -> Result<CallToolResponse, McpError> {
         RegistryErrorCode::ApprovalRequired => Ok(tool_failure(
             "This capability requires an approval runtime that is not available.",
         )),
+        RegistryErrorCode::ApprovalRateLimited => Ok(tool_failure(
+            "Approval prompts for this site are rate limited. Wait before requesting another approval.",
+        )),
         _ => Err(McpError::internal_error(
             "MCPatch could not reserve the tool call",
             None,

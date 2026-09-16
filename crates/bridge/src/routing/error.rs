@@ -9,6 +9,9 @@ pub enum RegistryErrorCode {
     ApprovalExpired,
     ApprovalMismatch,
     ApprovalNotFound,
+    /// The per-site prompt budget is exhausted or the site is in a denial
+    /// cooldown; no browser prompt was opened.
+    ApprovalRateLimited,
     ApprovalRequired,
     CapabilityDenied,
     ConnectionAlreadyExists,

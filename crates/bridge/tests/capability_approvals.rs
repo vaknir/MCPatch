@@ -8,8 +8,10 @@ use mcpatch_bridge::{
         Permission, Risk,
     },
     routing::{
-        ApprovalCompletionError, CallReservation, CapabilityRegistry, RegistryErrorCode,
-        RoutedApproval, ToolInvocation, shared_capability_registry,
+        APPROVAL_DENIAL_COOLDOWN, APPROVAL_DENIALS_BEFORE_COOLDOWN, APPROVAL_PROMPT_BURST,
+        APPROVAL_PROMPT_REFILL_INTERVAL, ApprovalCompletionError, CallReservation,
+        CapabilityRegistry, RegistryErrorCode, RoutedApproval, ToolInvocation,
+        shared_capability_registry,
     },
 };
 use serde_json::{Value, json};
@@ -448,6 +450,94 @@ async fn approved_call_fails_distinctly_when_the_bound_context_changes() {
     assert_eq!(
         registry.route_approved(grant, now).unwrap_err().code(),
         RegistryErrorCode::ApprovalContextChanged
+    );
+}
+
+#[tokio::test]
+async fn approval_prompts_are_budgeted_per_site() {
+    let (mut registry, _id, browser) = action_registry();
+    let now = fixed_time();
+    for index in 0..APPROVAL_PROMPT_BURST {
+        prepare(
+            &mut registry,
+            invocation(&format!("request-{index}"), "demo.action", "burst"),
+            now,
+        );
+    }
+
+    let refused = registry
+        .prepare_call(
+            invocation("request-refused", "demo.action", "burst"),
+            now,
+            Duration::from_secs(60),
+        )
+        .err()
+        .expect("the seventh prompt must be refused");
+    assert_eq!(refused.code(), RegistryErrorCode::ApprovalRateLimited);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(20), browser.receive_from_bridge())
+            .await
+            .is_err(),
+        "a refused prompt must never reach the browser"
+    );
+
+    let later = now + APPROVAL_PROMPT_REFILL_INTERVAL;
+    prepare(
+        &mut registry,
+        invocation("request-refilled", "demo.action", "burst"),
+        later,
+    );
+}
+
+#[tokio::test]
+async fn repeated_denials_put_the_site_in_a_cooldown() {
+    let (mut registry, id, _browser) = action_registry();
+    let now = fixed_time();
+    for index in 0..APPROVAL_DENIALS_BEFORE_COOLDOWN {
+        let approval = prepare(
+            &mut registry,
+            invocation(&format!("request-{index}"), "demo.action", "denied"),
+            now,
+        );
+        registry
+            .accept_approval_result(
+                &id,
+                approval_result(&approval, ApprovalDecision::Denied),
+                now,
+            )
+            .unwrap();
+    }
+
+    assert_eq!(
+        registry
+            .prepare_call(
+                invocation("request-cooldown", "demo.action", "denied"),
+                now,
+                Duration::from_secs(60),
+            )
+            .err()
+            .expect("a site in cooldown must not prompt")
+            .code(),
+        RegistryErrorCode::ApprovalRateLimited
+    );
+    let released = now + APPROVAL_DENIAL_COOLDOWN;
+    let approval = prepare(
+        &mut registry,
+        invocation("request-released", "demo.action", "denied"),
+        released,
+    );
+    // One approval resets the consecutive-denial count.
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            released,
+        )
+        .unwrap();
+    prepare(
+        &mut registry,
+        invocation("request-after-approval", "demo.action", "denied"),
+        released,
     );
 }
 

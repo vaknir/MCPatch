@@ -166,6 +166,13 @@ All notable MCPatch changes are documented here. The format follows
   exact SDK matching, native WebMCP precedence, bounded schema interpretation,
   typed calls, result validation, cancellation, and lifecycle revocation.
 
+- A per-site approval prompt budget in the bridge: six prompts in a burst per
+  browser connection and origin, refilling one every ten seconds, and a
+  sixty-second cooldown after three consecutive non-approvals. A refused prompt
+  fails the MCP call with an explanatory tool failure before any nonce is
+  generated or browser message sent. The extension opens a prompt without
+  stealing focus when a denial was seen in the last minute.
+
 ### Changed
 
 - Pack Manifest v1 now requires closed output schemas as well as closed input

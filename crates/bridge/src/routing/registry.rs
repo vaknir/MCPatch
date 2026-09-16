@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use super::{
     PermissionDecision, RegistryError, RegistryErrorCode, RoutedCancellation,
+    approval_limits::ApprovalLimiter,
     policy::permission_decision,
     state::{ConnectionState, ContextState, RegisteredCapability, ResolvedCapability},
     types::{ActiveRequest, PendingApproval},
@@ -17,6 +18,7 @@ pub struct CapabilityRegistry {
     pub(super) connections: BTreeMap<BrowserConnectionId, ConnectionState>,
     pub(super) active_requests: BTreeMap<String, ActiveRequest>,
     pub(super) pending_approvals: BTreeMap<String, PendingApproval>,
+    pub(super) approval_limiter: ApprovalLimiter,
 }
 
 impl CapabilityRegistry {
@@ -25,6 +27,7 @@ impl CapabilityRegistry {
             connections: BTreeMap::new(),
             active_requests: BTreeMap::new(),
             pending_approvals: BTreeMap::new(),
+            approval_limiter: ApprovalLimiter::default(),
         }
     }
 
@@ -56,6 +59,7 @@ impl CapabilityRegistry {
         if self.connections.remove(connection_id).is_none() {
             return false;
         }
+        self.approval_limiter.forget_connection(connection_id);
 
         let request_ids = self
             .active_requests

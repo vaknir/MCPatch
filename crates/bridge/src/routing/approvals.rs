@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     RegistryError, RegistryErrorCode, RoutedApproval, ToolInvocation,
+    approval_limits::ApprovalLimitKey,
     registry::CapabilityRegistry,
     state::ResolvedCapability,
     types::{ApprovalBinding, ApprovalCompletionError, ApprovalGrant, PendingApproval},
@@ -46,6 +47,14 @@ impl CapabilityRegistry {
             .checked_add(ttl)
             .ok_or_else(|| RegistryError::new(RegistryErrorCode::InvalidMessage))?;
         let args_hash = canonical_arguments_hash(&invocation.arguments)?;
+        // Budget the prompt before spending a nonce or touching the browser, so
+        // a refused request leaves no trace the extension could act on.
+        self.approval_limiter
+            .admit(
+                ApprovalLimitKey::new(resolved.connection.id(), &resolved.origin),
+                now,
+            )
+            .map_err(|_| RegistryError::new(RegistryErrorCode::ApprovalRateLimited))?;
         let approval_id = self.unique_approval_id()?;
         let expires_at_text = expires_at
             .format(&Rfc3339)
@@ -119,7 +128,10 @@ impl CapabilityRegistry {
                 .send(Err(ApprovalCompletionError::Revoked));
             return Err(RegistryError::new(RegistryErrorCode::ApprovalMismatch));
         }
+        let limit_key =
+            ApprovalLimitKey::new(&pending.binding.connection_id, &pending.binding.origin);
         if now < pending.binding.issued_at || now >= pending.binding.expires_at {
+            self.approval_limiter.record_outcome(&limit_key, false, now);
             let _ = pending
                 .completion
                 .send(Err(ApprovalCompletionError::Expired));
@@ -127,11 +139,13 @@ impl CapabilityRegistry {
         }
         match result.decision {
             ApprovalDecision::Approved => {
+                self.approval_limiter.record_outcome(&limit_key, true, now);
                 let _ = pending.completion.send(Ok(ApprovalGrant {
                     binding: pending.binding,
                 }));
             }
             ApprovalDecision::Denied => {
+                self.approval_limiter.record_outcome(&limit_key, false, now);
                 let _ = pending
                     .completion
                     .send(Err(ApprovalCompletionError::Denied));
@@ -149,6 +163,11 @@ impl CapabilityRegistry {
             .collect::<Vec<_>>();
         for approval_id in expired {
             if let Some(approval) = self.pending_approvals.remove(&approval_id) {
+                let limit_key = ApprovalLimitKey::new(
+                    &approval.binding.connection_id,
+                    &approval.binding.origin,
+                );
+                self.approval_limiter.record_outcome(&limit_key, false, now);
                 approval.revocation.cancel();
                 let _ = approval
                     .completion

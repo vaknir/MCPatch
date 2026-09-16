@@ -25,6 +25,26 @@ Pending approvals and active calls share a global bound of 128 reservations. The
 normal approval lifetime is 60 seconds and the core rejects configured lifetimes
 over five minutes.
 
+## Prompt budget
+
+Every approval opens a trusted browser prompt, and a hostile or looping MCP client
+could otherwise open prompts indefinitely—the realistic way to defeat argument
+binding is not to break it but to wear the human down. The bridge therefore
+budgets prompts per browser connection and origin, the surface the human sees, so
+the budget holds whichever client is asking:
+
+- a site may have six prompts in a burst, refilling one every ten seconds;
+- three consecutive non-approvals (denials or expiries) lock the site for sixty
+  seconds, and one approval resets the count; and
+- a refused prompt fails the call before a nonce is generated or any browser
+  message is sent, so the extension never sees it.
+
+The MCP client receives a tool failure telling it to wait; the budget is not a
+protocol error, so the model learns the reason rather than a generic rejection.
+The extension additionally opens a prompt without stealing focus when the same
+window has just seen a denial, so repeated prompts are pulled by the user rather
+than pushed at them.
+
 Arguments are canonicalized with RFC 8785 JSON Canonicalization Scheme, prefixed by
 a protocol- and policy-version domain separator, and hashed with SHA-256. Values are
 bounded to 32 levels, 8,192 nodes, 512 array items, and 256 fields per object before
