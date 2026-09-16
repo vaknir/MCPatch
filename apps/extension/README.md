@@ -82,17 +82,21 @@ own native host.
 
 ## Current permissions
 
-The baseline permissions are `nativeMessaging`, `storage`, `scripting`, and
-`activeTab`. `activeTab` is used only by the toolbar click that identifies the
-selected page. The manifest has no permanent `host_permissions`, static content
-scripts, or externally connectable surface. Google is the only optional host
-authority and can be requested only from a toolbar click on one of the two matching
-Google Flights paths.
+The baseline permissions are exactly `nativeMessaging`, `storage`, and
+`scripting`. The toolbar click that identifies the selected page receives the
+tab from the `action.onClicked` event itself, so `activeTab` is not declared:
+combined with `scripting`, it would let a click run code on any page, which is a
+capability nothing in the extension uses. The manifest has no permanent
+`host_permissions`, static content scripts, web-accessible resources, or
+externally connectable surface. Each reviewed site is an optional host authority
+that can be requested only from a toolbar click on one of its matching paths.
+`apps/extension/tests/manifest.test.ts` pins the exact permission set so any
+widening is a deliberate, reviewed change.
 
-ADR 0008 fixes the Phase 6 direction: `storage`, `scripting`, and `activeTab` may be
-added as baseline permissions, while each site remains an optional HTTPS host grant.
-Reviewed scripts will be registered dynamically in the isolated world, and their
-top-level document ports—not `tabs` or `webNavigation`—will own context lifecycle.
+ADR 0008 fixes the Phase 6 direction: `storage` and `scripting` are baseline
+permissions, while each site remains an optional HTTPS host grant. Reviewed
+scripts are registered dynamically in the isolated world, and their top-level
+document ports—not `tabs` or `webNavigation`—own context lifecycle.
 
 The closed, bounded JSON contract for those ports is implemented as page-channel
 protocol version 2 and documented in

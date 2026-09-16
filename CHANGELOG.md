@@ -180,6 +180,13 @@ All notable MCPatch changes are documented here. The format follows
   capability that omits `outputSchema`, in the JSON Schema and in both the Rust
   and TypeScript validators. Native WebMCP capabilities may still omit it.
 
+### Removed
+
+- The unused `activeTab` extension permission. The toolbar gesture receives its
+  tab from `action.onClicked`, and `activeTab` with `scripting` would have granted
+  a click-to-inject capability nothing used. The manifest test now pins the exact
+  permission set and asserts that no web-accessible resources are declared.
+
 ### Fixed
 
 - Protocol and SDK JSON value types now agree on immutable array values, allowing

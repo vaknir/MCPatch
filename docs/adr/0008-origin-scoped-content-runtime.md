@@ -31,6 +31,12 @@ The production extension uses the following authority model for real sites:
    extension permissions needed for this phase. `activeTab` is used only to identify
    the user-selected page during the extension-action gesture; it does not enable a
    pack by itself.
+   _Amended 2026-09-16 ([#192](https://github.com/vaknir/MCPatch/issues/192)):_
+   `activeTab` was removed. The `action.onClicked` event already delivers the
+   selected tab, and `activeTab` together with `scripting` would grant a
+   click-to-inject capability nothing in the extension uses. The baseline set is
+   now exactly `nativeMessaging`, `storage`, and `scripting`, pinned by
+   `apps/extension/tests/manifest.test.ts`.
 2. Every supported site is declared under `optional_host_permissions`. The user
    enables one reviewed pack from an extension-controlled gesture, and MCPatch asks
    Chromium for that pack's exact HTTPS origin pattern. A path rule is still checked

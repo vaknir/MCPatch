@@ -46,8 +46,9 @@ describe("extension manifest", () => {
       "version",
     ]);
     expect(manifest["minimum_chrome_version"]).toBe("106");
+    // Exact set: `activeTab` plus `scripting` would let a toolbar click run
+    // code on any page, so it is deliberately absent.
     expect(manifest["permissions"]).toEqual([
-      "activeTab",
       "nativeMessaging",
       "scripting",
       "storage",
@@ -65,6 +66,7 @@ describe("extension manifest", () => {
     expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
     expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
   });
 
   it("derives one stable ID from a committed public identity", () => {
