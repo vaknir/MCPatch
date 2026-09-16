@@ -13,6 +13,10 @@ import {
   type TradingViewSearchFetch,
 } from "./symbol-search.js";
 import { captureTradingViewChartImage } from "./chart-image.js";
+import {
+  addTradingViewWatchlistSymbol,
+  removeTradingViewWatchlistSymbol,
+} from "./watchlist.js";
 
 const MAX_CHARTS = 4;
 const MAX_CHART_DIVS = 4_096;
@@ -104,6 +108,14 @@ class TradingViewDocumentSource implements TradingViewSnapshotSource {
 
   captureChart(symbol: string, signal: AbortSignal) {
     return captureTradingViewChartImage(this.#document, symbol, signal);
+  }
+
+  addToWatchlist(input: unknown, signal: AbortSignal) {
+    return addTradingViewWatchlistSymbol(this.#fetchRequest, input, signal);
+  }
+
+  removeFromWatchlist(input: unknown, signal: AbortSignal) {
+    return removeTradingViewWatchlistSymbol(this.#fetchRequest, input, signal);
   }
 
   subscribe(listener: () => void): () => void {

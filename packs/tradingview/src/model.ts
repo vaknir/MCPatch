@@ -9,10 +9,16 @@ export const TRADINGVIEW_CURRENT_WATCHLIST =
 export const TRADINGVIEW_CHANGE_SYMBOL = "tradingview.change_symbol" as const;
 export const TRADINGVIEW_SEARCH_SYMBOLS = "tradingview.search_symbols" as const;
 export const TRADINGVIEW_CAPTURE_CHART = "tradingview.capture_chart" as const;
+export const TRADINGVIEW_ADD_TO_WATCHLIST =
+  "tradingview.add_to_watchlist" as const;
+export const TRADINGVIEW_REMOVE_FROM_WATCHLIST =
+  "tradingview.remove_from_watchlist" as const;
 export const TRADINGVIEW_SYMBOL_SEARCH_ORIGIN =
   "https://symbol-search.tradingview.com" as const;
 
 export const TRADINGVIEW_TOOLS = Object.freeze([
+  TRADINGVIEW_ADD_TO_WATCHLIST,
+  TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_CURRENT_CHART,
@@ -96,6 +102,20 @@ export interface TradingViewChangeSymbolResult {
   readonly symbol: string;
 }
 
+export interface TradingViewWatchlistMutationInput {
+  readonly symbol: string;
+}
+
+export type TradingViewWatchlistMutationState =
+  "added" | "already_absent" | "already_present" | "removed";
+
+export interface TradingViewWatchlistMutationResult {
+  readonly fingerprint: typeof TRADINGVIEW_FINGERPRINT;
+  readonly state: TradingViewWatchlistMutationState;
+  readonly symbol: string;
+  readonly watchlistName: string;
+}
+
 export interface TradingViewSearchSymbolsInput {
   readonly query: string;
   readonly limit?: number;
@@ -149,6 +169,7 @@ export type TradingViewErrorReason =
   | "missing_value"
   | "navigation_already_started"
   | "navigation_unavailable"
+  | "watchlist_action_unavailable"
   | "symbol_search_unavailable"
   | "chart_capture_unavailable"
   | "unsupported_locale"

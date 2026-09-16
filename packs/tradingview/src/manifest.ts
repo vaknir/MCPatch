@@ -3,6 +3,7 @@ import type { MCPatchDefinition } from "@mcpatch/sdk/runtime";
 
 import { createTradingViewDocumentSource } from "./document-source.js";
 import {
+  TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
   TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_CHART_PATH,
@@ -10,6 +11,7 @@ import {
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
 } from "./model.js";
@@ -22,15 +24,39 @@ const EMPTY_INPUT_SCHEMA = {
   properties: {},
 } as const;
 
+const SYMBOL_ACTION_INPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  maxProperties: 1,
+  required: ["symbol"],
+  properties: {
+    symbol: { type: "string", minLength: 3, maxLength: 57 },
+  },
+} as const;
+
+const WATCHLIST_ACTION_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["fingerprint", "state", "symbol", "watchlistName"],
+  properties: {
+    fingerprint: { const: TRADINGVIEW_FINGERPRINT },
+    state: {
+      enum: ["added", "already_absent", "already_present", "removed"],
+    },
+    symbol: { type: "string" },
+    watchlistName: { type: "string", minLength: 1, maxLength: 128 },
+  },
+} as const;
+
 const mcp = new MCPatch<TradingViewSite>({
   publisher: "tradingview",
   id: "tradingview-web",
   name: "TradingView",
   description:
-    "Expose bounded chart and watchlist state plus approved chart navigation from TradingView.",
-  version: "0.3.0",
+    "Expose bounded chart and watchlist state plus approved chart and watchlist actions from TradingView.",
+  version: "0.4.0",
   digest:
-    "sha256:0302771a5570c24f8d5abb3458b311b753e357d8937a9126d1759ac4ff7497be",
+    "sha256:b55e23cefe214968e3125bbaedd52343ea9c2d0e420b491324b2fa3f2c29e564",
   matches: [
     {
       origin: TRADINGVIEW_ORIGIN,
@@ -44,6 +70,30 @@ const mcp = new MCPatch<TradingViewSite>({
     },
   },
 });
+
+mcp.tool(
+  {
+    name: TRADINGVIEW_ADD_TO_WATCHLIST,
+    description:
+      "Add one exact canonical EXCHANGE:TICKER symbol to the current authenticated TradingView watchlist after one-time approval and confirm the resulting state.",
+    risk: "action",
+    inputSchema: SYMBOL_ACTION_INPUT_SCHEMA,
+    outputSchema: WATCHLIST_ACTION_OUTPUT_SCHEMA,
+  },
+  (input, { site, signal }) => site.addToWatchlist(input, signal),
+);
+
+mcp.tool(
+  {
+    name: TRADINGVIEW_REMOVE_FROM_WATCHLIST,
+    description:
+      "Remove one exact canonical EXCHANGE:TICKER symbol from the current authenticated TradingView watchlist after one-time approval and confirm the resulting state.",
+    risk: "action",
+    inputSchema: SYMBOL_ACTION_INPUT_SCHEMA,
+    outputSchema: WATCHLIST_ACTION_OUTPUT_SCHEMA,
+  },
+  (input, { site, signal }) => site.removeFromWatchlist(input, signal),
+);
 
 mcp.tool(
   {
@@ -223,19 +273,7 @@ mcp.tool(
     description:
       "Change the active TradingView chart to one exact canonical EXCHANGE:TICKER symbol after one-time approval.",
     risk: "action",
-    inputSchema: {
-      type: "object",
-      additionalProperties: false,
-      maxProperties: 1,
-      required: ["symbol"],
-      properties: {
-        symbol: {
-          type: "string",
-          minLength: 3,
-          maxLength: 57,
-        },
-      },
-    },
+    inputSchema: SYMBOL_ACTION_INPUT_SCHEMA,
     outputSchema: {
       type: "object",
       additionalProperties: false,
@@ -252,6 +290,18 @@ mcp.tool(
 
 export const tradingViewBrowserPack = mcp.build({
   fixtures: [
+    {
+      id: "page-only-add-to-watchlist",
+      tool: TRADINGVIEW_ADD_TO_WATCHLIST,
+      input: { symbol: "NYSE:IBM" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-remove-from-watchlist",
+      tool: TRADINGVIEW_REMOVE_FROM_WATCHLIST,
+      input: { symbol: "NYSE:IBM" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
     {
       id: "page-only-capture-chart",
       tool: TRADINGVIEW_CAPTURE_CHART,

@@ -4,7 +4,8 @@ The second reviewed MCPatch real-site pack exposes a narrow chart workflow from
 TradingView. It reads the active chart and visible watchlist, resolves bounded
 company/ticker queries, and can navigate the active tab to one caller-supplied
 canonical symbol. It can also return the active chart as bounded native MCP image
-content. The implementation follows the
+content and perform approved single-symbol mutations against the current custom
+watchlist. The implementation follows the
 bounded observations in
 [TradingView public-page reconnaissance](../research/tradingview-2026-09-16.md).
 
@@ -110,12 +111,31 @@ rectangle, DOM text, cookies, storage, request traffic, or a caller-chosen regio
 The shared SDK, page channel, bridge protocol, and Rust MCP projection each enforce
 the closed one-image result contract.
 
+### `tradingview.add_to_watchlist` and `tradingview.remove_from_watchlist`
+
+These `ACTION` tools accept exactly one canonical `EXCHANGE:TICKER` symbol. After
+the bridge consumes a one-time approval bound to the tool, page origin, context,
+pack, and exact arguments, the pack reads TradingView's current active custom list
+through one fixed same-origin operation. It derives the list ID internally, issues
+at most one fixed append or remove request, and re-reads the active list to require
+the same identity and requested postcondition.
+
+The browser attaches its authenticated session directly; MCPatch never reads or
+returns the cookie. The caller cannot provide a URL, method, headers, body, list ID,
+or retry instruction. The response returns only the fingerprint, outcome, symbol,
+and bounded watchlist name. Existing desired state returns `already_present` or
+`already_absent` without a write. Non-custom lists, redirects, authentication
+failures, oversized or malformed responses, changed identity, and uncertain
+postconditions fail closed.
+
 ## Resource and lifecycle bounds
 
 Collection admits at most four chart regions, examines at most 4,096 chart `div`
 elements, returns at most 64 watchlist rows, admits at most 16 chart canvases, and
-bounds every string before it
-crosses the page channel. Long aggregate containers are ignored when looking for
+bounds every string before it crosses the page channel. Authenticated watchlist
+reads admit at most 1,024 canonical symbols and 256 KiB per response; the complete
+operation has an eight-second deadline and no mutation retry. Long aggregate
+containers are ignored when looking for
 small OHLC or change leaves. Cancellation is checked while collecting and before
 navigation.
 
@@ -141,9 +161,15 @@ unsupported-path revocation, and deleted the profile without retaining prices or
 page data. See the
 [TradingView MCP field report](../test-reports/2026-09-16-tradingview-field.md).
 
+Signed-in write verification is intentionally separate: it must use a disposable
+account, an explicitly selected test symbol, an initially recorded state, and a
+paired add/remove sequence that restores that state. It may invoke only MCP tools
+and the extension-owned approval surface. The harness must not click or type into
+TradingView, retain profile data, capture credentials, or run in routine CI.
+
 ## Explicit non-goals
 
-- creating, deleting, or changing watchlist entries;
+- creating, deleting, renaming, reordering, or replacing whole watchlists;
 - creating or changing alerts;
 - placing trades or connecting a broker;
 - background collection, repeated scraping, or historical data export; and
@@ -158,5 +184,6 @@ network or browser-control escape hatch.
 - [ADR 0006: permissions and approvals](../adr/0006-permission-and-approval-model.md)
 - [ADR 0008: origin-scoped content runtime](../adr/0008-origin-scoped-content-runtime.md)
 - [ADR 0009: reviewed read-network authority](../adr/0009-reviewed-read-network-authority.md)
+- [ADR 0011: reviewed authenticated session actions](../adr/0011-reviewed-authenticated-session-actions.md)
 - [Pack resolution and native precedence](pack-resolution.md)
 - [Extension page-channel protocol](page-channel-protocol.md)

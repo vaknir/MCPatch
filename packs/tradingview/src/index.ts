@@ -12,6 +12,7 @@ export {
 } from "./extractor.js";
 export { tradingViewBrowserPack, tradingViewPack } from "./manifest.js";
 export {
+  TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
   TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_CHART_PATH,
@@ -19,6 +20,7 @@ export {
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   TRADINGVIEW_TOOLS,
@@ -40,6 +42,9 @@ export type {
   TradingViewSymbolCandidate,
   TradingViewToolName,
   TradingViewWatchlistItem,
+  TradingViewWatchlistMutationInput,
+  TradingViewWatchlistMutationResult,
+  TradingViewWatchlistMutationState,
   TradingViewWatchlistRowSemantics,
 } from "./model.js";
 export { createTradingViewSite } from "./site.js";
@@ -57,3 +62,8 @@ export {
   validateTradingViewSearchInput,
 } from "./symbol-search.js";
 export type { TradingViewSearchFetch } from "./symbol-search.js";
+export {
+  addTradingViewWatchlistSymbol,
+  removeTradingViewWatchlistSymbol,
+} from "./watchlist.js";
+export type { TradingViewSessionFetch } from "./watchlist.js";
