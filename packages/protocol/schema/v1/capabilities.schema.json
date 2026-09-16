@@ -96,10 +96,9 @@
           },
           "then": {
             "properties": {
-              "pack": true,
-              "outputSchema": true
+              "pack": true
             },
-            "required": ["pack", "outputSchema"]
+            "required": ["pack"]
           },
           "else": {
             "not": {

@@ -179,6 +179,14 @@ All notable MCPatch changes are documented here. The format follows
 - Bridge protocol v1 capability snapshots now reject a `source: "pack"`
   capability that omits `outputSchema`, in the JSON Schema and in both the Rust
   and TypeScript validators. Native WebMCP capabilities may still omit it.
+- Bridge protocol v1 capability schemas are now restricted, on both sides and in
+  the JSON Schema, to the keyword allowlist the extension's interpreter already
+  enforced (`type`, `const`, `enum`, `properties`, `required`,
+  `additionalProperties`, `items`, and the numeric and length bounds), with
+  `type` limited to one JSON type; the first unsupported keyword is reported at
+  its exact path. The bridge compiles its validators with format assertions
+  disabled. The bridge no longer relies on the extension being the only layer
+  that refuses `pattern`, `format`, `$ref`, or combinators.
 
 ### Fixed
 

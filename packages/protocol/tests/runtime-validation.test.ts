@@ -25,6 +25,59 @@ describe("TypeScript protocol runtime validation", () => {
     expect(validateMessage(readFixture(invalidDirectory, name))).toBe(false);
   });
 
+  it.each([
+    [
+      "an unsupported keyword in a nested input property",
+      {
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: { q: { type: "string", pattern: "^a" } },
+        },
+      },
+      "capabilities[0].inputSchema.properties.q.pattern",
+    ],
+    [
+      "a reference in the output schema",
+      {
+        outputSchema: {
+          type: "object",
+          $ref: "https://attacker.example/schema.json",
+        },
+      },
+      "capabilities[0].outputSchema.$ref",
+    ],
+    [
+      "a union type",
+      {
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          properties: { q: { type: ["string", "null"] } },
+        },
+      },
+      "capabilities[0].inputSchema.properties.q.type",
+    ],
+    [
+      "a format assertion inside array items",
+      {
+        outputSchema: {
+          type: "object",
+          properties: {
+            rows: { type: "array", items: { type: "string", format: "email" } },
+          },
+        },
+      },
+      "capabilities[0].outputSchema.properties.rows.items.format",
+    ],
+  ])("rejects %s at its exact schema path", (_label, patch, field) => {
+    const message = structuredClone(
+      readFixture(validDirectory, "capability-snapshot.json"),
+    ) as { capabilities: Record<string, unknown>[] };
+    message.capabilities[0] = { ...message.capabilities[0], ...patch };
+    expect(validationIssue(message)).toEqual({ code: "INVALID_SCHEMA", field });
+  });
+
   it("returns a typed message or throws a stable validation error", () => {
     const valid = parseMessage(readFixture(validDirectory, "tool-call.json"));
     expect(valid.type).toBe("tool_call");

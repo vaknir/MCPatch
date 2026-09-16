@@ -1,6 +1,6 @@
 import type { ValidationIssue } from "./error.js";
 import { validateOrigin, validateSemVer } from "./formats.js";
-import { validateJsonObject } from "./json.js";
+import { validateRuntimeSchema } from "./json.js";
 import {
   checkClosedObject,
   issue,
@@ -130,14 +130,14 @@ function validateCapability(
   const permissionIssue = validatePermissions(capability, prefix);
   if (permissionIssue !== undefined) return permissionIssue;
 
-  const inputIssue = validateJsonObject(
+  const inputIssue = validateRuntimeSchema(
     capability.inputSchema,
     `${prefix}.inputSchema`,
     true,
   );
   if (inputIssue !== undefined) return inputIssue;
   if (Object.hasOwn(capability, "outputSchema")) {
-    const outputIssue = validateJsonObject(
+    const outputIssue = validateRuntimeSchema(
       capability.outputSchema,
       `${prefix}.outputSchema`,
     );

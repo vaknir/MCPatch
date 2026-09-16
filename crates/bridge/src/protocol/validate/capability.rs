@@ -5,7 +5,7 @@ use semver::Version;
 use super::formats::validate_origin;
 use super::primitives::{
     valid_lower_hex, valid_pack_id, valid_publisher, validate_bounded_text,
-    validate_collection_size, validate_identifier, validate_input_schema, validate_object_limit,
+    validate_collection_size, validate_identifier, validate_input_schema, validate_output_schema,
     validate_protocol_version, validate_revision, validate_tool_name,
 };
 use super::{MAX_CAPABILITIES, invalid};
@@ -116,7 +116,7 @@ fn validate_capability(
 
     validate_input_schema(&capability.input_schema, format!("{prefix}.inputSchema"))?;
     if let Some(output_schema) = &capability.output_schema {
-        validate_object_limit(output_schema.len(), format!("{prefix}.outputSchema"))?;
+        validate_output_schema(output_schema, format!("{prefix}.outputSchema"))?;
     }
 
     Ok(())

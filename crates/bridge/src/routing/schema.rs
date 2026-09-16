@@ -41,9 +41,12 @@ fn compile_schema(schema: &serde_json::Map<String, Value>) -> Result<Validator, 
     if !schema_within_limits(&schema) {
         return Err(RegistryError::new(RegistryErrorCode::InvalidSchema));
     }
+    // No allowlisted keyword needs format assertions, so leave them off: a
+    // `format` that slipped past protocol validation must never compile the
+    // instance value as a regex or otherwise interpret it.
     jsonschema::options()
         .with_draft(Draft::Draft202012)
-        .should_validate_formats(true)
+        .should_validate_formats(false)
         .build(&schema)
         .map_err(|_| RegistryError::new(RegistryErrorCode::InvalidSchema))
 }
@@ -67,4 +70,36 @@ fn schema_within_limits(schema: &Value) -> bool {
         }
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+
+    use super::compile_schema;
+
+    fn object(value: Value) -> serde_json::Map<String, Value> {
+        value.as_object().expect("schema must be an object").clone()
+    }
+
+    #[test]
+    fn compiled_validators_never_assert_formats() {
+        let validator = compile_schema(&object(json!({
+            "type": "object",
+            "properties": {"q": {"type": "string", "format": "regex"}}
+        })))
+        .expect("schema must compile");
+        assert!(validator.is_valid(&json!({"q": "(((("})));
+    }
+
+    #[test]
+    fn schemas_within_the_protocol_depth_bound_compile() {
+        // Each `properties` level costs two JSON levels; protocol validation
+        // counts the same units, so anything it accepts must compile here.
+        let mut nested = json!({"type": "string"});
+        for _ in 0..14 {
+            nested = json!({"type": "object", "properties": {"next": nested}});
+        }
+        assert!(compile_schema(&object(nested)).is_ok());
+    }
 }

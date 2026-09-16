@@ -34,7 +34,12 @@ The only intentionally opaque JSON locations are:
 - `tool_result.result`.
 
 Opaque means their internal keys are defined by the selected tool, not that they
-bypass size, depth, schema, policy, or output validation.
+bypass size, depth, schema, policy, or output validation. Capability schemas are
+additionally restricted to the runtime keyword allowlist shared with the
+extension's interpreter (`type`, `const`, `enum`, `properties`, `required`,
+`additionalProperties`, `items`, and the numeric and length bounds); any other
+keyword is rejected at its exact path by the JSON Schema and by both runtime
+validators.
 Approval messages contain only a canonical argument hash, never raw arguments or
 results.
 

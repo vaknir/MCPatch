@@ -50,9 +50,17 @@ For each call, the registry:
 7. records a revocation token and one-shot completion channel before dispatch.
 
 JSON Schema draft 2020-12 validators are compiled when a snapshot is accepted.
-Schema depth and node counts are bounded. HTTP and file resolver features are not
-compiled into the bridge, so a pack schema cannot trigger bridge-originated network
-or filesystem reads.
+Before compilation, protocol validation restricts every input and output schema to
+the same keyword allowlist the extension's codegen-free interpreter understands
+(`type`, `const`, `enum`, `properties`, `required`, `additionalProperties`,
+`items`, and the numeric and length bounds), requires `type` to name one JSON
+type, and reports the first unsupported keyword at its exact path. The bridge
+therefore never compiles `pattern`, `format`, `$ref`, or combinator keywords, and
+its validators are built with format assertions disabled, so no page- or
+pack-supplied schema can make the bridge interpret an instance value as a regex
+or fetch anything. Schema depth and node counts are bounded. HTTP and file
+resolver features are not compiled into the bridge, so a pack schema cannot
+trigger bridge-originated network or filesystem reads.
 
 Responses are accepted only from the original connection with the exact request,
 context, revision, and origin. Declared output schemas are enforced, and a pack

@@ -231,12 +231,14 @@ fn rejects_unresolvable_schema_references_at_registration() {
         "$ref": "https://attacker.example/schema.json"
     }));
 
+    // `$ref` is outside the runtime keyword allowlist, so the snapshot is
+    // rejected as invalid protocol data before any compiler could resolve it.
     assert_eq!(
         registry
             .replace_snapshot(&id, snapshot("tab-7", 1, vec![capability]))
             .expect_err("remote schema references must fail closed")
             .code(),
-        RegistryErrorCode::InvalidSchema
+        RegistryErrorCode::InvalidMessage
     );
 }
 
@@ -253,12 +255,14 @@ fn rejects_excessively_deep_schemas_before_compilation() {
     }
     capability.input_schema = object(nested);
 
+    // Protocol validation bounds schema depth in the same JSON-nesting units
+    // as the compiler, so the snapshot is rejected before compilation starts.
     assert_eq!(
         registry
             .replace_snapshot(&id, snapshot("tab-7", 1, vec![capability]))
             .expect_err("deep schema must fail before compilation")
             .code(),
-        RegistryErrorCode::InvalidSchema
+        RegistryErrorCode::InvalidMessage
     );
 }
 
@@ -553,7 +557,6 @@ async fn validates_and_consumes_browser_results() {
     let (mut registry, id, _browser) = registry_with_connection("connection-a");
     let mut capability = read_capability("demo.read");
     capability.output_schema = Some(object(json!({
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false,
         "required": ["ok"],
@@ -654,7 +657,6 @@ fn capability(name: &str, risk: Risk, permissions: Vec<Permission>) -> Capabilit
         risk,
         permissions,
         input_schema: object(json!({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "additionalProperties": false,
             "required": ["query"],

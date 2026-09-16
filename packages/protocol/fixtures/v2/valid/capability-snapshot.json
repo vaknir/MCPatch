@@ -20,13 +20,11 @@
       "risk": "read",
       "permissions": ["READ"],
       "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false,
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "required": ["origin", "destination"],
         "properties": {
