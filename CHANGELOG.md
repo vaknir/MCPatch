@@ -8,7 +8,8 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
-- Declarative Operations v1: an immutable, closed, read-only AST embedded at
+- Declarative Operations v1 (initial pre-release definition): an immutable, closed,
+  read-only AST embedded at
   `operations.program`, with one operation per manifest tool, static role and
   structured selectors, bounded descendant reads and projections, exact resource
   limits, output-schema parity checks, malicious golden fixtures, and stable

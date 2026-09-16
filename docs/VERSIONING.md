@@ -20,7 +20,9 @@ documented in [Declarative Pack Bundle v1](architecture/declarative-pack-bundle.
 Unknown bundle or operations versions fail closed; a change to accepted authority
 or cryptographic projection requires a new version.
 
-Declarative Operations v1 is a read-only, non-computational AST embedded in
+Declarative Operations v1 was reserved by the pre-release bundle contract; this
+unreleased 0.1.0 implementation establishes its initial concrete read-only,
+non-computational AST embedded in
 `operations.program`. Its selector, projection, resource-limit, output-schema,
 and permission semantics are versioned together. Tightening rejection of data
 that is already outside the v1 language is compatible hardening; accepting a new

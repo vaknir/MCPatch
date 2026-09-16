@@ -348,6 +348,134 @@ describe("Declarative Operations v1 golden contract", () => {
         [tool({ outputSchema: { type: "string", enum: ["b", "c"] } })],
       ),
     ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(program({ projection: { kind: "text" } }), [
+        tool({ outputSchema: { type: "string", maxLength: 1 } }),
+      ]),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(program({ projection: { kind: "text" } }), [
+        tool({ outputSchema: { type: "string", pattern: "^safe$" } }),
+      ]),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(
+        program({ projection: { kind: "number", source: { kind: "text" } } }),
+        [tool({ outputSchema: { type: "number", minimum: 50 } })],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(
+        program({
+          projection: { kind: "percentage", source: { kind: "text" } },
+        }),
+        [tool({ outputSchema: { type: "number", minimum: 50 } })],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(
+        program({
+          projection: { kind: "percentage", source: { kind: "text" } },
+        }),
+        [tool({ outputSchema: { type: "number", minimum: 0, maximum: 100 } })],
+      ),
+    ).toBeUndefined();
+    expect(
+      validateDeclarativeOperations(
+        program({ projection: { kind: "constant", value: {} } }),
+        [tool({ outputSchema: { type: "object", required: ["secret"] } })],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(
+        program({ projection: { kind: "constant", value: { title: "x" } } }),
+        [
+          tool({
+            outputSchema: {
+              type: "object",
+              properties: { title: { type: "string", maxLength: 0 } },
+            },
+          }),
+        ],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(
+        program({ projection: { kind: "optional", value: { kind: "text" } } }),
+        [tool({ outputSchema: { type: ["string", "null"], const: "x" } })],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(program({ projection: { kind: "text" } }), [
+        tool({ outputSchema: { anyOf: [{ type: "string" }] } }),
+      ]),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    const rootList = {
+      kind: "list",
+      locator: { kind: "role", role: "list" },
+      maxMatches: 2,
+    };
+    expect(
+      validateDeclarativeOperations(
+        program({ scope: rootList, projection: { kind: "text" } }),
+        [
+          tool({
+            outputSchema: {
+              type: "array",
+              minItems: 1,
+              maxItems: 2,
+              items: { type: "string" },
+            },
+          }),
+        ],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(
+        program({ scope: rootList, projection: { kind: "text" } }),
+        [
+          tool({
+            outputSchema: {
+              type: "array",
+              maxItems: 1,
+              items: { type: "string" },
+            },
+          }),
+        ],
+      ),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    const nestedList = {
+      kind: "descendant",
+      scope: {
+        kind: "list",
+        locator: { kind: "selector", tag: "span" },
+        maxMatches: 2,
+      },
+      projection: { kind: "text" },
+    };
+    expect(
+      validateDeclarativeOperations(program({ projection: nestedList }), [
+        tool({
+          outputSchema: {
+            type: "array",
+            minItems: 1,
+            maxItems: 2,
+            items: { type: "string" },
+          },
+        }),
+      ]),
+    ).toMatchObject({ code: "INVALID_SCHEMA" });
+    expect(
+      validateDeclarativeOperations(program({ projection: nestedList }), [
+        tool({
+          outputSchema: {
+            type: "array",
+            maxItems: 2,
+            items: { type: "string" },
+          },
+        }),
+      ]),
+    ).toBeUndefined();
     const outputNodes = Array.from({ length: MAX_OUTPUT_NODES }, () => "x");
     expect(
       validateDeclarativeOperations(
