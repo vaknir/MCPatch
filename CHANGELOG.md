@@ -180,6 +180,21 @@ All notable MCPatch changes are documented here. The format follows
   capability that omits `outputSchema`, in the JSON Schema and in both the Rust
   and TypeScript validators. Native WebMCP capabilities may still omit it.
 
+### Fixed
+
+- A Linux host without `XDG_RUNTIME_DIR` (containers, `cron`, services without a
+  PAM session, some SSH configurations) failed with the opaque
+  `local_core_unavailable` or, two seconds later, `core_startup_timeout`. The
+  adapters now report `local_core_runtime_directory_unavailable`, the core reports
+  `core_runtime_directory_unavailable` or `core_runtime_directory_unsafe`, and
+  every such line carries a fixed, path-free `hint`. A `MCPATCH_RUNTIME_DIR`
+  override selects the base directory for hosts without a session directory; it
+  never relaxes the ownership or mode checks. The stdio process tests provision
+  their own private directory so `cargo test` no longer depends on the login
+  session, and the requirement is documented in `docs/installation.md`.
+- The README no longer says the Google Flights field smoke is outstanding; it
+  links the recorded report.
+
 ### Removed
 
 - The unused `activeTab` extension permission. The toolbar gesture receives its

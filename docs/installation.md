@@ -63,6 +63,41 @@ the public-key bytes needed to preserve this ID. The repository and package cont
 no private signing key; the private half of this pre-alpha local identity was
 discarded after the public key was generated.
 
+## Runtime directory
+
+Both adapters and the bridge core rendezvous over private local endpoints inside a
+per-user runtime directory. The directory must be an absolute path owned by the
+current user with mode `0700`; MCPatch creates `mcpatch/<channel>/` beneath it with
+the same mode and refuses anything looser, anything owned by another user, and any
+symlinked endpoint. There is deliberately no fallback to a shared temporary
+directory, because a world-writable base would let another local user race the
+socket paths.
+
+- **Linux** uses `XDG_RUNTIME_DIR`, which a login session normally exports. Hosts
+  without one—containers, `cron`, `systemd` services without a PAM session, and
+  some SSH configurations—must set `MCPATCH_RUNTIME_DIR` to a directory that meets
+  the rules above. The override only selects the base; it never relaxes a check.
+- **macOS** uses the per-user temporary directory and accepts the same override.
+- **Windows** uses named pipes under the current user's security descriptor and
+  needs no directory.
+
+An empty value counts as unset. When the MCP client launches `mcpatch mcp-stdio`
+from an environment without a usable directory, the adapter exits before the first
+response and writes one structured line to standard error. The `hint` field is a
+fixed sentence; MCPatch never writes paths, user names, or environment values.
+
+| Log event            | `code`                                     | Meaning                                                        |
+| -------------------- | ------------------------------------------ | -------------------------------------------------------------- |
+| `mcp_stdio_failed`   | `local_core_runtime_directory_unavailable` | Neither `MCPATCH_RUNTIME_DIR` nor the session directory is set |
+| `mcp_stdio_failed`   | `local_core_runtime_unsafe`                | The directory exists but fails the ownership or mode checks    |
+| `native_host_failed` | the same two codes                         | The Chromium-facing adapter hit the same condition             |
+| `bridge_core_failed` | `core_runtime_directory_unavailable`       | The core could not resolve a directory                         |
+| `bridge_core_failed` | `core_runtime_directory_unsafe`            | The core's directory failed the checks                         |
+| `bridge_core_failed` | `core_transport_failed`                    | The directory is usable but a socket could not be bound there  |
+
+The last row is what a filesystem without Unix-socket support produces; point the
+override at a local filesystem such as `/run/user/<uid>` or a `tmpfs`.
+
 ## Enable the Google Flights pack
 
 Use only a disposable or signed-out profile during pre-alpha testing. Open either

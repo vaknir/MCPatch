@@ -38,6 +38,12 @@ cargo audit
 Run the full set before opening a PR. During development, run the smallest relevant
 test first.
 
+The bridge process tests spawn real adapters and cores, which need a private
+runtime directory. They provision their own, so a login session is not required;
+if you run the built binary by hand on a Linux host without `XDG_RUNTIME_DIR`,
+set `MCPATCH_RUNTIME_DIR` to a directory you own with mode `0700` (see
+[docs/installation.md](docs/installation.md#runtime-directory)).
+
 ## Code rules
 
 - Preserve the invariants in `SECURITY.md` and update `THREAT_MODEL.md` when a new

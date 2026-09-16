@@ -120,17 +120,69 @@ async fn version_command_does_not_start_the_runtime() {
     assert!(output.stderr.is_empty());
 }
 
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn reports_missing_runtime_directory_with_an_operator_hint() {
+    let mut child = bridge_command()
+        .env_remove("XDG_RUNTIME_DIR")
+        .env_remove("MCPATCH_RUNTIME_DIR")
+        .spawn()
+        .expect("bridge must spawn");
+    write_json_line(
+        &mut child,
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"secret-client-marker","version":"0.1.0"}}}"#,
+    )
+    .await;
+
+    let (status, stdout, stderr) = finish(child).await;
+    assert!(!status.success());
+    assert!(stdout.is_empty());
+    assert!(stderr.contains(r#""event":"mcp_stdio_failed""#));
+    assert!(stderr.contains(r#""code":"local_core_runtime_directory_unavailable""#));
+    assert!(stderr.contains(r#""hint":"#));
+    assert!(stderr.contains("XDG_RUNTIME_DIR"));
+    assert!(stderr.contains("MCPATCH_RUNTIME_DIR"));
+    assert!(!stderr.contains("secret-client-marker"));
+    assert!(!stderr.contains('/'), "hints must never carry paths");
+    assert_json_lines(&stderr);
+}
+
 fn spawn_bridge() -> Child {
-    Command::new(env!("CARGO_BIN_EXE_mcpatch"))
+    bridge_command().spawn().expect("bridge must spawn")
+}
+
+/// Every spawned bridge gets a private runtime directory so the suite does not
+/// depend on a login session exporting `XDG_RUNTIME_DIR`.
+fn bridge_command() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_mcpatch"));
+    command
         .arg("mcp-stdio")
         .env("RUST_LOG", "trace")
         .env("MCPATCH_LOG", "trace")
+        .env("MCPATCH_RUNTIME_DIR", private_runtime_directory())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()
-        .expect("bridge must spawn")
+        .kill_on_drop(true);
+    command
+}
+
+fn private_runtime_directory() -> &'static std::path::Path {
+    static DIRECTORY: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    DIRECTORY.get_or_init(|| {
+        let path = std::env::temp_dir().join(format!("mcpatch-stdio-{}", std::process::id()));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&path)
+                .expect("private runtime directory must be creatable");
+        }
+        #[cfg(not(unix))]
+        std::fs::create_dir(&path).expect("runtime directory must be creatable");
+        path
+    })
 }
 
 async fn write_json_line(child: &mut Child, line: &str) {

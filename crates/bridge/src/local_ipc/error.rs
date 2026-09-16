@@ -40,6 +40,15 @@ impl LocalFrameError {
     }
 }
 
+/// Fixed, path-free guidance for a runtime directory that could not be found.
+///
+/// Hints are logged next to a stable code so an operator can act without the
+/// bridge ever writing a filesystem path, user name, or environment value.
+pub const RUNTIME_DIRECTORY_UNAVAILABLE_HINT: &str = "Set XDG_RUNTIME_DIR, or the MCPATCH_RUNTIME_DIR override, to an existing directory owned by the current user with mode 0700";
+
+/// Fixed, path-free guidance for a runtime directory that failed its safety checks.
+pub const RUNTIME_DIRECTORY_UNSAFE_HINT: &str = "The runtime directory and its MCPatch subdirectories must be owned by the current user with mode 0700 and contain no symlinked endpoints";
+
 /// Stable Unix endpoint and peer-authentication failure categories.
 #[cfg(unix)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -54,6 +63,29 @@ pub enum UnixIpcErrorCode {
     UnsafeEndpoint,
     UnsafeLock,
     UnsafeRuntimeDirectory,
+}
+
+#[cfg(unix)]
+impl UnixIpcErrorCode {
+    /// Stable bridge-core startup code for structured logs. Runtime-directory
+    /// failures are distinguished because an operator can fix them; every other
+    /// failure stays under the transport code so logs never hint at internals.
+    pub const fn core_startup_code(self) -> &'static str {
+        match self {
+            Self::RuntimeUnavailable => "core_runtime_directory_unavailable",
+            Self::UnsafeRuntimeDirectory => "core_runtime_directory_unsafe",
+            _ => "core_transport_failed",
+        }
+    }
+
+    /// Fixed guidance for failures an operator can correct in the environment.
+    pub const fn operator_hint(self) -> Option<&'static str> {
+        match self {
+            Self::RuntimeUnavailable => Some(RUNTIME_DIRECTORY_UNAVAILABLE_HINT),
+            Self::UnsafeRuntimeDirectory => Some(RUNTIME_DIRECTORY_UNSAFE_HINT),
+            _ => None,
+        }
+    }
 }
 
 /// A path- and identity-free Unix IPC failure safe for structured logs.
