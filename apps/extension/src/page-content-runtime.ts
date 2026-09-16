@@ -332,6 +332,11 @@ export class PageContentRuntime {
       // Adapter cleanup cannot prevent cancellation and port revocation.
     }
     this.#unsubscribe = undefined;
+    try {
+      this.#adapter.close?.();
+    } catch {
+      // Authority and pending calls are already revoked at this point.
+    }
     if (disconnect) disconnectQuietly(port);
   }
 

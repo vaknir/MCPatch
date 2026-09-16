@@ -193,8 +193,10 @@ describe("page content runtime", () => {
 
   it("cancels exact calls and closes on crossed bindings", async () => {
     let executionSignal: AbortSignal | undefined;
+    const close = vi.fn();
     const state = setup(
       createAdapter({
+        close,
         execute(_tool, _args, signal) {
           executionSignal = signal;
           return new Promise<JsonValue>(() => undefined);
@@ -223,6 +225,7 @@ describe("page content runtime", () => {
       }),
     );
     expect(port.disconnected).toBe(true);
+    expect(close).toHaveBeenCalledOnce();
     state.scheduler.advanceBy(10);
     expect(state.runtime.ports).toHaveLength(2);
   });
@@ -230,9 +233,11 @@ describe("page content runtime", () => {
   it("refreshes monotonically and stops cleanly on pagehide", async () => {
     let listener: (() => void) | undefined;
     const capabilities = [CAPABILITY];
+    const close = vi.fn();
     const unsubscribe = vi.fn();
     const adapter = createAdapter({
       capabilities: async () => capabilities,
+      close,
       subscribe(next) {
         listener = next;
         return unsubscribe;
@@ -263,6 +268,7 @@ describe("page content runtime", () => {
     });
     expect(port.disconnected).toBe(true);
     expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
     state.scheduler.advanceBy(1_000);
     expect(state.runtime.ports).toHaveLength(1);
   });

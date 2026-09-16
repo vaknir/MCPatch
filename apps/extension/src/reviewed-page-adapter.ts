@@ -254,6 +254,19 @@ class ReviewedDocumentAdapter implements PageAdapter {
     };
   }
 
+  close(): void {
+    this.#routes.clear();
+    for (const adapter of this.#adapters()) {
+      try {
+        adapter.close?.();
+      } catch {
+        // Child authority has already been removed from this router.
+      }
+    }
+    this.#packs = Object.freeze([]);
+    this.#subscribed = false;
+  }
+
   #adapters(): readonly PageAdapter[] {
     return [
       ...(this.#native === undefined ? [] : [this.#native]),
@@ -417,7 +430,9 @@ function validateAdapter(adapter: PageAdapter): void {
     adapter === null ||
     typeof adapter.capabilities !== "function" ||
     typeof adapter.execute !== "function" ||
-    (adapter.subscribe !== undefined && typeof adapter.subscribe !== "function")
+    (adapter.subscribe !== undefined &&
+      typeof adapter.subscribe !== "function") ||
+    (adapter.close !== undefined && typeof adapter.close !== "function")
   ) {
     throw new TypeError("invalid reviewed page adapter");
   }
