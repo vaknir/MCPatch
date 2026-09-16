@@ -1,6 +1,6 @@
 import type { ValidationIssue } from "./error.js";
 import { validateOrigin, validateSemVer } from "./formats.js";
-import { validateJsonObject } from "./json.js";
+import { validateRuntimeSchema } from "./json.js";
 import {
   checkClosedObject,
   issue,
@@ -130,14 +130,14 @@ function validateCapability(
   const permissionIssue = validatePermissions(capability, prefix);
   if (permissionIssue !== undefined) return permissionIssue;
 
-  const inputIssue = validateJsonObject(
+  const inputIssue = validateRuntimeSchema(
     capability.inputSchema,
     `${prefix}.inputSchema`,
     true,
   );
   if (inputIssue !== undefined) return inputIssue;
   if (Object.hasOwn(capability, "outputSchema")) {
-    const outputIssue = validateJsonObject(
+    const outputIssue = validateRuntimeSchema(
       capability.outputSchema,
       `${prefix}.outputSchema`,
     );
@@ -154,6 +154,11 @@ function validateSource(
   if (capability.source === "pack") {
     if (!Object.hasOwn(capability, "pack")) {
       return issue("INVALID_CAPABILITY", `${prefix}.pack`);
+    }
+    // A pack result crosses to the MCP client only through its declared
+    // output schema, so a pack capability without one has no allowlist.
+    if (!Object.hasOwn(capability, "outputSchema")) {
+      return issue("INVALID_CAPABILITY", `${prefix}.outputSchema`);
     }
     return validatePack(capability.pack, `${prefix}.pack`);
   }

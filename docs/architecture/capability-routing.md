@@ -22,7 +22,11 @@ for that connection.
 Tool names are sorted for stable discovery. A name is visible only when it resolves
 to exactly one live context. If two tabs or connections advertise the same name,
 the bridge hides it and rejects calls as ambiguous; update arrival order never picks
-a winner. Protocol version 2 does not infer an active tab.
+a winner. Protocol version 2 does not infer an active tab. Ambiguity is judged when
+a call is reserved: an approval that was already granted is bound to one exact
+registration and dispatches there even if the name has since become ambiguous, and
+fails with a distinct outcome only if that registration itself was replaced or
+closed.
 
 Native WebMCP versus pack precedence is resolved by the extension before it sends a
 complete snapshot. Duplicate names inside one snapshot are invalid protocol data.
@@ -45,13 +49,33 @@ For each call, the registry:
 6. creates a tool call containing the registered context, revision, and origin; and
 7. records a revocation token and one-shot completion channel before dispatch.
 
+Snapshot acceptance is budgeted per browser connection: thirty snapshots in a
+burst, refilling ten per second. Exact replays and stale revisions are answered
+before the budget is charged, so only a snapshot that would compile schemas spends
+a token. A connection over budget has its snapshot refused as
+`SnapshotRateLimited` and its session closed with `browser_session_snapshot_flood`;
+closing, rather than silently dropping, keeps bridge and page state from drifting
+apart and lets the extension reconnect and republish. Compiled validators are
+shared across snapshots by exact schema bytes in a bounded cache, so a page that
+republishes unchanged tools costs no recompilation.
+
 JSON Schema draft 2020-12 validators are compiled when a snapshot is accepted.
-Schema depth and node counts are bounded. HTTP and file resolver features are not
-compiled into the bridge, so a pack schema cannot trigger bridge-originated network
-or filesystem reads.
+Before compilation, protocol validation restricts every input and output schema to
+the same keyword allowlist the extension's codegen-free interpreter understands
+(`type`, `const`, `enum`, `properties`, `required`, `additionalProperties`,
+`items`, and the numeric and length bounds), requires `type` to name one JSON
+type, and reports the first unsupported keyword at its exact path. The bridge
+therefore never compiles `pattern`, `format`, `$ref`, or combinator keywords, and
+its validators are built with format assertions disabled, so no page- or
+pack-supplied schema can make the bridge interpret an instance value as a regex
+or fetch anything. Schema depth and node counts are bounded. HTTP and file
+resolver features are not compiled into the bridge, so a pack schema cannot
+trigger bridge-originated network or filesystem reads.
 
 Responses are accepted only from the original connection with the exact request,
-context, revision, and origin. Declared output schemas are enforced. A valid result,
+context, revision, and origin. Declared output schemas are enforced, and a pack
+capability must declare one or its snapshot is rejected; only native WebMCP
+capabilities, whose draft surface advertises no result schema, may omit it. A valid result,
 tool error, invalid result, cancellation, context replacement, or disconnect consumes
 the pending request once. Completion data is delivered directly to the reserving
 call; no polling or shared response buffer is used.

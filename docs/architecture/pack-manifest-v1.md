@@ -75,13 +75,76 @@ patterns together with the matched page origin during the user's enable gesture;
 missing or removed authority disables the whole pack. See
 [ADR 0009](../adr/0009-reviewed-read-network-authority.md).
 
+`networkPolicy.extensionRequests` is enforced at runtime by the isolated-world
+realm lockdown (`apps/extension/src/realm-lockdown.ts`), installed before any
+pack code runs. The lockdown replaces the content-script realm's `fetch` with a
+wrapper that requires `https:` and allows only the declared request origins
+(same-origin to the page only when the page origin is declared), strips
+`Authorization` and `Cookie` headers, and bounds body size; it removes
+`XMLHttpRequest`, `WebSocket`, `EventSource`, and `navigator.sendBeacon`, and
+makes `document.cookie` throw. So a pack under `extensionRequests: "none"` has no
+reachable network primitive, and no pack can reach an undeclared origin or read
+cookies, by mechanism rather than review. A lockdown failure publishes no
+capability snapshot for the document.
+
+## Pack-boundary enforcement status
+
+Several boundaries below are honoured by **review** rather than by a runtime
+mechanism for the compiled (bundled) pack tier — every reviewed pack until the
+declarative interpreter exists. The table states, per claim, what enforces it
+today, so a reviewer never trusts a control that is not there for the tier they
+are reviewing. Each enforcement PR flips its row and links its issue; moving a row
+from review to mechanism is a trust-boundary change and needs an ADR
+(../../CONTRIBUTING.md, "Before implementation" step 2).
+
+| Claim (compiled pack tier)                                 | Enforced by today                                                           |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176)                                        |
+| Network only to declared origins                           | host permissions + review; no runtime realm bound yet (#187)                |
+| No network under `networkPolicy.extensionRequests: "none"` | review; no runtime realm bound yet (#187)                                   |
+| No navigation from `READ` tools                            | review (#188)                                                               |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                        |
+| Origin binding                                             | mechanism                                                                   |
+| Path binding                                               | extension JavaScript after injection (#180)                                 |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](../adr/0015-sensitive-read-classification.md) (#185) |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)          |
+
+The **declarative community tier** is not yet shippable. Its stronger invariants —
+no dynamic selectors, code, navigation, mutation, cookies, storage, or network
+primitive — become mechanism as the interpreter and operations schema land
+(#143–#147 under Phase 13, #141). Until then no declarative pack can activate, so
+those rows do not yet describe running code.
+
 ## Tools and fixtures
 
 Every tool declares a description, risk, permission set, closed object input JSON
-Schema, output JSON Schema, and at least one inline deterministic fixture. The risk
-must have its corresponding `READ`, `ACTION`, or `SENSITIVE` permission. Tool and
-fixture IDs are unique, fixture tool references must resolve, and all collections,
-text, JSON depth, JSON node count, and total content are bounded.
+Schema, closed object output JSON Schema, and at least one inline deterministic
+fixture. The risk must have its corresponding `READ`, `ACTION`, or `SENSITIVE`
+permission, and reviewers classify each read against
+[ADR 0015](../adr/0015-sensitive-read-classification.md). Tool and fixture IDs
+are unique, fixture tool references must resolve, and all collections, text, JSON
+depth, JSON node count, and total content are bounded.
+
+### Closed schemas
+
+The output schema is the only boundary between page content and the MCP client:
+the bridge validates every result against it and there is no separate scrubbing
+step. Both schemas are therefore required to be closed, which means every value
+they accept is fully described by the pack author:
+
+- the root is `type: "object"` with `additionalProperties` set to `false` or to a
+  closed subschema;
+- every subschema declares `type`, `const`, or `enum`;
+- every nested `type: "object"` subschema is closed the same way;
+- every `type: "array"` subschema declares closed `items`; and
+- `not` never appears, because a schema that rejects everything ships a tool that
+  can never succeed.
+
+Draft 2020-12 applicators such as `allOf` only narrow what a schema accepts and
+cannot reopen a closed schema, so validation leaves them to the runtime support
+check described below. `validatePackManifest` reports the first violation as
+`INVALID_SCHEMA` at the exact subschema path, for example
+`tools[0].outputSchema.properties.rows.items`.
 
 Fixtures are untrusted test data. They are part of the pack artifact and identity,
 not runtime authority. The

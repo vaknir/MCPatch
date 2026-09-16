@@ -67,6 +67,9 @@ pub enum BrowserSessionErrorCode {
     NegotiationFailed,
     ProtocolViolation,
     RegistryRejected,
+    /// The browser published capability snapshots faster than its budget. The
+    /// session is closed so bridge and page state cannot drift apart.
+    SnapshotFlood,
     Transport,
 }
 
@@ -82,6 +85,7 @@ impl BrowserSessionErrorCode {
             Self::NegotiationFailed => "browser_session_negotiation_failed",
             Self::ProtocolViolation => "browser_session_protocol_violation",
             Self::RegistryRejected => "browser_session_registry_rejected",
+            Self::SnapshotFlood => "browser_session_snapshot_flood",
             Self::Transport => "browser_session_transport_failed",
         }
     }

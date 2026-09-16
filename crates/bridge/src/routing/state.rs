@@ -20,8 +20,8 @@ pub(super) struct ContextState {
 
 pub(super) struct RegisteredCapability {
     pub capability: Capability,
-    pub input_validator: Validator,
-    pub output_validator: Option<Validator>,
+    pub input_validator: Arc<Validator>,
+    pub output_validator: Option<Arc<Validator>>,
 }
 
 pub(super) struct ResolvedCapability {
@@ -30,6 +30,6 @@ pub(super) struct ResolvedCapability {
     pub context_revision: u64,
     pub origin: String,
     pub capability: Capability,
-    pub input_validator: Validator,
-    pub output_validator: Option<Validator>,
+    pub input_validator: Arc<Validator>,
+    pub output_validator: Option<Arc<Validator>>,
 }

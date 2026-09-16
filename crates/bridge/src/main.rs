@@ -125,8 +125,16 @@ async fn run_bridge_core(channel: InstallChannel) -> ExitCode {
 
         let runtime = match UnixRuntime::prepare(channel).await {
             Ok(runtime) => runtime,
-            Err(_) => {
-                tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = "core_transport_failed");
+            Err(error) => {
+                let code = error.code().core_startup_code();
+                match error.code().operator_hint() {
+                    Some(hint) => {
+                        tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = code, hint = hint);
+                    }
+                    None => {
+                        tracing::error!(target: "mcpatch", event = "bridge_core_failed", code = code);
+                    }
+                }
                 return ExitCode::FAILURE;
             }
         };
@@ -247,7 +255,14 @@ async fn run_native_host(caller_origin: OsString) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            tracing::error!(target: "mcpatch", event = "native_host_failed", code = error.code());
+            match error.operator_hint() {
+                Some(hint) => {
+                    tracing::error!(target: "mcpatch", event = "native_host_failed", code = error.code(), hint = hint);
+                }
+                None => {
+                    tracing::error!(target: "mcpatch", event = "native_host_failed", code = error.code());
+                }
+            }
             ExitCode::FAILURE
         }
     }
@@ -262,7 +277,14 @@ async fn run_mcp_stdio() -> ExitCode {
     match mcp::run_stdio().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            tracing::error!(target: "mcpatch", event = "mcp_stdio_failed", code = error.code());
+            match error.operator_hint() {
+                Some(hint) => {
+                    tracing::error!(target: "mcpatch", event = "mcp_stdio_failed", code = error.code(), hint = hint);
+                }
+                None => {
+                    tracing::error!(target: "mcpatch", event = "mcp_stdio_failed", code = error.code());
+                }
+            }
             ExitCode::FAILURE
         }
     }

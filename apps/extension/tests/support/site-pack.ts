@@ -70,7 +70,11 @@ export const networkSitePack = definePack({
         additionalProperties: false,
         properties: {},
       },
-      outputSchema: { type: "object" },
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
       execute() {
         return {};
       },

@@ -3,12 +3,15 @@ use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 use mcpatch_bridge::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
     protocol::{
-        ApprovalDecision, ApprovalResult, Capability, CapabilitySnapshot, CapabilitySource,
-        JsonObject, Message, PROTOCOL_VERSION, PackReference, Permission, Risk,
+        ApprovalDecision, ApprovalRequester, ApprovalResult, Capability, CapabilitySnapshot,
+        CapabilitySource, ContextClosed, ContextClosedReason, JsonObject, Message,
+        PROTOCOL_VERSION, PackReference, Permission, Risk,
     },
     routing::{
-        ApprovalCompletionError, CallReservation, CapabilityRegistry, RegistryErrorCode,
-        RoutedApproval, ToolInvocation, shared_capability_registry,
+        APPROVAL_DENIAL_COOLDOWN, APPROVAL_DENIALS_BEFORE_COOLDOWN, APPROVAL_PROMPT_BURST,
+        APPROVAL_PROMPT_REFILL_INTERVAL, ApprovalCompletionError, CallReservation,
+        CapabilityRegistry, RegistryErrorCode, RoutedApproval, ToolInvocation,
+        shared_capability_registry,
     },
 };
 use serde_json::{Value, json};
@@ -17,7 +20,7 @@ use time::OffsetDateTime;
 const ORIGIN: &str = "https://example.com";
 
 #[tokio::test]
-async fn approval_message_is_random_route_bound_and_contains_no_raw_arguments() {
+async fn approval_message_is_random_route_bound_and_carries_validated_arguments() {
     let (mut registry, _id, browser) = action_registry();
     let now = fixed_time();
     let approval = prepare(
@@ -41,12 +44,16 @@ async fn approval_message_is_random_route_bound_and_contains_no_raw_arguments() 
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
     );
-    assert!(
-        !serde_json::to_string(&message)
-            .unwrap()
-            .contains("sensitive-marker")
+    assert_eq!(
+        message.args.get("query").and_then(Value::as_str),
+        Some("sensitive-marker"),
+        "the prompt must show the user exactly what the hash commits to"
     );
-    assert!(!format!("{approval:?}").contains("sensitive-marker"));
+    assert_eq!(message.requester, requester());
+    assert!(
+        !format!("{approval:?}").contains("sensitive-marker"),
+        "retained arguments must stay out of logs"
+    );
 
     let second = prepare(
         &mut registry,
@@ -213,9 +220,11 @@ async fn route_change_after_decision_invalidates_the_grant() {
     registry
         .replace_snapshot(&id, snapshot(2, action_capability()))
         .unwrap();
+    // The decision was valid; its target changed. That is reported distinctly
+    // from a binding mismatch so the caller knows to approve again.
     assert_eq!(
         registry.route_approved(grant, now).unwrap_err().code(),
-        RegistryErrorCode::ApprovalMismatch
+        RegistryErrorCode::ApprovalContextChanged
     );
 }
 
@@ -311,6 +320,234 @@ async fn concurrent_decisions_have_exactly_one_winner() {
 }
 
 #[tokio::test]
+async fn approved_call_dispatches_to_the_bound_context_when_a_second_context_appears() {
+    let (mut registry, id, browser) = action_registry();
+    let now = fixed_time();
+    let approval = prepare(
+        &mut registry,
+        invocation("request-1", "demo.action", "bound-value"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+
+    // While the human was deciding, a second tab of the same site published the
+    // same tool. Discovery hides the ambiguous name, but the approval was bound to
+    // one exact registration and must still dispatch there.
+    registry
+        .replace_snapshot(&id, snapshot_in("tab-8", 1, action_capability()))
+        .unwrap();
+    assert!(registry.visible_capabilities().is_empty());
+
+    let routed = registry.route_approved(grant, now).unwrap();
+    assert_eq!(routed.message().context_id, "tab-7");
+    assert_eq!(routed.message().context_revision, 1);
+    routed.dispatch().await.unwrap();
+    assert!(matches!(
+        browser.receive_from_bridge().await.unwrap(),
+        Some(Message::ToolCall(call)) if call.context_id == "tab-7"
+    ));
+}
+
+#[tokio::test]
+async fn approved_call_dispatches_to_the_bound_connection_when_another_connection_collides() {
+    let (mut registry, id, browser) = action_registry();
+    let now = fixed_time();
+    let approval = prepare(
+        &mut registry,
+        invocation("request-1", "demo.action", "bound-value"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+
+    // A second browser profile connects and advertises the same tool name.
+    let (other, other_browser) = connection("connection-b");
+    let other_id = other.id().clone();
+    registry.add_connection(other).unwrap();
+    registry
+        .replace_snapshot(&other_id, snapshot(1, action_capability()))
+        .unwrap();
+    assert!(registry.visible_capabilities().is_empty());
+
+    let routed = registry.route_approved(grant, now).unwrap();
+    routed.dispatch().await.unwrap();
+    assert!(matches!(
+        browser.receive_from_bridge().await.unwrap(),
+        Some(Message::ToolCall(_))
+    ));
+    assert!(
+        tokio::time::timeout(
+            Duration::from_millis(20),
+            other_browser.receive_from_bridge()
+        )
+        .await
+        .is_err(),
+        "the colliding connection must never receive the approved call"
+    );
+}
+
+#[tokio::test]
+async fn approved_call_fails_distinctly_when_the_bound_context_changes() {
+    let (mut registry, id, _browser) = action_registry();
+    let now = fixed_time();
+
+    // The bound document republished under a new revision (navigation).
+    let approval = prepare(
+        &mut registry,
+        invocation("request-1", "demo.action", "replaced"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+    registry
+        .replace_snapshot(&id, snapshot(2, action_capability()))
+        .unwrap();
+    assert_eq!(
+        registry.route_approved(grant, now).unwrap_err().code(),
+        RegistryErrorCode::ApprovalContextChanged
+    );
+
+    // The bound document disappeared entirely before dispatch.
+    let approval = prepare(
+        &mut registry,
+        invocation("request-2", "demo.action", "closed"),
+        now,
+    );
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            now,
+        )
+        .unwrap();
+    let grant = approval.completion().await.unwrap();
+    registry
+        .close_context(
+            &id,
+            ContextClosed {
+                protocol_version: PROTOCOL_VERSION,
+                context_id: "tab-7".to_owned(),
+                context_revision: 3,
+                reason: ContextClosedReason::Navigation,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        registry.route_approved(grant, now).unwrap_err().code(),
+        RegistryErrorCode::ApprovalContextChanged
+    );
+}
+
+#[tokio::test]
+async fn approval_prompts_are_budgeted_per_site() {
+    let (mut registry, _id, browser) = action_registry();
+    let now = fixed_time();
+    for index in 0..APPROVAL_PROMPT_BURST {
+        prepare(
+            &mut registry,
+            invocation(&format!("request-{index}"), "demo.action", "burst"),
+            now,
+        );
+    }
+
+    let refused = registry
+        .prepare_call(
+            invocation("request-refused", "demo.action", "burst"),
+            now,
+            Duration::from_secs(60),
+            requester(),
+        )
+        .err()
+        .expect("the seventh prompt must be refused");
+    assert_eq!(refused.code(), RegistryErrorCode::ApprovalRateLimited);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(20), browser.receive_from_bridge())
+            .await
+            .is_err(),
+        "a refused prompt must never reach the browser"
+    );
+
+    let later = now + APPROVAL_PROMPT_REFILL_INTERVAL;
+    prepare(
+        &mut registry,
+        invocation("request-refilled", "demo.action", "burst"),
+        later,
+    );
+}
+
+#[tokio::test]
+async fn repeated_denials_put_the_site_in_a_cooldown() {
+    let (mut registry, id, _browser) = action_registry();
+    let now = fixed_time();
+    for index in 0..APPROVAL_DENIALS_BEFORE_COOLDOWN {
+        let approval = prepare(
+            &mut registry,
+            invocation(&format!("request-{index}"), "demo.action", "denied"),
+            now,
+        );
+        registry
+            .accept_approval_result(
+                &id,
+                approval_result(&approval, ApprovalDecision::Denied),
+                now,
+            )
+            .unwrap();
+    }
+
+    assert_eq!(
+        registry
+            .prepare_call(
+                invocation("request-cooldown", "demo.action", "denied"),
+                now,
+                Duration::from_secs(60),
+                requester(),
+            )
+            .err()
+            .expect("a site in cooldown must not prompt")
+            .code(),
+        RegistryErrorCode::ApprovalRateLimited
+    );
+    let released = now + APPROVAL_DENIAL_COOLDOWN;
+    let approval = prepare(
+        &mut registry,
+        invocation("request-released", "demo.action", "denied"),
+        released,
+    );
+    // One approval resets the consecutive-denial count.
+    registry
+        .accept_approval_result(
+            &id,
+            approval_result(&approval, ApprovalDecision::Approved),
+            released,
+        )
+        .unwrap();
+    prepare(
+        &mut registry,
+        invocation("request-after-approval", "demo.action", "denied"),
+        released,
+    );
+}
+
+#[tokio::test]
 async fn pending_authority_does_not_survive_registry_restart() {
     let (mut original, id, _browser) = action_registry();
     let now = fixed_time();
@@ -355,13 +592,20 @@ fn connection(id: &str) -> (Arc<dyn BrowserConnection>, FakeBrowserPeer) {
     (connection, browser)
 }
 
+fn requester() -> ApprovalRequester {
+    ApprovalRequester {
+        client: "Claude Code".to_owned(),
+        session: "session-0001".to_owned(),
+    }
+}
+
 fn prepare(
     registry: &mut CapabilityRegistry,
     invocation: ToolInvocation,
     now: OffsetDateTime,
 ) -> RoutedApproval {
     match registry
-        .prepare_call(invocation, now, Duration::from_secs(60))
+        .prepare_call(invocation, now, Duration::from_secs(60), requester())
         .unwrap()
     {
         CallReservation::Approval(approval) => approval,
@@ -379,9 +623,13 @@ fn approval_result(approval: &RoutedApproval, decision: ApprovalDecision) -> App
 }
 
 fn snapshot(revision: u64, capability: Capability) -> CapabilitySnapshot {
+    snapshot_in("tab-7", revision, capability)
+}
+
+fn snapshot_in(context_id: &str, revision: u64, capability: Capability) -> CapabilitySnapshot {
     CapabilitySnapshot {
         protocol_version: PROTOCOL_VERSION,
-        context_id: "tab-7".to_owned(),
+        context_id: context_id.to_owned(),
         context_revision: revision,
         origin: ORIGIN.to_owned(),
         capabilities: vec![capability],

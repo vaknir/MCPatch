@@ -29,7 +29,12 @@
         "additionalProperties": false,
         "properties": {}
       },
-      "outputSchema": { "type": "object" }
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text"],
+        "properties": { "text": { "type": "string" } }
+      }
     }
   ],
   "fixtures": [
@@ -37,7 +42,7 @@
       "id": "current-item",
       "tool": "example.items.current",
       "input": {},
-      "expect": { "kind": "result", "result": { "id": "fixture-item" } }
+      "expect": { "kind": "result", "result": { "text": "fixture-item" } }
     }
   ]
 }

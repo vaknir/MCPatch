@@ -11,7 +11,7 @@ use mcpatch_bridge::{
     },
     routing::{
         BrowserToolResponse, CapabilityRegistry, RegistryErrorCode, RoutedCallCompletionError,
-        ToolInvocation,
+        SNAPSHOT_BURST, SNAPSHOT_REFILL_INTERVAL, ToolInvocation,
     },
 };
 use serde_json::{Value, json};
@@ -231,12 +231,14 @@ fn rejects_unresolvable_schema_references_at_registration() {
         "$ref": "https://attacker.example/schema.json"
     }));
 
+    // `$ref` is outside the runtime keyword allowlist, so the snapshot is
+    // rejected as invalid protocol data before any compiler could resolve it.
     assert_eq!(
         registry
             .replace_snapshot(&id, snapshot("tab-7", 1, vec![capability]))
             .expect_err("remote schema references must fail closed")
             .code(),
-        RegistryErrorCode::InvalidSchema
+        RegistryErrorCode::InvalidMessage
     );
 }
 
@@ -253,13 +255,80 @@ fn rejects_excessively_deep_schemas_before_compilation() {
     }
     capability.input_schema = object(nested);
 
+    // Protocol validation bounds schema depth in the same JSON-nesting units
+    // as the compiler, so the snapshot is rejected before compilation starts.
     assert_eq!(
         registry
             .replace_snapshot(&id, snapshot("tab-7", 1, vec![capability]))
             .expect_err("deep schema must fail before compilation")
             .code(),
-        RegistryErrorCode::InvalidSchema
+        RegistryErrorCode::InvalidMessage
     );
+}
+
+#[test]
+fn snapshot_floods_are_refused_before_compilation_and_recover() {
+    let (mut registry, id, _browser) = registry_with_connection("connection-a");
+    let now = time::OffsetDateTime::from_unix_timestamp(2_000_000_000).unwrap();
+    for revision in 1..=u64::from(SNAPSHOT_BURST) {
+        registry
+            .replace_snapshot_at(
+                &id,
+                snapshot("tab-7", revision, vec![read_capability("demo.read")]),
+                now,
+            )
+            .expect("snapshots within the burst must register");
+    }
+
+    let refused = registry
+        .replace_snapshot_at(
+            &id,
+            snapshot(
+                "tab-7",
+                u64::from(SNAPSHOT_BURST) + 1,
+                vec![read_capability("demo.flood")],
+            ),
+            now,
+        )
+        .expect_err("a snapshot over budget must be refused");
+    assert_eq!(refused.code(), RegistryErrorCode::SnapshotRateLimited);
+    // Nothing was registered by the refused snapshot.
+    assert_eq!(
+        registry
+            .visible_capabilities()
+            .iter()
+            .map(|capability| capability.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["demo.read"]
+    );
+
+    // An exact replay of the current revision costs nothing even when the
+    // budget is empty.
+    let replay = registry
+        .replace_snapshot_at(
+            &id,
+            snapshot(
+                "tab-7",
+                u64::from(SNAPSHOT_BURST),
+                vec![read_capability("demo.read")],
+            ),
+            now,
+        )
+        .expect("replays are idempotent");
+    assert!(!replay.changed);
+
+    let later = now + SNAPSHOT_REFILL_INTERVAL;
+    registry
+        .replace_snapshot_at(
+            &id,
+            snapshot(
+                "tab-7",
+                u64::from(SNAPSHOT_BURST) + 1,
+                vec![read_capability("demo.flood")],
+            ),
+            later,
+        )
+        .expect("one token refills per interval");
 }
 
 #[test]
@@ -553,7 +622,6 @@ async fn validates_and_consumes_browser_results() {
     let (mut registry, id, _browser) = registry_with_connection("connection-a");
     let mut capability = read_capability("demo.read");
     capability.output_schema = Some(object(json!({
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false,
         "required": ["ok"],
@@ -654,7 +722,6 @@ fn capability(name: &str, risk: Risk, permissions: Vec<Permission>) -> Capabilit
         risk,
         permissions,
         input_schema: object(json!({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "additionalProperties": false,
             "required": ["query"],

@@ -3,10 +3,14 @@ mod formats;
 mod messages;
 mod primitives;
 
+pub use messages::valid_display_label;
+
 use super::{Message, ValidationCode, ValidationError};
 
 pub(super) const MAX_CAPABILITIES: usize = 256;
 pub(super) const MAX_TOP_LEVEL_PROPERTIES: usize = 128;
+pub(super) const MAX_SCHEMA_DEPTH: usize = 32;
+pub(super) const MAX_SCHEMA_NODES: usize = 4096;
 
 impl Message {
     /// Enforce protocol invariants that are stricter than JSON shape validation.

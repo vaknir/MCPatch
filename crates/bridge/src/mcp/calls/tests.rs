@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, time::Duration};
+use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, ContentBlock, ErrorCode as McpErrorCode,
@@ -7,17 +7,97 @@ use serde_json::{Map, Value, json};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
-use super::{DEFAULT_APPROVAL_TIMEOUT, McpCallRuntime};
+use super::{DEFAULT_APPROVAL_TIMEOUT, McpCallRuntime, UNKNOWN_CLIENT_LABEL, requester_label};
 use crate::{
     browser::{BrowserConnection, BrowserConnectionId, FakeBrowserPeer, fake_browser_connection},
     protocol::{
-        ApprovalDecision, ApprovalResult, ErrorCode, Message, PROTOCOL_VERSION, Permission, Risk,
-        ToolContent, ToolError, ToolImageContent, ToolResult, parse_message,
+        ApprovalDecision, ApprovalRequester, ApprovalResult, ErrorCode, Message, PROTOCOL_VERSION,
+        Permission, Risk, ToolContent, ToolError, ToolImageContent, ToolResult, parse_message,
     },
     routing::{BrowserToolResponse, SharedCapabilityRegistry, shared_capability_registry},
 };
 
 const TEST_TIMEOUT: Duration = Duration::from_secs(1);
+
+#[test]
+fn approval_timeout_override_is_bounded_and_falls_back_loudly() {
+    use std::ffi::OsStr;
+
+    use super::{ApprovalTimeoutError, approval_timeout_from};
+
+    assert_eq!(
+        approval_timeout_from(None),
+        Ok(super::DEFAULT_APPROVAL_TIMEOUT)
+    );
+    assert_eq!(
+        approval_timeout_from(Some(OsStr::new("120"))),
+        Ok(Duration::from_secs(120))
+    );
+    assert_eq!(
+        approval_timeout_from(Some(OsStr::new(" 5 "))),
+        Ok(Duration::from_secs(5))
+    );
+    for value in ["4", "301", "0"] {
+        assert_eq!(
+            approval_timeout_from(Some(OsStr::new(value))),
+            Err(ApprovalTimeoutError::OutOfRange),
+            "{value}"
+        );
+    }
+    for value in ["", "sixty", "60s", "-1", "1e2"] {
+        assert_eq!(
+            approval_timeout_from(Some(OsStr::new(value))),
+            Err(ApprovalTimeoutError::Unparseable),
+            "{value}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn approval_wait_reports_argument_free_progress_to_the_client() {
+    let fixture = elevated_fixture(Duration::from_millis(100), Duration::from_millis(100)).await;
+    let progress = Arc::new(RecordedProgress::default());
+    let task = spawn_call_with_progress(
+        &fixture.runtime,
+        CancellationToken::new(),
+        Map::new(),
+        Some(progress.clone()),
+    );
+    let Message::ApprovalRequired(_) = receive_message(&fixture.browser).await else {
+        panic!("elevated call must request approval first");
+    };
+    // Nobody decides; the wait expires.
+    assert_eq!(complete(task).await.is_error, Some(true));
+
+    let sequences = progress.sequences.lock().unwrap().clone();
+    assert_eq!(
+        sequences,
+        vec![1],
+        "one report on dispatch, none within 100 ms"
+    );
+    assert!(!super::APPROVAL_WAIT_MESSAGE.contains("demo"));
+    assert!(!super::APPROVAL_WAIT_MESSAGE.contains("invalid"));
+    assert!(!super::APPROVAL_WAIT_MESSAGE.contains("http"));
+}
+
+#[test]
+fn a_lost_approval_target_tells_the_caller_to_approve_again() {
+    use crate::routing::RegistryErrorCode;
+
+    let changed = super::approval_route_failure(RegistryErrorCode::ApprovalContextChanged);
+    assert!(changed.contains("fresh approval"));
+    for code in [
+        RegistryErrorCode::ApprovalMismatch,
+        RegistryErrorCode::ApprovalExpired,
+        RegistryErrorCode::InvalidArguments,
+        RegistryErrorCode::LimitExceeded,
+    ] {
+        assert_eq!(
+            super::approval_route_failure(code),
+            "The approval is no longer valid."
+        );
+    }
+}
 
 #[tokio::test]
 async fn returns_only_the_exact_validated_browser_result() {
@@ -154,7 +234,12 @@ async fn rejects_arguments_before_browser_dispatch() {
 
     let error = fixture
         .runtime
-        .execute(request(arguments), CancellationToken::new())
+        .execute(
+            request(arguments),
+            CancellationToken::new(),
+            None,
+            test_requester(),
+        )
         .await
         .unwrap_err();
     assert_eq!(error.code, McpErrorCode::INVALID_PARAMS);
@@ -176,6 +261,8 @@ async fn rejects_missing_and_denied_tools_before_browser_dispatch() {
         .execute(
             request_named("mcpatch.demo.missing", Map::new()),
             CancellationToken::new(),
+            None,
+            test_requester(),
         )
         .await
         .unwrap_err();
@@ -189,7 +276,12 @@ async fn rejects_missing_and_denied_tools_before_browser_dispatch() {
     .await;
     let error = denied
         .runtime
-        .execute(request(Map::new()), CancellationToken::new())
+        .execute(
+            request(Map::new()),
+            CancellationToken::new(),
+            None,
+            test_requester(),
+        )
         .await
         .unwrap_err();
     assert_eq!(error.code, McpErrorCode::INVALID_PARAMS);
@@ -205,13 +297,8 @@ async fn elevated_call_dispatches_only_after_the_exact_approval() {
     };
     assert_eq!(approval.tool, "mcpatch.demo.status");
     assert_eq!(approval.origin, "https://demo.mcpatch.invalid");
-    assert!(
-        !serde_json::to_value(&approval)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .contains_key("arguments")
-    );
+    assert_eq!(approval.args, Map::new());
+    assert_eq!(approval.requester, test_requester());
     assert_no_browser_dispatch(&fixture.browser).await;
 
     fixture
@@ -303,7 +390,12 @@ async fn send_failure_consumes_the_pending_request() {
 
     let result = fixture
         .runtime
-        .execute(request(Map::new()), CancellationToken::new())
+        .execute(
+            request(Map::new()),
+            CancellationToken::new(),
+            None,
+            test_requester(),
+        )
         .await
         .unwrap();
     let CallToolResponse::Complete(result) = result else {
@@ -453,13 +545,78 @@ async fn fixture_with_timeouts(
     }
 }
 
+fn test_requester() -> ApprovalRequester {
+    ApprovalRequester {
+        client: "Test Client".to_owned(),
+        session: "session-0001".to_owned(),
+    }
+}
+
+#[test]
+fn requester_label_keeps_short_printable_client_names_and_trims_them() {
+    let label = requester_label(Some("  Claude Code  "), "session-0003");
+    assert_eq!(label.client, "Claude Code");
+    assert_eq!(label.session, "session-0003");
+}
+
+#[test]
+fn requester_label_replaces_missing_or_unprintable_client_names() {
+    assert_eq!(
+        requester_label(None, "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some(""), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some("Claude Code\nApproved by MCPatch"), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some("Cl\u{202e}aude"), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+    assert_eq!(
+        requester_label(Some(&"x".repeat(65)), "session-0001").client,
+        UNKNOWN_CLIENT_LABEL
+    );
+}
+
 fn spawn_call(
     runtime: &McpCallRuntime,
     cancellation: CancellationToken,
     arguments: Map<String, Value>,
 ) -> tokio::task::JoinHandle<Result<CallToolResponse, rmcp::ErrorData>> {
+    spawn_call_with_progress(runtime, cancellation, arguments, None)
+}
+
+fn spawn_call_with_progress(
+    runtime: &McpCallRuntime,
+    cancellation: CancellationToken,
+    arguments: Map<String, Value>,
+    progress: Option<super::SharedApprovalProgress>,
+) -> tokio::task::JoinHandle<Result<CallToolResponse, rmcp::ErrorData>> {
     let runtime = runtime.clone();
-    tokio::spawn(async move { runtime.execute(request(arguments), cancellation).await })
+    tokio::spawn(async move {
+        runtime
+            .execute(request(arguments), cancellation, progress, test_requester())
+            .await
+    })
+}
+
+/// Records every progress report so a test can assert what the client saw.
+#[derive(Default)]
+struct RecordedProgress {
+    sequences: std::sync::Mutex<Vec<u32>>,
+}
+
+impl super::ApprovalProgress for RecordedProgress {
+    fn report(&self, sequence: u32) -> futures_util::future::BoxFuture<'_, ()> {
+        Box::pin(async move {
+            self.sequences.lock().unwrap().push(sequence);
+        })
+    }
 }
 
 fn request(arguments: Map<String, Value>) -> CallToolRequestParams {

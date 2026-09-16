@@ -55,10 +55,20 @@ mod tests {
             .serialize(DACL_SECURITY_INFORMATION, |value| value.to_string_lossy())
             .unwrap();
 
+        // Exactly one allow ACE, for this logon SID, and no inherited ACEs.
         assert_eq!(serialized.matches("(A;").count(), 1);
+        assert_eq!(serialized.matches("(D;").count(), 0);
         assert_eq!(serialized.matches(&sid).count(), 1);
-        assert!(!serialized.contains(";;;WD)"));
-        assert!(!serialized.contains(";;;AN)"));
+        // A protected DACL, so no ACL inheritance can widen it.
+        assert!(serialized.starts_with("D:P"));
+        // No rights to Everyone, Anonymous, Authenticated Users, or the
+        // Network principal (the SIDs a cross-user or remote peer would carry).
+        for principal in [";;;WD)", ";;;AN)", ";;;AU)", ";;;NU)"] {
+            assert!(
+                !serialized.contains(principal),
+                "DACL must not grant {principal}: {serialized}"
+            );
+        }
     }
     #[test]
     fn mutex_dacl_grants_only_required_rights_to_the_logon_sid() {
@@ -73,7 +83,12 @@ mod tests {
 
         assert_eq!(serialized.matches("(A;").count(), 1);
         assert_eq!(serialized.matches(&sid).count(), 1);
-        assert!(!serialized.contains(";;;WD)"));
-        assert!(!serialized.contains(";;;AN)"));
+        assert!(serialized.starts_with("D:P"));
+        for principal in [";;;WD)", ";;;AN)", ";;;AU)", ";;;NU)"] {
+            assert!(
+                !serialized.contains(principal),
+                "mutex DACL must not grant {principal}: {serialized}"
+            );
+        }
     }
 }

@@ -1,4 +1,5 @@
 import type { PackManifestValidationIssue } from "../types.js";
+import { closedSchemaIssue } from "./closed-schema.js";
 import {
   type RecordValue,
   boundedArray,
@@ -82,12 +83,10 @@ export function validateTools(
     if (textIssue !== undefined) return { issue: textIssue };
     const permissionIssue = validatePermissions(tool, prefix);
     if (permissionIssue !== undefined) return { issue: permissionIssue };
-    if (!isClosedInputSchema(tool.inputSchema)) {
-      return { issue: issue("INVALID_SCHEMA", `${prefix}.inputSchema`) };
-    }
-    if (!isRecord(tool.outputSchema)) {
-      return { issue: issue("INVALID_SCHEMA", `${prefix}.outputSchema`) };
-    }
+    const schemaIssue =
+      closedSchemaIssue(tool.inputSchema, `${prefix}.inputSchema`) ??
+      closedSchemaIssue(tool.outputSchema, `${prefix}.outputSchema`);
+    if (schemaIssue !== undefined) return { issue: schemaIssue };
   }
   return { names };
 }
@@ -182,12 +181,4 @@ function validateFixtureExpectation(
       : issue("INVALID_VALUE", `${prefix}.code`);
   }
   return issue("INVALID_VALUE", `${prefix}.kind`);
-}
-
-function isClosedInputSchema(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    value.type === "object" &&
-    value.additionalProperties === false
-  );
 }

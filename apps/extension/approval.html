@@ -17,8 +17,9 @@
 
           <div role="alert" class="alert alert-warning">
             <span>
-              Approving permits exactly this tool, website, and argument hash
-              until the displayed expiry. It cannot be reused.
+              Approving permits exactly this tool, website, and these arguments
+              until the displayed expiry. It cannot be reused, and a call with
+              different arguments needs a new approval.
             </span>
           </div>
 
@@ -27,11 +28,26 @@
             <dd id="tool" class="break-all">Loading…</dd>
             <dt class="font-semibold">Website</dt>
             <dd id="origin" class="break-all">Loading…</dd>
+            <dt class="font-semibold">Requested by</dt>
+            <dd id="requester" class="break-all">Loading…</dd>
+            <dt class="font-semibold">Arguments</dt>
+            <dd>
+              <pre
+                id="args"
+                class="bg-base-200 max-h-64 overflow-auto rounded p-3 font-mono text-xs break-all whitespace-pre-wrap"
+              >
+Loading…</pre>
+            </dd>
             <dt class="font-semibold">Arguments hash</dt>
             <dd id="args-hash" class="font-mono text-xs break-all">Loading…</dd>
             <dt class="font-semibold">Expires</dt>
             <dd id="expires-at">Loading…</dd>
           </dl>
+
+          <p id="withdrawn" role="status" class="alert alert-info" hidden>
+            The requesting client stopped waiting before you decided. Nothing
+            was approved, and this prompt will close shortly.
+          </p>
 
           <p class="text-base-content/70 text-sm">
             MCPatch never shows this page inside the website and does not expose

@@ -12,6 +12,7 @@ import {
   PageAdapterExecutionError,
   type PageAdapter,
 } from "./page-content-model.js";
+import type { RealmNetworkPolicy } from "./realm-lockdown.js";
 import {
   validateCompiledPacks,
   validateRuntimeOptions,
@@ -56,6 +57,32 @@ export function createReviewedDocumentAdapter(
       )
     : [];
   return new ReviewedDocumentAdapter(document, matching, native);
+}
+
+/**
+ * The realm network policy for a page: every request origin declared by the
+ * reviewed packs whose match rules select this location. Used to lock the
+ * isolated content-script realm before any pack code runs. Reuses the same
+ * validation and matching as {@link createReviewedDocumentAdapter}, so a
+ * malformed definition fails closed here too.
+ */
+export function reviewedRealmNetworkPolicy(
+  url: string,
+  definitions: readonly ReviewedPageAdapterDefinition[],
+  options: CompiledPackRuntimeOptions,
+): RealmNetworkPolicy {
+  const entries = validateDefinitions(definitions, options);
+  const page = canonicalizePageLocation(url);
+  const allowed = new Set<string>();
+  if (page.ok) {
+    for (const entry of entries) {
+      if (!packMatchesLocation(entry.manifest, page.location)) continue;
+      const policy = entry.manifest.networkPolicy.extensionRequests;
+      if (policy === "none") continue;
+      for (const origin of policy.origins) allowed.add(origin);
+    }
+  }
+  return Object.freeze({ allowedOrigins: Object.freeze([...allowed]) });
 }
 
 class ReviewedDocumentAdapter implements PageAdapter {

@@ -181,6 +181,119 @@ All notable MCPatch changes are documented here. The format follows
   exact SDK matching, native WebMCP precedence, bounded schema interpretation,
   typed calls, result validation, cancellation, and lifecycle revocation.
 
+- A per-site approval prompt budget in the bridge: six prompts in a burst per
+  browser connection and origin, refilling one every ten seconds, and a
+  sixty-second cooldown after three consecutive non-approvals. A refused prompt
+  fails the MCP call with an explanatory tool failure before any nonce is
+  generated or browser message sent. The extension opens a prompt without
+  stealing focus when a denial was seen in the last minute.
+
+- ADR 0015 defines when a read is `SENSITIVE`: content the user has already
+  rendered in the current document and credential-free network reads are
+  `READ`; undisplayed account data and high-impact content such as credentials
+  or private correspondence are `SENSITIVE`. The shipped TradingView and Google
+  Flights reads are classified by that rule, the review checklist cites it, and
+  the bundled permission ceiling is unchanged.
+
+- Progress notifications during the approval wait: when the MCP client supplies
+  a progress token, the bridge sends `notifications/progress` with a fixed,
+  argument-free message on dispatch and every ten seconds until the user
+  decides. The approval wait is configurable with `MCPATCH_APPROVAL_TIMEOUT_SECS`
+  (5–300 seconds; invalid values are ignored and logged). When the client stops
+  waiting while a prompt is on screen, the extension keeps the prompt visible
+  for eight seconds with a notice that nothing was approved instead of closing
+  it under the user's cursor.
+
+- A per-connection capability snapshot budget in the bridge: thirty snapshots
+  in a burst, refilling ten per second, charged only for snapshots that would
+  compile schemas. A connection over budget is refused with
+  `SnapshotRateLimited` and its session closed with the distinct
+  `browser_session_snapshot_flood` code so bridge and page state cannot drift.
+  Compiled validators are now shared across snapshots by exact schema bytes in a
+  bounded cache, so republishing unchanged tools costs no recompilation.
+
+- Isolated-realm lockdown for compiled packs
+  (`apps/extension/src/realm-lockdown.ts`), installed before any pack code runs:
+  the content-script realm's `fetch` is replaced with an MCPatch-owned wrapper
+  that requires `https:`, allows only the pack's declared request origins, strips
+  `Authorization`/`Cookie` headers, and bounds body size; `XMLHttpRequest`,
+  `WebSocket`, `EventSource`, and `navigator.sendBeacon` are removed; and
+  `document.cookie` throws. Every replacement is frozen and non-configurable, and
+  a lockdown failure publishes no capability snapshot. This turns the
+  declared-origin network bound and the no-cookie bound from review into
+  mechanism for every compiled pack, with no policy change; documented in
+  `docs/architecture/realm-lockdown.md`.
+- Per-tier pack-boundary enforcement-status tables in THREAT_MODEL.md,
+  ARCHITECTURE.md, and pack-manifest-v1.md, stating for each compiled-pack claim
+  whether it is enforced by mechanism or by review today, with the declarative
+  tier marked not-yet-shippable; CONTRIBUTING.md now requires an ADR to move a row
+  from review to mechanism, and the README status links the tables.
+- A security regression suite that pins red-team findings against regression: a
+  `mcpatch mcp-stdio` abuse test (hostile bytes never leaving the process,
+  frame-abuse termination with a stable code, continuation-state refusal,
+  bounded concurrency, and pinned version negotiation), hostile-page adapter and
+  worker tests (serialization-hook and over-long-description rejection,
+  `toolchange`-flood coalescing, and the approval page being unreachable from web
+  content), and stronger Windows named-pipe/mutex DACL assertions, documented in
+  `docs/testing/security-regression-suite.md`.
+- Readable, attributed approval prompts: `approval_required` now carries the
+  bridge-validated arguments the grant's hash commits to and the requesting MCP
+  client and bridge session, and the trusted approval page renders both as inert
+  text beside the hash. The client name is trimmed and limited to short printable
+  ASCII (else `unknown client`), arguments stay out of every log, and the
+  pre-freeze protocol-v2 addition is recorded in
+  `docs/architecture/protocol-v2-approval-presentation.md`.
+
+### Changed
+
+- Pack Manifest v1 now requires closed output schemas as well as closed input
+  schemas: the root is an object with `additionalProperties` set to `false` or to
+  a closed subschema, every subschema declares `type`, `const`, or `enum`, nested
+  objects are closed, arrays declare `items`, and `not` is rejected.
+  `validatePackManifest` reports the first violation at the exact subschema path.
+  The output schema is the only allowlist between page content and the MCP
+  client, so an open output schema is now a manifest error rather than a review
+  concern.
+- Bridge protocol v1 capability snapshots now reject a `source: "pack"`
+  capability that omits `outputSchema`, in the JSON Schema and in both the Rust
+  and TypeScript validators. Native WebMCP capabilities may still omit it.
+- Bridge protocol v1 capability schemas are now restricted, on both sides and in
+  the JSON Schema, to the keyword allowlist the extension's interpreter already
+  enforced (`type`, `const`, `enum`, `properties`, `required`,
+  `additionalProperties`, `items`, and the numeric and length bounds), with
+  `type` limited to one JSON type; the first unsupported keyword is reported at
+  its exact path. The bridge compiles its validators with format assertions
+  disabled. The bridge no longer relies on the extension being the only layer
+  that refuses `pattern`, `format`, `$ref`, or combinators.
+
+### Fixed
+
+- A Linux host without `XDG_RUNTIME_DIR` (containers, `cron`, services without a
+  PAM session, some SSH configurations) failed with the opaque
+  `local_core_unavailable` or, two seconds later, `core_startup_timeout`. The
+  adapters now report `local_core_runtime_directory_unavailable`, the core reports
+  `core_runtime_directory_unavailable` or `core_runtime_directory_unsafe`, and
+  every such line carries a fixed, path-free `hint`. A `MCPATCH_RUNTIME_DIR`
+  override selects the base directory for hosts without a session directory; it
+  never relaxes the ownership or mode checks. The stdio process tests provision
+  their own private directory so `cargo test` no longer depends on the login
+  session, and the requirement is documented in `docs/installation.md`.
+- The README no longer says the Google Flights field smoke is outstanding; it
+  links the recorded report.
+- An approved action no longer fails with "The approval is no longer valid" when
+  a second tab or browser profile publishes the same tool name while the human is
+  deciding. The bridge now dispatches an approved call to the exact registration
+  the approval was bound to instead of resolving the tool name again, and reports
+  the distinct `ApprovalContextChanged` outcome—with guidance to request a fresh
+  approval—only when that registration was replaced or closed before dispatch.
+
+### Removed
+
+- The unused `activeTab` extension permission. The toolbar gesture receives its
+  tab from `action.onClicked`, and `activeTab` with `scripting` would have granted
+  a click-to-inject capability nothing used. The manifest test now pins the exact
+  permission set and asserts that no web-accessible resources are declared.
+
 ### Fixed
 
 - Protocol and SDK JSON value types now agree on immutable array values, allowing

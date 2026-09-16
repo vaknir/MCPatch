@@ -7,9 +7,9 @@ use mcpatch_bridge::{
     browser::BrowserSessionErrorCode,
     local_ipc::read_json_frame,
     protocol::{
-        ApprovalDecision, ApprovalResult, CapabilitySource, ContextClosed, ContextClosedReason,
-        ErrorCode, Message, PROTOCOL_VERSION, PackReference, Permission, Risk, ToolError,
-        ToolResult, parse_message,
+        ApprovalDecision, ApprovalRequester, ApprovalResult, CapabilitySource, ContextClosed,
+        ContextClosedReason, ErrorCode, Message, PROTOCOL_VERSION, PackReference, Permission, Risk,
+        ToolError, ToolResult, parse_message,
     },
     routing::{
         CallReservation, RegistryErrorCode, RoutedCall, SharedCapabilityRegistry, ToolInvocation,
@@ -91,6 +91,10 @@ async fn authenticated_session_completes_an_exact_one_time_approval() {
                 },
                 now,
                 Duration::from_secs(60),
+                ApprovalRequester {
+                    client: "Claude Code".to_owned(),
+                    session: "session-0001".to_owned(),
+                },
             )
             .unwrap()
         {

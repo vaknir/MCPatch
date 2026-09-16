@@ -112,7 +112,9 @@ async fn oversized_prefix_is_rejected_without_reading_a_payload() {
 #[tokio::test]
 async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
     let mut command = native_host_command(ALLOWED_ORIGIN);
-    command.env_remove("XDG_RUNTIME_DIR");
+    command
+        .env_remove("XDG_RUNTIME_DIR")
+        .env_remove("MCPATCH_RUNTIME_DIR");
     let mut child = command.spawn().expect("native host must spawn");
     let payload = serde_json::to_vec(&json!({
         "type": "heartbeat",
@@ -134,8 +136,11 @@ async fn valid_message_fails_closed_while_local_ipc_is_unavailable() {
     let (status, stdout, stderr) = finish(child).await;
     assert!(!status.success());
     assert!(stdout.is_empty());
-    assert!(stderr.contains(r#""code":"local_core_unavailable""#));
+    assert!(stderr.contains(r#""code":"local_core_runtime_directory_unavailable""#));
+    assert!(stderr.contains(r#""hint":"#));
+    assert!(stderr.contains("MCPATCH_RUNTIME_DIR"));
     assert!(!stderr.contains("private-heartbeat-marker"));
+    assert!(!stderr.contains('/'), "hints must never carry paths");
     assert_json_lines(&stderr);
 }
 

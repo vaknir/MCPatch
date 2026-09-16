@@ -2,8 +2,11 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use super::{
     PermissionDecision, RegistryError, RegistryErrorCode, RoutedCancellation,
+    approval_limits::ApprovalLimiter,
     policy::permission_decision,
-    state::{ConnectionState, RegisteredCapability, ResolvedCapability},
+    schema::SchemaCache,
+    snapshot_limits::SnapshotLimiter,
+    state::{ConnectionState, ContextState, RegisteredCapability, ResolvedCapability},
     types::{ActiveRequest, PendingApproval},
 };
 use crate::{
@@ -17,6 +20,9 @@ pub struct CapabilityRegistry {
     pub(super) connections: BTreeMap<BrowserConnectionId, ConnectionState>,
     pub(super) active_requests: BTreeMap<String, ActiveRequest>,
     pub(super) pending_approvals: BTreeMap<String, PendingApproval>,
+    pub(super) approval_limiter: ApprovalLimiter,
+    pub(super) snapshot_limiter: SnapshotLimiter,
+    pub(super) schema_cache: SchemaCache,
 }
 
 impl CapabilityRegistry {
@@ -25,6 +31,9 @@ impl CapabilityRegistry {
             connections: BTreeMap::new(),
             active_requests: BTreeMap::new(),
             pending_approvals: BTreeMap::new(),
+            approval_limiter: ApprovalLimiter::default(),
+            snapshot_limiter: SnapshotLimiter::default(),
+            schema_cache: SchemaCache::default(),
         }
     }
 
@@ -56,6 +65,8 @@ impl CapabilityRegistry {
         if self.connections.remove(connection_id).is_none() {
             return false;
         }
+        self.approval_limiter.forget_connection(connection_id);
+        self.snapshot_limiter.forget_connection(connection_id);
 
         let request_ids = self
             .active_requests
@@ -124,18 +135,26 @@ impl CapabilityRegistry {
                 if resolved.is_some() {
                     return Err(RegistryError::new(RegistryErrorCode::AmbiguousTool));
                 }
-                resolved = Some(ResolvedCapability {
-                    connection: state.connection.clone(),
-                    context_id: context.snapshot.context_id.clone(),
-                    context_revision: context.snapshot.context_revision,
-                    origin: context.snapshot.origin.clone(),
-                    capability: capability.capability.clone(),
-                    input_validator: capability.input_validator.clone(),
-                    output_validator: capability.output_validator.clone(),
-                });
+                resolved = Some(resolve_registration(state, context, capability));
             }
         }
         resolved.ok_or_else(|| RegistryError::new(RegistryErrorCode::ToolNotFound))
+    }
+
+    /// Resolve the exact registration an approval was bound to. Unlike name
+    /// resolution this ignores same-named tools that appeared in other contexts
+    /// or connections while the human was deciding: the decision was made about
+    /// one document, so it dispatches there or nowhere.
+    pub(super) fn resolve_bound_capability(
+        &self,
+        connection_id: &BrowserConnectionId,
+        context_id: &str,
+        tool: &str,
+    ) -> Option<ResolvedCapability> {
+        let state = self.connections.get(connection_id)?;
+        let context = state.contexts.get(context_id)?;
+        let capability = context.capabilities.get(tool)?;
+        Some(resolve_registration(state, context, capability))
     }
 
     pub(super) fn revoke_context_requests(
@@ -200,5 +219,21 @@ impl CapabilityRegistry {
 impl Default for CapabilityRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn resolve_registration(
+    state: &ConnectionState,
+    context: &ContextState,
+    capability: &RegisteredCapability,
+) -> ResolvedCapability {
+    ResolvedCapability {
+        connection: state.connection.clone(),
+        context_id: context.snapshot.context_id.clone(),
+        context_revision: context.snapshot.context_revision,
+        origin: context.snapshot.origin.clone(),
+        capability: capability.capability.clone(),
+        input_validator: capability.input_validator.clone(),
+        output_validator: capability.output_validator.clone(),
     }
 }

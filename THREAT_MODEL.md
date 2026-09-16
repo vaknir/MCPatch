@@ -146,13 +146,18 @@ page data, or excessive content through tool output, errors, or logs.
 
 Mitigations:
 
-- no cookie or credential APIs in the pack context;
+- no cookie or credential APIs in the pack context; the isolated-world realm
+  lockdown removes the network primitives and makes `document.cookie` throw for
+  compiled packs ([realm lockdown](docs/architecture/realm-lockdown.md), #187);
 - expose task-specific DOM adapters instead of a document handle where practical;
 - require output schemas and byte limits;
 - use allowlisted structured log fields with opaque identifiers;
 - never log raw arguments, results, page text, grants, or transport frames; and
 - classify tools that can read sensitive page content as `SENSITIVE` even if they
-  do not mutate state.
+  do not mutate state, using the rules in
+  [ADR 0015](docs/adr/0015-sensitive-read-classification.md): rendered content
+  and credential-free network reads are `READ`; undisplayed account data and
+  high-impact content are `SENSITIVE`.
 
 Content-level secret detection can reduce accidents but is not the primary boundary;
 the capability API must make credential access unavailable.
@@ -333,6 +338,34 @@ Mitigations:
 - separate development and production extension/native-host identities;
 - signed releases and pack bundles before external distribution; and
 - key rotation and revocation procedures before the first public release.
+
+## Pack-boundary enforcement status
+
+Several boundaries below are honoured by **review** rather than by a runtime
+mechanism for the compiled (bundled) pack tier — every reviewed pack until the
+declarative interpreter exists. The table states, per claim, what enforces it
+today, so a reviewer never trusts a control that is not there for the tier they
+are reviewing. Each enforcement PR flips its row and links its issue; moving a row
+from review to mechanism is a trust-boundary change and needs an ADR
+(CONTRIBUTING.md, "Before implementation" step 2).
+
+| Claim (compiled pack tier)                                 | Enforced by today                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
+| No navigation from `READ` tools                            | review (#188)                                                                            |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
+| Origin binding                                             | mechanism                                                                                |
+| Path binding                                               | extension JavaScript after injection (#180)                                              |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
+
+The **declarative community tier** is not yet shippable. Its stronger invariants —
+no dynamic selectors, code, navigation, mutation, cookies, storage, or network
+primitive — become mechanism as the interpreter and operations schema land
+(#143–#147 under Phase 13, #141). Until then no declarative pack can activate, so
+those rows do not yet describe running code.
 
 ## Permission classes
 

@@ -334,7 +334,7 @@ describe("Declarative Pack Bundle v1", () => {
     const bundle = fixtureBundle();
     const digest = await computeDeclarativePackBundleDigest(bundle);
     expect(digest).toBe(
-      "sha256:bb4e5a9ec1eca3429b126a340415f670041c62a0242e5bd51da4c5ca680e24fb",
+      "sha256:71ee26e441ae053582e39e78c3cb339fb92afe960df5a40c6aee979e6a47aa07",
     );
     const reordered = structuredClone(bundle) as {
       operations: { readonly program: unknown; readonly operationsVersion: 1 };
@@ -405,9 +405,10 @@ describe("Declarative Pack Bundle v1", () => {
     const flipped = structuredClone(signed) as {
       publisherSignature: { signature: string };
     } & Omit<DeclarativePackBundle, "publisherSignature">;
+    const flippedSignature = flipped.publisherSignature.signature;
     flipped.publisherSignature.signature =
-      flipped.publisherSignature.signature.slice(0, -1) +
-      (flipped.publisherSignature.signature.endsWith("A") ? "B" : "A");
+      (flippedSignature.startsWith("A") ? "B" : "A") +
+      flippedSignature.slice(1);
     await expect(
       verifyDeclarativePackBundle(
         serializeDeclarativePackBundle(
@@ -640,6 +641,7 @@ function fixtureBundle(): DeclarativePackBundle {
 
 function bundleWithProgram(program: JsonValue): DeclarativePackBundle {
   const bundle = structuredClone(fixtureBundle()) as unknown as {
+    manifest: { tools: Array<{ outputSchema: unknown }> };
     operations: { program: { operations: Array<{ projection: unknown }> } };
   };
   const operation = bundle.operations.program.operations[0];
@@ -647,6 +649,22 @@ function bundleWithProgram(program: JsonValue): DeclarativePackBundle {
   operation.projection = {
     kind: "object",
     fields: [{ key: "value", value: { kind: "constant", value: program } }],
+  };
+  // The declared output schema has to describe whatever projection the test
+  // swaps in: a tool's output schema is closed, so it can neither omit the
+  // projected key nor admit one the projection never produces.
+  const tool = bundle.manifest.tools[0];
+  if (tool === undefined) throw new Error("fixture tool missing");
+  tool.outputSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["value"],
+    properties: {
+      // A string constant is described by its type so the byte-bound cases
+      // measure the program alone; any other constant is pinned exactly.
+      value:
+        typeof program === "string" ? { type: "string" } : { const: program },
+    },
   };
   return bundle as unknown as DeclarativePackBundle;
 }

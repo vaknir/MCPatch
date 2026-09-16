@@ -163,21 +163,51 @@ result-binding rules are detailed in
 7. If an approval is required, execution pauses until a deterministic grant matches
    the canonical argument hash, tool, origin, expiry, and unused nonce.
 8. The extension invokes the bound native capability or installed pack operation.
-9. The result is validated, size-limited, stripped of forbidden data, and returned
-   to the MCP client.
+9. The result is validated against the tool's closed output schema, size-limited,
+   and returned to the MCP client. The closed schema is the allowlist; no
+   separate scrubbing step exists, so content the schema does not name never
+   leaves the browser.
 
 Navigation, tab closure, pack disablement, disconnect, timeout, or cancellation
 invalidates the affected registrations and pending calls.
 
 ## Trust boundaries
 
-| Boundary            | Untrusted input                              | Required controls                                                                        |
-| ------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| MCP client → bridge | method, tool name, arguments, cancellation   | framing limits, protocol validation, schema validation, permission policy                |
-| Extension → bridge  | identity claims, contexts, schemas, results  | native-host allowlist, negotiation, message validation, origin binding, size limits      |
-| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text              |
-| Pack → extension    | code, manifest, schemas, network intent      | installed immutable bundle, signature/trust policy, manifest validation, least privilege |
-| Registry → runtime  | metadata, updates, compatibility claims      | signatures, transparency, explicit install/enable, no runtime code loading               |
+| Boundary            | Untrusted input                              | Required controls                                                                                                 |
+| ------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| MCP client → bridge | method, tool name, arguments, cancellation   | framing limits, protocol validation, schema validation, permission policy                                         |
+| Extension → bridge  | identity claims, contexts, schemas, results  | native-host allowlist, negotiation, message validation, origin binding, size limits                               |
+| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text                                       |
+| Pack → extension    | code, manifest, schemas, network intent      | installed immutable bundle, signature/trust policy, manifest validation, least privilege, isolated-realm lockdown |
+| Registry → runtime  | metadata, updates, compatibility claims      | signatures, transparency, explicit install/enable, no runtime code loading                                        |
+
+### Pack-boundary enforcement status
+
+Several boundaries below are honoured by **review** rather than by a runtime
+mechanism for the compiled (bundled) pack tier — every reviewed pack until the
+declarative interpreter exists. The table states, per claim, what enforces it
+today, so a reviewer never trusts a control that is not there for the tier they
+are reviewing. Each enforcement PR flips its row and links its issue; moving a row
+from review to mechanism is a trust-boundary change and needs an ADR
+(CONTRIBUTING.md, "Before implementation" step 2).
+
+| Claim (compiled pack tier)                                 | Enforced by today                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
+| No navigation from `READ` tools                            | review (#188)                                                                            |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
+| Origin binding                                             | mechanism                                                                                |
+| Path binding                                               | extension JavaScript after injection (#180)                                              |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
+
+The **declarative community tier** is not yet shippable. Its stronger invariants —
+no dynamic selectors, code, navigation, mutation, cookies, storage, or network
+primitive — become mechanism as the interpreter and operations schema land
+(#143–#147 under Phase 13, #141). Until then no declarative pack can activate, so
+those rows do not yet describe running code.
 
 ## Protocol boundaries
 

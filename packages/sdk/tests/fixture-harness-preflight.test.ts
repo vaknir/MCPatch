@@ -127,7 +127,12 @@ describe("pack fixture preflight", () => {
       inputSchema: {
         type: "object",
         additionalProperties: false,
-        properties: "private malformed schema value" as never,
+        properties: {
+          value: {
+            type: "string",
+            minLength: "private malformed schema value" as never,
+          },
+        },
       },
       handler: execute,
     });
@@ -154,6 +159,7 @@ describe("pack fixture preflight", () => {
       outputSchema: {
         $async: true,
         type: "object",
+        additionalProperties: false,
         properties: { echoed: { type: "string" } },
       },
       handler: execute,
@@ -311,7 +317,12 @@ function twoToolDefinition(
       properties: { value: { type: "string" } },
       required: ["value"],
     },
-    outputSchema: { type: "object" },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { echoed: { type: "string" } },
+      required: ["echoed"],
+    },
     execute: first,
   });
   const count = defineTool({
@@ -325,7 +336,12 @@ function twoToolDefinition(
       properties: { count: { type: "integer" } },
       required: ["count"],
     },
-    outputSchema: { type: "object" },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { count: { type: "integer" } },
+      required: ["count"],
+    },
     execute: second,
   });
   return definePack({

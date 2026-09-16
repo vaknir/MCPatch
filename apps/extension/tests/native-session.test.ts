@@ -588,8 +588,10 @@ function approvalRequired(): ApprovalRequired {
     contextRevision: 1,
     origin: "https://example.com",
     tool: "demo.action",
+    args: {},
     argsHash: "a".repeat(64),
     expiresAt: "2026-09-15T00:01:00Z",
+    requester: { client: "Claude Code", session: "session-0001" },
   };
 }
 

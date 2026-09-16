@@ -103,21 +103,90 @@ fn io_error(error: io::Error) -> UnixIpcError {
     UnixIpcError::with_source(UnixIpcErrorCode::Io, error)
 }
 
+/// Explicit override for hosts without a login-session runtime directory, such as
+/// containers, cron, or some SSH sessions. It selects the base only; the directory
+/// still has to pass the same ownership and mode checks as a session directory.
+const RUNTIME_DIRECTORY_OVERRIDE_ENV: &str = "MCPATCH_RUNTIME_DIR";
+#[cfg(target_os = "linux")]
+const SESSION_RUNTIME_DIRECTORY_ENV: &str = "XDG_RUNTIME_DIR";
+
 #[cfg(target_os = "linux")]
 fn default_runtime_base() -> Result<PathBuf, UnixIpcError> {
-    let path = env::var_os("XDG_RUNTIME_DIR")
-        .ok_or_else(|| UnixIpcError::without_source(UnixIpcErrorCode::RuntimeUnavailable))?;
-    Ok(PathBuf::from(path))
+    runtime_base_from(
+        env::var_os(RUNTIME_DIRECTORY_OVERRIDE_ENV),
+        env::var_os(SESSION_RUNTIME_DIRECTORY_ENV),
+    )
 }
 
 #[cfg(target_os = "macos")]
 fn default_runtime_base() -> Result<PathBuf, UnixIpcError> {
-    Ok(env::temp_dir())
+    runtime_base_from(
+        env::var_os(RUNTIME_DIRECTORY_OVERRIDE_ENV),
+        Some(env::temp_dir().into_os_string()),
+    )
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn default_runtime_base() -> Result<PathBuf, UnixIpcError> {
-    Err(UnixIpcError::without_source(
-        UnixIpcErrorCode::RuntimeUnavailable,
-    ))
+    runtime_base_from(env::var_os(RUNTIME_DIRECTORY_OVERRIDE_ENV), None)
+}
+
+/// Picks the first non-empty candidate: the explicit override, then the platform
+/// session directory. An empty value is treated as unset so a stray `VAR=` in a
+/// service file cannot select the current directory.
+fn runtime_base_from(
+    override_value: Option<std::ffi::OsString>,
+    session_value: Option<std::ffi::OsString>,
+) -> Result<PathBuf, UnixIpcError> {
+    [override_value, session_value]
+        .into_iter()
+        .flatten()
+        .find(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| UnixIpcError::without_source(UnixIpcErrorCode::RuntimeUnavailable))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+
+    use super::{UnixIpcErrorCode, runtime_base_from};
+
+    #[test]
+    fn override_wins_over_the_session_directory() {
+        let base = runtime_base_from(
+            Some(OsString::from("/override")),
+            Some(OsString::from("/session")),
+        )
+        .expect("override must resolve");
+        assert_eq!(base.as_os_str(), "/override");
+    }
+
+    #[test]
+    fn session_directory_is_used_when_no_override_is_set() {
+        let base = runtime_base_from(None, Some(OsString::from("/session")))
+            .expect("session directory must resolve");
+        assert_eq!(base.as_os_str(), "/session");
+    }
+
+    #[test]
+    fn empty_values_count_as_unset() {
+        let base = runtime_base_from(Some(OsString::new()), Some(OsString::from("/session")))
+            .expect("empty override must fall through");
+        assert_eq!(base.as_os_str(), "/session");
+        let missing = runtime_base_from(Some(OsString::new()), Some(OsString::new()))
+            .expect_err("two empty values leave no runtime directory");
+        assert_eq!(missing.code(), UnixIpcErrorCode::RuntimeUnavailable);
+    }
+
+    #[test]
+    fn no_candidates_is_a_distinct_unavailable_failure() {
+        let error = runtime_base_from(None, None).expect_err("nothing to resolve");
+        assert_eq!(error.code(), UnixIpcErrorCode::RuntimeUnavailable);
+        assert_eq!(
+            error.code().core_startup_code(),
+            "core_runtime_directory_unavailable"
+        );
+        assert!(error.code().operator_hint().is_some());
+    }
 }

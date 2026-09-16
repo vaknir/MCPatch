@@ -7,6 +7,9 @@ easier to understand, test, and maintain.
 
 1. Find or create a focused issue with acceptance criteria and security impact.
 2. For a material architecture or trust-boundary change, propose an ADR first.
+   Moving a pack-boundary enforcement-status row (in THREAT_MODEL.md,
+   ARCHITECTURE.md, or pack-manifest-v1.md) from review to mechanism is such a
+   change and requires an ADR.
 3. Branch from an up-to-date `main` using `<type>/<issue>-<short-name>`, for example
    `feat/10-protocol-schemas` or `fix/42-origin-check`.
 4. Add a failing test before important behavior, especially validation, policy,
@@ -37,6 +40,17 @@ cargo audit
 
 Run the full set before opening a PR. During development, run the smallest relevant
 test first.
+
+The above commands include the security regression suite (stdio abuse, hostile-page
+adapter, and Windows DACL tests); see
+[docs/testing/security-regression-suite.md](docs/testing/security-regression-suite.md)
+for what each test pins and for the two manual Windows checks a release records.
+
+The bridge process tests spawn real adapters and cores, which need a private
+runtime directory. They provision their own, so a login session is not required;
+if you run the built binary by hand on a Linux host without `XDG_RUNTIME_DIR`,
+set `MCPATCH_RUNTIME_DIR` to a directory you own with mode `0700` (see
+[docs/installation.md](docs/installation.md#runtime-directory)).
 
 ## Code rules
 
@@ -85,7 +99,11 @@ changes, verify:
 - malformed, denied, expired, replayed, and stale-state cases;
 - exact origin, context, tool, pack, and argument binding;
 - size, complexity, timeout, cancellation, and concurrency limits;
-- absence of credentials and sensitive content from results and logs; and
+- absence of credentials and sensitive content from results and logs;
+- each tool's risk class against the rules in
+  [ADR 0015](docs/adr/0015-sensitive-read-classification.md): rendered content
+  and credential-free network reads are `READ`; undisplayed account data and
+  high-impact content are `SENSITIVE`; and
 - cross-language fixture agreement.
 
 ## Release changes

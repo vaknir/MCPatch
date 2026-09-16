@@ -49,10 +49,13 @@ extension identity to platform-correct user-level Native Messaging registration 
 source-commit digests. Deterministic real-Chromium fixtures now prove the complete
 page-backed pack-to-MCP path. The first reviewed real-site pack implements bounded
 Google Flights reads plus one approved typed search action and is bundled behind
-exact optional-origin enablement; an MCP-driven signed-out field smoke remains
-before calling that adapter verified.
+exact optional-origin enablement; the MCP-driven signed-out field smoke that
+verifies that adapter is recorded in
+[docs/test-reports/2026-09-15-google-flights-field.md](docs/test-reports/2026-09-15-google-flights-field.md).
 Product versioning starts at `0.1.0`; the MCPatch bridge protocol and pack manifest
 have independent compatibility versions.
+
+Which pack-boundary claims are enforced by mechanism and which by review today is stated per tier in the enforcement-status tables in [THREAT_MODEL.md](THREAT_MODEL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [docs/architecture/pack-manifest-v1.md](docs/architecture/pack-manifest-v1.md).
 
 The Phase 13 community-pack trust, lifecycle, discovery, and exact-origin authority
 decisions are documented in
