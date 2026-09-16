@@ -1,3 +1,4 @@
+import { contentScriptMatches } from "./content-script-matches.js";
 import {
   canonicalizePageLocation,
   packMatchesLocation,
@@ -45,10 +46,8 @@ export function createReviewedPackCatalog(
         );
       }
     }
-    const packOrigins = new Set(
-      pack.manifest.matches.map((match) => match.origin),
-    );
-    for (const origin of packOrigins) {
+    for (const match of pack.manifest.matches) {
+      const origin = match.origin;
       if (origin.endsWith(".invalid")) continue;
       if (!origins.has(origin)) {
         throw new TypeError(
@@ -71,6 +70,7 @@ export function createReviewedPackCatalog(
               .map((value) => `${value}/*`),
           ),
           registrationId: registrationId(origin),
+          scriptMatches: contentScriptMatches(match),
           tools: Object.freeze(
             new Set(pack.manifest.tools.map((tool) => tool.name)),
           ),

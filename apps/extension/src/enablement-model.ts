@@ -15,6 +15,12 @@ export interface ReviewedPackSite {
   readonly permissionPattern: string;
   readonly permissionPatterns: readonly string[];
   readonly registrationId: string;
+  /**
+   * Where the content script is registered: the manifest's own path rules,
+   * not the whole origin. Host permissions stay origin-granular because
+   * Chrome grants them that way; this bounds where code runs.
+   */
+  readonly scriptMatches: readonly string[];
   readonly tools: ReadonlySet<string>;
 }
 

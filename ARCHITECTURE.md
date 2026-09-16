@@ -210,7 +210,7 @@ from review to mechanism is a trust-boundary change and needs an ADR
 | No navigation from `READ` tools                            | review (#188)                                                                            |
 | Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
 | Origin binding                                             | mechanism                                                                                |
-| Path binding                                               | extension JavaScript after injection (#180)                                              |
+| Path binding                                               | content-script registration from the manifest path rules (#180)                          |
 | Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
 | Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
 

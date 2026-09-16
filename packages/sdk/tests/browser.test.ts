@@ -253,6 +253,7 @@ function packOptions() {
       {
         origin: "https://example.com",
         paths: [{ kind: "prefix" as const, path: "/" }],
+        wholeOrigin: true as const,
       },
     ],
   };

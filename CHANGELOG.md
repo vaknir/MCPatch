@@ -212,6 +212,13 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- Content scripts are now registered for the paths a pack declares instead of
+  its whole origin, so the reviewed Google Flights bundle runs on
+  `/travel/flights` and `/travel/flights/search` rather than on every page of
+  `www.google.com`. A `prefix` rule of `/` still covers a host, but only when
+  the match sets the new `wholeOrigin: true` flag, which is rejected without
+  such a rule so the grant cannot be read past. Host permissions stay
+  origin-granular because Chrome grants them that way.
 - Native WebMCP tool metadata is now isolated from the agent's context. A
   page-declared tool is published under the reserved `native` namespace,
   qualified by its origin, so it can no longer be listed under a reviewed
