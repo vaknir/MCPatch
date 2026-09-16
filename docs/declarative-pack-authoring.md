@@ -65,7 +65,7 @@ export const pack = await buildDeclarativePack({
   version: "0.1.0",
   compatibility: {
     runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
-    bridgeProtocol: { minimum: 1, maximum: 1 },
+    bridgeProtocol: { minimum: 2, maximum: 2 },
   },
   matches: [
     {

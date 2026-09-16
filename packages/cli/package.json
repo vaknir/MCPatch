@@ -1,0 +1,26 @@
+{
+  "name": "@mcpatch/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local authoring CLI for data-only MCPatch community packs",
+  "type": "module",
+  "bin": {
+    "mcpatch": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm build && vitest run",
+    "typecheck": "tsc --noEmit",
+    "verify": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@mcpatch/protocol": "workspace:*",
+    "@mcpatch/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4"
+  }
+}

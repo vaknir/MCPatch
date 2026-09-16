@@ -8,6 +8,11 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A strict `mcpatch pack` community workflow for creating, validating, testing,
+  inspecting, and reproducibly building data-only declarative packs, with inert
+  fixture execution, Git source attribution, atomic no-overwrite publication, and
+  payload-safe process errors.
+
 - A bounded read-only declarative pack interpreter for the extension, using
   opaque document handles, static packaged DOM traversal, strict scalar parsing,
   incremental node/byte budgets, schema-valid output, exact
