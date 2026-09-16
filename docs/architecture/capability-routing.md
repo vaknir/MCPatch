@@ -49,6 +49,16 @@ For each call, the registry:
 6. creates a tool call containing the registered context, revision, and origin; and
 7. records a revocation token and one-shot completion channel before dispatch.
 
+Snapshot acceptance is budgeted per browser connection: thirty snapshots in a
+burst, refilling ten per second. Exact replays and stale revisions are answered
+before the budget is charged, so only a snapshot that would compile schemas spends
+a token. A connection over budget has its snapshot refused as
+`SnapshotRateLimited` and its session closed with `browser_session_snapshot_flood`;
+closing, rather than silently dropping, keeps bridge and page state from drifting
+apart and lets the extension reconnect and republish. Compiled validators are
+shared across snapshots by exact schema bytes in a bounded cache, so a page that
+republishes unchanged tools costs no recompilation.
+
 JSON Schema draft 2020-12 validators are compiled when a snapshot is accepted.
 Before compilation, protocol validation restricts every input and output schema to
 the same keyword allowlist the extension's codegen-free interpreter understands

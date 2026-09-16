@@ -27,6 +27,9 @@ pub enum RegistryErrorCode {
     ResultInvalid,
     RevisionConflict,
     RouteMismatch,
+    /// The connection published snapshots faster than its budget; nothing was
+    /// compiled or registered.
+    SnapshotRateLimited,
     StaleRevision,
     ToolNotFound,
     Unauthorized,

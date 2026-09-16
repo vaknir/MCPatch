@@ -5,6 +5,7 @@ mod error;
 mod policy;
 mod registry;
 mod schema;
+mod snapshot_limits;
 mod snapshots;
 mod state;
 mod types;
@@ -20,6 +21,7 @@ pub use approval_limits::{
 pub use error::{RegistryError, RegistryErrorCode};
 pub use policy::{PermissionDecision, permission_decision};
 pub use registry::CapabilityRegistry;
+pub use snapshot_limits::{SNAPSHOT_BURST, SNAPSHOT_REFILL_INTERVAL};
 pub use types::{
     ApprovalCompletionError, ApprovalGrant, BrowserToolResponse, CallReservation, RegistryChange,
     RoutedApproval, RoutedCall, RoutedCallCompletionError, RoutedCancellation, ToolInvocation,

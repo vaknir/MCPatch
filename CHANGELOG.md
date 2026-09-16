@@ -189,6 +189,14 @@ All notable MCPatch changes are documented here. The format follows
   for eight seconds with a notice that nothing was approved instead of closing
   it under the user's cursor.
 
+- A per-connection capability snapshot budget in the bridge: thirty snapshots
+  in a burst, refilling ten per second, charged only for snapshots that would
+  compile schemas. A connection over budget is refused with
+  `SnapshotRateLimited` and its session closed with the distinct
+  `browser_session_snapshot_flood` code so bridge and page state cannot drift.
+  Compiled validators are now shared across snapshots by exact schema bytes in a
+  bounded cache, so republishing unchanged tools costs no recompilation.
+
 ### Changed
 
 - Pack Manifest v1 now requires closed output schemas as well as closed input

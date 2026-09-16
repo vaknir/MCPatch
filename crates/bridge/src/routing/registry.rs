@@ -4,6 +4,8 @@ use super::{
     PermissionDecision, RegistryError, RegistryErrorCode, RoutedCancellation,
     approval_limits::ApprovalLimiter,
     policy::permission_decision,
+    schema::SchemaCache,
+    snapshot_limits::SnapshotLimiter,
     state::{ConnectionState, ContextState, RegisteredCapability, ResolvedCapability},
     types::{ActiveRequest, PendingApproval},
 };
@@ -19,6 +21,8 @@ pub struct CapabilityRegistry {
     pub(super) active_requests: BTreeMap<String, ActiveRequest>,
     pub(super) pending_approvals: BTreeMap<String, PendingApproval>,
     pub(super) approval_limiter: ApprovalLimiter,
+    pub(super) snapshot_limiter: SnapshotLimiter,
+    pub(super) schema_cache: SchemaCache,
 }
 
 impl CapabilityRegistry {
@@ -28,6 +32,8 @@ impl CapabilityRegistry {
             active_requests: BTreeMap::new(),
             pending_approvals: BTreeMap::new(),
             approval_limiter: ApprovalLimiter::default(),
+            snapshot_limiter: SnapshotLimiter::default(),
+            schema_cache: SchemaCache::default(),
         }
     }
 
@@ -60,6 +66,7 @@ impl CapabilityRegistry {
             return false;
         }
         self.approval_limiter.forget_connection(connection_id);
+        self.snapshot_limiter.forget_connection(connection_id);
 
         let request_ids = self
             .active_requests

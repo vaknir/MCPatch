@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     protocol::Message,
-    routing::{BrowserToolResponse, RegistryChange, SharedCapabilityRegistry},
+    routing::{BrowserToolResponse, RegistryChange, RegistryErrorCode, SharedCapabilityRegistry},
 };
 use time::OffsetDateTime;
 
@@ -27,8 +27,13 @@ pub(super) async fn apply_ready_message(
             let change = registry
                 .lock()
                 .await
-                .replace_snapshot(connection_id, snapshot)
-                .map_err(|_| registry_rejected())?;
+                .replace_snapshot_at(connection_id, snapshot, OffsetDateTime::now_utc())
+                .map_err(|error| match error.code() {
+                    RegistryErrorCode::SnapshotRateLimited => {
+                        session_error(BrowserSessionErrorCode::SnapshotFlood)
+                    }
+                    _ => registry_rejected(),
+                })?;
             dispatch_cancellations(change).await?;
             Ok(ReadyMessageAction::Continue)
         }
