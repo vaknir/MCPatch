@@ -29,6 +29,10 @@ The bridge permits `READ + EXTERNAL_NETWORK` only for an authenticated pack
 capability carrying an immutable pack reference. All native, action, sensitive,
 credential, arbitrary-execution, mixed, or malformed variants remain denied.
 
+ADR 0012 later admits the separate `ACTION + EXTERNAL_NETWORK` form only with
+declared POST authority and bridge-owned one-time approval. The credential-free
+read contract in this decision remains unchanged.
+
 Each compiled operation must additionally:
 
 - construct one fixed HTTPS host and operation path itself;

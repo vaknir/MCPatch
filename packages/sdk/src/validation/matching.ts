@@ -86,11 +86,25 @@ export function validateNetworkPolicy(
     }
     origins.add(origin as string);
   }
-  return Array.isArray(requestPolicy.value.methods) &&
-    requestPolicy.value.methods.length === 1 &&
-    requestPolicy.value.methods[0] === "GET"
-    ? undefined
-    : issue("INVALID_PERMISSION", "networkPolicy.extensionRequests.methods");
+  const methods = requestPolicy.value.methods;
+  if (!boundedArray(methods, 1, 2)) {
+    return issue(
+      "INVALID_PERMISSION",
+      "networkPolicy.extensionRequests.methods",
+    );
+  }
+  const allowed = ["GET", "POST"];
+  if (
+    methods.some((method) => !allowed.includes(String(method))) ||
+    new Set(methods).size !== methods.length ||
+    (methods.length === 2 && (methods[0] !== "GET" || methods[1] !== "POST"))
+  ) {
+    return issue(
+      "INVALID_PERMISSION",
+      "networkPolicy.extensionRequests.methods",
+    );
+  }
+  return undefined;
 }
 
 function validateOrigin(

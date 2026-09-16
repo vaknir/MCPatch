@@ -56,9 +56,13 @@ MCPatch fixes those paths and request shapes in reviewed code, derives the list 
 from the authenticated response, performs no retry, and verifies the final state.
 Cookies remain in the browser and no generic request capability is exposed.
 
-Alert creation remains deferred pending its own reviewed authenticated-site action
-contract. None of these capabilities may be implemented by exposing generic
-clicking, selectors, JavaScript execution, screenshots, or request replay.
+Follow-up issue #140 reviewed the first-party price-alert service. MCPatch creates
+only basic current-chart price alerts through one fixed authenticated POST and a
+separate bounded confirmation read. Every condition, threshold, frequency, expiry,
+and notification choice is explicit and approval-bound. It exposes no arbitrary
+message, webhook, script, destination, headers, or response body. None of these
+capabilities use generic clicking, selectors, JavaScript execution, screenshots,
+or request replay.
 
 ## Volatility and verification
 

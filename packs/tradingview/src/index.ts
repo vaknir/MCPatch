@@ -1,5 +1,10 @@
 export { captureTradingViewChartImage } from "./chart-image.js";
 export {
+  createTradingViewPriceAlert,
+  validateTradingViewPriceAlertInput,
+} from "./alert.js";
+export type { TradingViewAlertFetch } from "./alert.js";
+export {
   collectTradingViewSemanticSnapshot,
   createTradingViewDocumentSource,
 } from "./document-source.js";
@@ -15,11 +20,13 @@ export {
   TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
   TRADINGVIEW_CAPTURE_CHART,
+  TRADINGVIEW_CREATE_PRICE_ALERT,
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_PRICE_ALERTS_ORIGIN,
   TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
@@ -32,6 +39,11 @@ export type {
   TradingViewCaptureChartResult,
   TradingViewAssetType,
   TradingViewChartSemantics,
+  TradingViewAlertCondition,
+  TradingViewAlertFrequency,
+  TradingViewAlertNotification,
+  TradingViewCreatePriceAlertInput,
+  TradingViewCreatePriceAlertResult,
   TradingViewCurrentChartResult,
   TradingViewCurrentWatchlistResult,
   TradingViewErrorCode,

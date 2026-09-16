@@ -6,11 +6,13 @@ import {
   TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
   TRADINGVIEW_CAPTURE_CHART,
+  TRADINGVIEW_CREATE_PRICE_ALERT,
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_CURRENT_CHART,
   TRADINGVIEW_CURRENT_WATCHLIST,
   TRADINGVIEW_FINGERPRINT,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_PRICE_ALERTS_ORIGIN,
   TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_SEARCH_SYMBOLS,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
@@ -48,15 +50,70 @@ const WATCHLIST_ACTION_OUTPUT_SCHEMA = {
   },
 } as const;
 
+const CREATE_ALERT_INPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  maxProperties: 5,
+  required: [
+    "condition",
+    "threshold",
+    "frequency",
+    "expiresInDays",
+    "notification",
+  ],
+  properties: {
+    condition: { enum: ["above", "below", "crosses"] },
+    threshold: {
+      type: "number",
+      minimum: -1_000_000_000_000,
+      maximum: 1_000_000_000_000,
+    },
+    frequency: { enum: ["once", "once_per_bar_close"] },
+    expiresInDays: { type: "integer", minimum: 1, maximum: 365 },
+    notification: {
+      enum: ["mobile_push", "popup_and_mobile_push", "popup_only"],
+    },
+  },
+} as const;
+
+const CREATE_ALERT_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "fingerprint",
+    "state",
+    "alertId",
+    "symbol",
+    "condition",
+    "threshold",
+    "frequency",
+    "expiresAt",
+    "notification",
+  ],
+  properties: {
+    fingerprint: { const: TRADINGVIEW_FINGERPRINT },
+    state: { enum: ["confirmed", "created_unconfirmed"] },
+    alertId: { type: "string", minLength: 1, maxLength: 64 },
+    symbol: { type: "string" },
+    condition: { enum: ["above", "below", "crosses"] },
+    threshold: { type: "number" },
+    frequency: { enum: ["once", "once_per_bar_close"] },
+    expiresAt: { type: "string" },
+    notification: {
+      enum: ["mobile_push", "popup_and_mobile_push", "popup_only"],
+    },
+  },
+} as const;
+
 const mcp = new MCPatch<TradingViewSite>({
   publisher: "tradingview",
   id: "tradingview-web",
   name: "TradingView",
   description:
-    "Expose bounded chart and watchlist state plus approved chart and watchlist actions from TradingView.",
-  version: "0.4.0",
+    "Expose bounded chart and watchlist state plus approved chart, watchlist, and price-alert actions from TradingView.",
+  version: "0.5.0",
   digest:
-    "sha256:b55e23cefe214968e3125bbaedd52343ea9c2d0e420b491324b2fa3f2c29e564",
+    "sha256:a441a2f868f117514bbf279b4d39aaa3ee6f8a7bfc78e2f5dcf269094c09f473",
   matches: [
     {
       origin: TRADINGVIEW_ORIGIN,
@@ -65,8 +122,11 @@ const mcp = new MCPatch<TradingViewSite>({
   ],
   networkPolicy: {
     extensionRequests: {
-      origins: [TRADINGVIEW_SYMBOL_SEARCH_ORIGIN],
-      methods: ["GET"],
+      origins: [
+        TRADINGVIEW_PRICE_ALERTS_ORIGIN,
+        TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
+      ],
+      methods: ["GET", "POST"],
     },
   },
 });
@@ -81,6 +141,19 @@ mcp.tool(
     outputSchema: WATCHLIST_ACTION_OUTPUT_SCHEMA,
   },
   (input, { site, signal }) => site.addToWatchlist(input, signal),
+);
+
+mcp.tool(
+  {
+    name: TRADINGVIEW_CREATE_PRICE_ALERT,
+    description:
+      "Create one bounded price alert for the exact current chart symbol using explicit condition, threshold, frequency, expiry, and notification behavior after one-time approval.",
+    risk: "action",
+    permissions: ["ACTION", "EXTERNAL_NETWORK"],
+    inputSchema: CREATE_ALERT_INPUT_SCHEMA,
+    outputSchema: CREATE_ALERT_OUTPUT_SCHEMA,
+  },
+  (input, { site, signal }) => site.createPriceAlert(input, signal),
 );
 
 mcp.tool(
@@ -290,6 +363,18 @@ mcp.tool(
 
 export const tradingViewBrowserPack = mcp.build({
   fixtures: [
+    {
+      id: "page-only-create-price-alert",
+      tool: TRADINGVIEW_CREATE_PRICE_ALERT,
+      input: {
+        condition: "above",
+        threshold: 250,
+        frequency: "once",
+        expiresInDays: 30,
+        notification: "popup_only",
+      },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
     {
       id: "page-only-add-to-watchlist",
       tool: TRADINGVIEW_ADD_TO_WATCHLIST,

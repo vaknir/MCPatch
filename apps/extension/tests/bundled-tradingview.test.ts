@@ -1,6 +1,7 @@
 import {
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_ORIGIN,
+  TRADINGVIEW_PRICE_ALERTS_ORIGIN,
   TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   TRADINGVIEW_TOOLS,
   tradingViewBrowserPack,
@@ -58,6 +59,9 @@ describe("bundled TradingView production pack", () => {
     );
     expect(manifest["optional_host_permissions"]).toContain(
       `${TRADINGVIEW_SYMBOL_SEARCH_ORIGIN}/*`,
+    );
+    expect(manifest["optional_host_permissions"]).toContain(
+      `${TRADINGVIEW_PRICE_ALERTS_ORIGIN}/*`,
     );
     expect(manifest).not.toHaveProperty("host_permissions");
   });

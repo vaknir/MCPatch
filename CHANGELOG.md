@@ -15,7 +15,10 @@ All notable MCPatch changes are documented here. The format follows
   first-party origin, plus an argument-bound
   `tradingview.change_symbol` action and approved, postcondition-checked
   `tradingview.add_to_watchlist` / `tradingview.remove_from_watchlist` actions using
-  canonical `EXCHANGE:TICKER` identities and the browser's unexported site session,
+  canonical `EXCHANGE:TICKER` identities, plus a one-attempt
+  `tradingview.create_price_alert` action with explicit condition, threshold,
+  frequency, expiry, notification behavior, and postcondition state using the
+  browser's unexported site session,
   exact optional-origin enablement, native-first resolution, and fail-closed
   English single-chart compatibility checks.
 - A cross-language bounded media-result contract with one closed PNG/WebP content
@@ -26,6 +29,9 @@ All notable MCPatch changes are documented here. The format follows
   page handlers and generates capability discovery, routing, cancellation, safe
   errors, subscriptions, tool lists, and fail-closed compiled fallbacks, with safe
   manifest and permission defaults.
+- Reviewed external-session `POST` authority paired only with approved
+  `ACTION + EXTERNAL_NETWORK` pack tools, while malformed, sensitive, credential,
+  arbitrary-execution, and native combinations remain denied.
 - A FastMCP-style `MCPatch` pack-authoring facade with typed `.tool(...)`
   registration, directly testable handlers, immutable single-use finalization,
   registration-time identity checks, and explicit runtime JSON Schemas.

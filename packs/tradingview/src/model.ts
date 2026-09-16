@@ -13,11 +13,16 @@ export const TRADINGVIEW_ADD_TO_WATCHLIST =
   "tradingview.add_to_watchlist" as const;
 export const TRADINGVIEW_REMOVE_FROM_WATCHLIST =
   "tradingview.remove_from_watchlist" as const;
+export const TRADINGVIEW_CREATE_PRICE_ALERT =
+  "tradingview.create_price_alert" as const;
+export const TRADINGVIEW_PRICE_ALERTS_ORIGIN =
+  "https://pricealerts.tradingview.com" as const;
 export const TRADINGVIEW_SYMBOL_SEARCH_ORIGIN =
   "https://symbol-search.tradingview.com" as const;
 
 export const TRADINGVIEW_TOOLS = Object.freeze([
   TRADINGVIEW_ADD_TO_WATCHLIST,
+  TRADINGVIEW_CREATE_PRICE_ALERT,
   TRADINGVIEW_REMOVE_FROM_WATCHLIST,
   TRADINGVIEW_CAPTURE_CHART,
   TRADINGVIEW_SEARCH_SYMBOLS,
@@ -116,6 +121,31 @@ export interface TradingViewWatchlistMutationResult {
   readonly watchlistName: string;
 }
 
+export type TradingViewAlertCondition = "above" | "below" | "crosses";
+export type TradingViewAlertFrequency = "once" | "once_per_bar_close";
+export type TradingViewAlertNotification =
+  "mobile_push" | "popup_and_mobile_push" | "popup_only";
+
+export interface TradingViewCreatePriceAlertInput {
+  readonly condition: TradingViewAlertCondition;
+  readonly threshold: number;
+  readonly frequency: TradingViewAlertFrequency;
+  readonly expiresInDays: number;
+  readonly notification: TradingViewAlertNotification;
+}
+
+export interface TradingViewCreatePriceAlertResult {
+  readonly fingerprint: typeof TRADINGVIEW_FINGERPRINT;
+  readonly state: "confirmed" | "created_unconfirmed";
+  readonly alertId: string;
+  readonly symbol: string;
+  readonly condition: TradingViewAlertCondition;
+  readonly threshold: number;
+  readonly frequency: TradingViewAlertFrequency;
+  readonly expiresAt: string;
+  readonly notification: TradingViewAlertNotification;
+}
+
 export interface TradingViewSearchSymbolsInput {
   readonly query: string;
   readonly limit?: number;
@@ -172,6 +202,8 @@ export type TradingViewErrorReason =
   | "watchlist_action_unavailable"
   | "symbol_search_unavailable"
   | "chart_capture_unavailable"
+  | "alert_creation_already_started"
+  | "alert_creation_unavailable"
   | "unsupported_locale"
   | "unsupported_origin"
   | "unsupported_path"

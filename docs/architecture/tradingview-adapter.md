@@ -128,6 +128,27 @@ and bounded watchlist name. Existing desired state returns `already_present` or
 failures, oversized or malformed responses, changed identity, and uncertain
 postconditions fail closed.
 
+### `tradingview.create_price_alert`
+
+This `ACTION + EXTERNAL_NETWORK` tool creates one basic price alert for the exact
+compatible active chart. Its five required arguments make every consequential
+choice visible in the approval hash: condition (`above`, `below`, or `crosses`),
+finite threshold, one-shot or bar-close frequency, one-to-365-day expiry, and a
+closed popup/mobile-push notification choice.
+
+The adapter derives symbol and interval from the same strict chart result used by
+`current_chart`, then sends at most one fixed POST to TradingView's exact
+price-alert origin with the browser session attached. Email, SMS, sound, webhook,
+arbitrary message, script condition, caller-selected symbol, URL, headers, and body
+are impossible through the tool contract. The result contains the server alert ID
+and normalized choices, not the raw response.
+
+A separate bounded list read confirms that the returned ID belongs to the same
+canonical symbol. If creation returned an ID but confirmation is unavailable, the
+result is explicitly `created_unconfirmed`; the pack does not retry and blocks any
+second creation attempt in that document lifecycle. This avoids silently creating
+duplicates after an uncertain postcondition.
+
 ## Resource and lifecycle bounds
 
 Collection admits at most four chart regions, examines at most 4,096 chart `div`
@@ -153,7 +174,8 @@ disconnect revokes the context through the common lifecycle.
 The opt-in signed-out smoke in `apps/extension/e2e/tradingview-field.spec.ts` uses
 a disposable Chromium profile. The harness only launches the browser and performs
 the required extension-enable and trusted one-time approval gestures; every pack
-operation is invoked through MCP. The 2026-09-16 run discovered all five tools,
+operation is invoked through MCP. The final 2026-09-16 run discovered all eight
+tools with the exact chart, symbol-search, and price-alert host grants,
 validated both page reads, returned one bounded active-chart image, resolved
 `NYSE:IBM` through symbol search, approved and
 executed the exact symbol change, verified fresh-context readback and
@@ -167,10 +189,17 @@ paired add/remove sequence that restores that state. It may invoke only MCP tool
 and the extension-owned approval surface. The harness must not click or type into
 TradingView, retain profile data, capture credentials, or run in routine CI.
 
+Alert field verification uses a separate disposable signed-in account, a distant
+non-triggering threshold, popup-only notification, and a short expiry. It records
+the returned alert ID and confirms the server entry through MCP. The operator then
+removes that exact ID in TradingView, verifies cleanup, and deletes the profile. An
+interrupted run requires manual cleanup by ID before another attempt; creation is
+never retried blindly.
+
 ## Explicit non-goals
 
 - creating, deleting, renaming, reordering, or replacing whole watchlists;
-- creating or changing alerts;
+- deleting, editing, scripting, bulk-creating, or attaching webhooks to alerts;
 - placing trades or connecting a broker;
 - background collection, repeated scraping, or historical data export; and
 - reading or exporting credentials, cookies, storage, headers, or request logs.
@@ -185,5 +214,6 @@ network or browser-control escape hatch.
 - [ADR 0008: origin-scoped content runtime](../adr/0008-origin-scoped-content-runtime.md)
 - [ADR 0009: reviewed read-network authority](../adr/0009-reviewed-read-network-authority.md)
 - [ADR 0011: reviewed authenticated session actions](../adr/0011-reviewed-authenticated-session-actions.md)
+- [ADR 0012: reviewed external session actions](../adr/0012-reviewed-external-session-actions.md)
 - [Pack resolution and native precedence](pack-resolution.md)
 - [Extension page-channel protocol](page-channel-protocol.md)
