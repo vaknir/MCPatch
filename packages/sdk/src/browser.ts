@@ -20,6 +20,7 @@ import type {
   PackCompatibility,
   PackNetworkPolicy,
   PackPermission,
+  PackRisk,
 } from "./types.js";
 import { issue } from "./validation/primitives.js";
 
@@ -125,12 +126,16 @@ export class MCPatch<TSite, TDocument = Document> {
     const TName extends string,
     const TInputSchema extends JsonObject,
     const TOutputSchema extends JsonObject,
+    const TRisk extends PackRisk,
   >(
-    metadata: BrowserToolMetadata<TName, TInputSchema, TOutputSchema>,
+    metadata: BrowserToolMetadata<TName, TInputSchema, TOutputSchema> & {
+      readonly risk: TRisk;
+    },
     handler: BrowserToolHandler<
       TSite,
       InferPackInput<TInputSchema>,
-      InferPackOutput<TOutputSchema>
+      InferPackOutput<TOutputSchema>,
+      TRisk
     >,
     runtime: BrowserToolRuntimeOptions<TSite> = {},
   ): typeof handler {
@@ -170,8 +175,9 @@ export class MCPatch<TSite, TDocument = Document> {
     this.#tools.push(
       Object.freeze({
         name: metadataSource.name as string,
+        risk: metadataSource.risk as PackRisk,
         available: available as BrowserToolAvailability<TSite> | undefined,
-        execute: handler as unknown as BrowserToolHandler<TSite>,
+        execute: handler as unknown as RegisteredBrowserTool<TSite>["execute"],
       }),
     );
     return handler;
@@ -216,7 +222,10 @@ export class MCPatch<TSite, TDocument = Document> {
       >["fixtures"],
     });
     const registrations = Object.freeze([...this.#tools]);
-    const create = source.create as (document: TDocument) => TSite;
+    const create = source.create as BrowserPackBuildOptions<
+      TSite,
+      TDocument
+    >["create"];
     const discover = source.discover as
       BrowserPackBuildOptions<TSite, TDocument>["discover"] | undefined;
     const subscribe = source.subscribe as

@@ -105,6 +105,9 @@ export const fixturePack = definePack({
     {
       origin: FIXTURE_ORIGIN,
       paths: [{ kind: "prefix", path: "/" }],
+      // The synthetic fixture serves its pages from the whole host, so it
+      // declares that deliberately rather than relying on a bare "/" prefix.
+      wholeOrigin: true,
     },
   ],
   networkPolicy: { extensionRequests: "none" },

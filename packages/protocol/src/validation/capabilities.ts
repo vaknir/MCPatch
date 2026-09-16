@@ -1,3 +1,4 @@
+import { NATIVE_TOOL_NAMESPACE } from "../types/capabilities.js";
 import type { ValidationIssue } from "./error.js";
 import { validateOrigin, validateSemVer } from "./formats.js";
 import { validateRuntimeSchema } from "./json.js";
@@ -124,7 +125,9 @@ function validateCapability(
     if (titleIssue !== undefined) return titleIssue;
   }
 
-  const sourceIssue = validateSource(capability, prefix);
+  const sourceIssue =
+    validateSource(capability, prefix) ??
+    validateSourceNamespace(capability, prefix);
   if (sourceIssue !== undefined) return sourceIssue;
 
   const permissionIssue = validatePermissions(capability, prefix);
@@ -168,6 +171,23 @@ function validateSource(
       : undefined;
   }
   return issue("INVALID_VALUE", `${prefix}.source`);
+}
+
+/**
+ * Tool names carry their provenance: a page-declared tool lives under the
+ * reserved native namespace and a reviewed pack tool never does, so neither
+ * can be published under the other's name.
+ */
+function validateSourceNamespace(
+  capability: JsonRecord,
+  prefix: string,
+): ValidationIssue | undefined {
+  const namespaced =
+    typeof capability.name === "string" &&
+    capability.name.startsWith(`${NATIVE_TOOL_NAMESPACE}.`);
+  return namespaced === (capability.source === "native_webmcp")
+    ? undefined
+    : issue("INVALID_CAPABILITY", `${prefix}.name`);
 }
 
 function validatePack(

@@ -30,7 +30,74 @@ const outputSchema = {
   properties: { value: { type: "string" } },
 } as const;
 
+/** Page services the extension grants a pack: gated navigation only. */
+const SERVICES = { navigate: () => {} };
+
 describe("browser MCPatch authoring", () => {
+  it("hands navigation to an approved action and refuses it to a read", async () => {
+    const navigate = vi.fn();
+    const mcp = new MCPatch<TestSite, TestDocument>(packOptions());
+    mcp.tool(
+      {
+        name: "mcpatch.browser.read_only",
+        description: "A read tool that reaches for navigation.",
+        risk: "read",
+        inputSchema,
+        outputSchema,
+      },
+      (_input, context) => {
+        // A read handler does not receive `navigate` in its context type; this
+        // proves it is also refused at runtime.
+        (context as unknown as { navigate: (url: string) => void }).navigate(
+          "https://example.com/app/x",
+        );
+        return { value: "unreachable" };
+      },
+    );
+    mcp.tool(
+      {
+        name: "mcpatch.browser.act",
+        description: "An approved action that navigates.",
+        risk: "action",
+        inputSchema,
+        outputSchema,
+      },
+      (_input, context) => {
+        context.navigate("https://example.com/app/x");
+        return { value: "navigated" };
+      },
+    );
+    const built = mcp.build({
+      fixtures: [
+        {
+          id: "read-only-fallback",
+          tool: "mcpatch.browser.read_only",
+          input: { message: "safe" },
+          expect: { kind: "error" as const, code: "TOOL_NOT_FOUND" as const },
+        },
+        {
+          id: "act-fallback",
+          tool: "mcpatch.browser.act",
+          input: { message: "safe" },
+          expect: { kind: "error" as const, code: "TOOL_NOT_FOUND" as const },
+        },
+      ],
+      create: (document) => ({ enabled: true, prefix: document.prefix }),
+    });
+    const adapter = built.page.create({ prefix: "page" }, { navigate });
+
+    await expect(
+      adapter.execute("mcpatch.browser.act", {}, signal()),
+    ).resolves.toEqual({ value: "navigated" });
+    expect(navigate).toHaveBeenCalledWith("https://example.com/app/x");
+
+    navigate.mockClear();
+    await expect(
+      adapter.execute("mcpatch.browser.read_only", {}, signal()),
+    ).rejects.toMatchObject({ code: "EXECUTION_FAILED" });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("builds one compiled definition and generated page adapter", async () => {
     const mcp = new MCPatch<TestSite, TestDocument>(packOptions());
     const echo = mcp.tool(
@@ -90,7 +157,7 @@ describe("browser MCPatch authoring", () => {
       "mcpatch.browser.conditional",
     ]);
 
-    const adapter = built.page.create({ prefix: "page" });
+    const adapter = built.page.create({ prefix: "page" }, SERVICES);
     await expect(adapter.capabilities(signal())).resolves.toEqual([
       { source: "pack", name: "mcpatch.browser.echo" },
     ]);
@@ -131,7 +198,7 @@ describe("browser MCPatch authoring", () => {
     });
 
     const capabilities = await built.page
-      .create({ prefix: "page" })
+      .create({ prefix: "page" }, SERVICES)
       .capabilities(signal());
 
     expect(discover).toHaveBeenCalledTimes(1);
@@ -148,7 +215,7 @@ describe("browser MCPatch authoring", () => {
       create: (document) => ({ enabled: true, prefix: document.prefix }),
       discover: () => ["mcpatch.browser.undeclared"],
     });
-    const adapter = built.page.create({ prefix: "page" });
+    const adapter = built.page.create({ prefix: "page" }, SERVICES);
 
     await expect(adapter.capabilities(signal())).rejects.toMatchObject({
       code: "EXECUTION_FAILED",
@@ -190,7 +257,7 @@ describe("browser MCPatch authoring", () => {
 
     try {
       await built.page
-        .create({ prefix: "page" })
+        .create({ prefix: "page" }, SERVICES)
         .execute("mcpatch.browser.echo", { message: "fail" }, signal());
       expect.unreachable("handler must fail");
     } catch (error) {
@@ -253,6 +320,7 @@ function packOptions() {
       {
         origin: "https://example.com",
         paths: [{ kind: "prefix" as const, path: "/" }],
+        wholeOrigin: true as const,
       },
     ],
   };

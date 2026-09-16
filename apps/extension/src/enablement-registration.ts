@@ -55,7 +55,7 @@ export function registrationFor(
 ): ChromeRegisteredContentScript {
   return Object.freeze({
     id: site.registrationId,
-    matches: Object.freeze([site.permissionPattern]),
+    matches: Object.freeze([...site.scriptMatches]),
     js: Object.freeze([CONTENT_SCRIPT_FILE]),
     allFrames: false,
     persistAcrossSessions: true,

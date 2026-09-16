@@ -29,8 +29,19 @@ function realm(overrides: Partial<LockableRealm> = {}): {
     },
     set() {},
   });
+  // A locked realm also loses its navigation primitives, so the stand-in
+  // carries the shape those need.
+  const locationPrototype = { assign() {}, replace() {} };
+  Object.defineProperty(locationPrototype, "href", {
+    configurable: true,
+    get: () => "https://shop.example/current",
+    set: () => {},
+  });
   const built: LockableRealm = {
     fetch: original as unknown as typeof fetch,
+    open: () => undefined,
+    HTMLFormElement: { prototype: { submit() {}, requestSubmit() {} } },
+    Location: { prototype: locationPrototype },
     XMLHttpRequest: function XMLHttpRequest() {},
     WebSocket: function WebSocket() {},
     EventSource: function EventSource() {},

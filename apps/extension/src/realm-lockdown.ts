@@ -35,6 +35,12 @@
  * fails closed and publishes no capability snapshot for the document.
  */
 
+import {
+  removeNavigationPrimitives,
+  type NavigableRealm,
+  type RealmNavigation,
+} from "./realm-navigation.js";
+
 /** Exact, normalised `https://host[:port]` origins a pack may request. */
 export interface RealmNetworkPolicy {
   readonly allowedOrigins: readonly string[];
@@ -42,7 +48,7 @@ export interface RealmNetworkPolicy {
 
 /** The isolated-world globals `lockRealm` replaces. Real callers pass the
  * content script's `globalThis`; tests pass a stand-in with the same shape. */
-export interface LockableRealm {
+export interface LockableRealm extends NavigableRealm {
   fetch: typeof fetch;
   XMLHttpRequest?: unknown;
   WebSocket?: unknown;
@@ -68,7 +74,7 @@ const STRIPPED_REQUEST_HEADERS = Object.freeze(["authorization", "cookie"]);
 export function lockRealm(
   realm: LockableRealm,
   policy: RealmNetworkPolicy,
-): void {
+): RealmNavigation {
   const allowed = normalizeOrigins(policy.allowedOrigins);
   const originalFetch = realm.fetch;
   if (typeof originalFetch !== "function") {
@@ -81,6 +87,10 @@ export function lockRealm(
   removeNetworkPrimitive(realm, "EventSource");
   removeSendBeacon(realm);
   sealCookieAccessor(realm);
+  // Navigation is the one side effect a read tool could otherwise reach, so
+  // the ambient primitives go too and the captured entry point is returned
+  // for the caller to hand only to an approved action.
+  return removeNavigationPrimitives(realm);
 }
 
 function installFetch(

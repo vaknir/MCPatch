@@ -1,0 +1,41 @@
+{
+  "protocolVersion": 2,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://www.google.com",
+  "capabilities": [
+    {
+      "name": "native.www_google_com.flights.current_search",
+      "title": "Current flight search",
+      "description": "Return the current visible flight-search criteria.",
+      "origin": "https://www.google.com",
+      "source": "pack",
+      "pack": {
+        "publisher": "dev.mcpatch",
+        "id": "google-flights",
+        "version": "0.1.0",
+        "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      },
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["origin", "destination"],
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

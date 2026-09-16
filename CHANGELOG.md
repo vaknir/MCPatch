@@ -212,6 +212,53 @@ All notable MCPatch changes are documented here. The format follows
   Compiled validators are now shared across snapshots by exact schema bytes in a
   bounded cache, so republishing unchanged tools costs no recompilation.
 
+- The Google Flights search action no longer navigates after a cancelled call:
+  the deferred navigation checks the call's abort signal, so a late cancel is
+  honoured instead of the timer firing regardless. An unauthorized target now
+  fails during the call rather than silently afterwards. The opaque `tfs`
+  parameter gained a decoder and a golden round-trip test, so a change to the
+  encoder's field numbers is visible in review instead of sending a user to a
+  search they did not approve.
+- Navigation is now an approved-action capability. The isolated realm loses
+  `location.assign`, `location.replace`, assignment to `location.href`,
+  `window.open` and form submission, so a `read` tool has no side effect left
+  beyond reading the DOM. The single captured entry point is handed to a pack
+  through a gate that refuses unless one of that pack's approved `ACTION` tools
+  is running and the target is a page its manifest matches, and that authorizes
+  one navigation per call. In the SDK an action tool's context gains
+  `navigate`, which a read tool's context does not have. Google Flights and
+  TradingView now navigate through it instead of touching `location` directly.
+- Content scripts are now registered for the paths a pack declares instead of
+  its whole origin, so the reviewed Google Flights bundle runs on
+  `/travel/flights` and `/travel/flights/search` rather than on every page of
+  `www.google.com`. A `prefix` rule of `/` still covers a host, but only when
+  the match sets the new `wholeOrigin: true` flag, which is rejected without
+  such a rule so the grant cannot be read past. Host permissions stay
+  origin-granular because Chrome grants them that way.
+- Native WebMCP tool metadata is now isolated from the agent's context. A
+  page-declared tool is published under the reserved `native` namespace,
+  qualified by its origin, so it can no longer be listed under a reviewed
+  pack's name; the bridge rejects a native capability outside that namespace
+  and a pack capability inside it, and the JSON Schema carries the same rule.
+  The bridge publishes its own attributed description naming the origin and
+  stating that MCPatch has not reviewed the tool, quoting the page's text as
+  bounded, control-character-free data, and drops the page-authored title.
+  A page can therefore no longer hide a reviewed pack tool by claiming its
+  name: the two are listed side by side.
+- Every native WebMCP call now requires an argument-bound one-time approval.
+  A page declares its own tool's risk and permissions, so an allow resting on
+  them was an allow decided by untrusted input: a site whose tool genuinely
+  wrote executed with no human decision because MCPatch had relabelled it a
+  read. The bridge now turns such an allow into an approval, leaves genuine
+  denials denied, and emits no read-only, destructive or idempotent hint for a
+  native tool, so MCPatch no longer vouches to an MCP client for behaviour it
+  has not reviewed. Recorded in ADR 0016.
+- A per-document capability snapshot gate in the extension: publications
+  coalesce to at most one per 250 ms, with the first request in an idle window
+  running immediately and a flood of any size collapsing into one trailing
+  publication, and a snapshot whose canonical capability set is unchanged is
+  not republished at all. This completes the per-context half of the snapshot
+  rate bound whose per-connection half already lives in the bridge.
 - Isolated-realm lockdown for compiled packs
   (`apps/extension/src/realm-lockdown.ts`), installed before any pack code runs:
   the content-script realm's `fetch` is replaced with an MCPatch-owned wrapper

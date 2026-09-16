@@ -1,7 +1,10 @@
 import { MCPatch } from "@mcpatch/sdk/browser";
 import type { MCPatchDefinition } from "@mcpatch/sdk/runtime";
 
-import { createTradingViewDocumentSource } from "./document-source.js";
+import {
+  createGrantedNavigation,
+  createTradingViewDocumentSource,
+} from "./document-source.js";
 import {
   TRADINGVIEW_ADD_TO_WATCHLIST,
   TRADINGVIEW_CHANGE_SYMBOL,
@@ -418,8 +421,16 @@ export const tradingViewBrowserPack = mcp.build({
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
   ],
-  create: (document) =>
-    createTradingViewSite(createTradingViewDocumentSource(document)),
+  create: (document, services) =>
+    createTradingViewSite(
+      createTradingViewDocumentSource(
+        document,
+        createGrantedNavigation(
+          document.defaultView?.location.origin ?? TRADINGVIEW_ORIGIN,
+          services.navigate,
+        ),
+      ),
+    ),
   discover: ({ site, signal }) => site.capabilities(signal),
   subscribe: (site, listener) => site.subscribe(listener),
 });

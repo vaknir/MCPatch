@@ -334,7 +334,7 @@ function expectedRegistration(
 ): ChromeRegisteredContentScript {
   return {
     id: site.registrationId,
-    matches: [site.permissionPattern],
+    matches: [...site.scriptMatches],
     js: ["content-script.js"],
     allFrames: false,
     persistAcrossSessions: true,

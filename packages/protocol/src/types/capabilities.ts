@@ -1,3 +1,10 @@
+/**
+ * First name segment reserved for tools a page declares through native
+ * WebMCP. Reserving it keeps page-authored names out of the space reviewed
+ * packs publish in, so neither can impersonate the other.
+ */
+export const NATIVE_TOOL_NAMESPACE = "native";
+
 import type {
   JsonObject,
   Permission,

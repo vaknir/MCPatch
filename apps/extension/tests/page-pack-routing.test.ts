@@ -157,7 +157,7 @@ describe("page-backed compiled-pack routing", () => {
     expect(outside.sent).toEqual([]);
   });
 
-  it("keeps native WebMCP precedence over a colliding page-pack route", async () => {
+  it("publishes a native tool beside a same-named pack tool without either hiding the other", async () => {
     const pageExecute = vi.fn(() => ({ ...CURRENT_RESULT, origin: "Page" }));
     const nativeExecute = vi.fn(() => ({
       ...CURRENT_RESULT,
@@ -167,7 +167,13 @@ describe("page-backed compiled-pack routing", () => {
       (candidate) => candidate.name === FLIGHTS_CURRENT_SEARCH,
     );
     if (tool === undefined) throw new Error("missing current-search tool");
-    const native: NativeRuntimeTool = { tool, execute: nativeExecute };
+    // A page-declared tool reaches the runtime already namespaced, so the name
+    // a reviewed pack publishes is not one a page can take.
+    const nativeName = `native.www_google_com.${FLIGHTS_CURRENT_SEARCH}`;
+    const native: NativeRuntimeTool = {
+      tool: { ...tool, name: nativeName },
+      execute: nativeExecute,
+    };
     const { runtime, sent } = packRuntime([googleFlightsPack]);
 
     runtime.activateContext({
@@ -177,14 +183,17 @@ describe("page-backed compiled-pack routing", () => {
       page: [pageTool(FLIGHTS_CURRENT_SEARCH, pageExecute)],
     });
     expect(sent[0]).toMatchObject({
-      capabilities: [{ name: FLIGHTS_CURRENT_SEARCH, source: "native_webmcp" }],
+      capabilities: [
+        { name: FLIGHTS_CURRENT_SEARCH, source: "pack" },
+        { name: nativeName, source: "native_webmcp" },
+      ],
     });
+
     runtime.handle(call());
     await flushPromises();
-
-    expect(nativeExecute).toHaveBeenCalledOnce();
-    expect(pageExecute).not.toHaveBeenCalled();
-    expect(sent[1]).toMatchObject({ result: { origin: "Native" } });
+    expect(pageExecute).toHaveBeenCalledOnce();
+    expect(nativeExecute).not.toHaveBeenCalled();
+    expect(sent[1]).toMatchObject({ result: { origin: "Page" } });
   });
 });
 

@@ -244,6 +244,9 @@ the user or reviewer.
 
 Mitigations:
 
+- require an argument-bound approval for every native WebMCP call, whose risk and
+  permissions are page-declared, and emit no behavioural hints for it
+  ([ADR 0016](docs/adr/0016-native-webmcp-approval.md));
 - derive policy from locally validated manifest fields and operation semantics, not
   descriptions, annotations, or page text;
 - show exact origins/paths, schemas, risk, permissions, network policy, publisher
@@ -354,10 +357,10 @@ from review to mechanism is a trust-boundary change and needs an ADR
 | No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
 | Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
 | No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
-| No navigation from `READ` tools                            | review (#188)                                                                            |
+| No navigation from `READ` tools                            | realm lockdown plus an action-gated navigator (#188)                                     |
 | Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
 | Origin binding                                             | mechanism                                                                                |
-| Path binding                                               | extension JavaScript after injection (#180)                                              |
+| Path binding                                               | content-script registration from the manifest path rules (#180)                          |
 | Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
 | Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
 

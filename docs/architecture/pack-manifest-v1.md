@@ -59,6 +59,18 @@ fragments, control characters, or normalizable dot segments. Prefix paths end in
 `/`. Query parameters never broaden activation. Runtime semantics are defined in
 [Pack matching and capability resolution](pack-resolution.md).
 
+A match's path rules also decide where the extension registers the pack's
+content script: an exact rule registers that path, a prefix rule registers its
+subtree. A reviewed bundle therefore runs only on the pages its manifest
+declares, rather than running on every page of the host and deciding afterwards
+to publish nothing. Chrome grants host permissions per origin whatever pattern
+is requested, so `optional_host_permissions` and the enablement prompt stay
+origin-granular; the registration is what narrows.
+
+A `prefix` rule of `/` covers the whole host. It is accepted only when the match
+also sets `wholeOrigin: true`, and that flag is rejected without such a rule, so
+a whole-origin grant is always stated outright.
+
 `networkPolicy.extensionRequests` is required. It is either `none` or a closed,
 bounded authority containing one to eight exact HTTPS origins and a canonical
 non-empty subset of `GET` and `POST`. `GET` requires a `READ + EXTERNAL_NETWORK`
@@ -102,10 +114,10 @@ from review to mechanism is a trust-boundary change and needs an ADR
 | No cookies or tokens in results                            | review + closed output schema (#176)                                        |
 | Network only to declared origins                           | host permissions + review; no runtime realm bound yet (#187)                |
 | No network under `networkPolicy.extensionRequests: "none"` | review; no runtime realm bound yet (#187)                                   |
-| No navigation from `READ` tools                            | review (#188)                                                               |
+| No navigation from `READ` tools                            | realm lockdown plus an action-gated navigator (#188)                        |
 | Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                        |
 | Origin binding                                             | mechanism                                                                   |
-| Path binding                                               | extension JavaScript after injection (#180)                                 |
+| Path binding                                               | content-script registration from the manifest path rules (#180)             |
 | Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](../adr/0015-sensitive-read-classification.md) (#185) |
 | Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)          |
 

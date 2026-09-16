@@ -166,6 +166,35 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "native_webmcp"
+              }
+            },
+            "required": ["source"]
+          },
+          "then": {
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^native\\."
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "name": {
+                "type": "string",
+                "not": {
+                  "type": "string",
+                  "pattern": "^native\\."
+                }
+              }
+            }
+          }
         }
       ]
     },

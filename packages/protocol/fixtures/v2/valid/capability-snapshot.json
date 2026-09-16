@@ -34,7 +34,7 @@
       }
     },
     {
-      "name": "flights.price_insights",
+      "name": "native.www_google_com.flights.price_insights",
       "description": "Return price guidance exposed by the current document.",
       "origin": "https://www.google.com",
       "source": "native_webmcp",

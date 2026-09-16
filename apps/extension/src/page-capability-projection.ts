@@ -7,6 +7,8 @@ import {
 } from "@mcpatch/sdk/runtime";
 import type { JsonObject as ProtocolJsonObject } from "@mcpatch/protocol";
 
+import { nativeToolName } from "./native-tool-name.js";
+
 import type {
   NativeRuntimeTool,
   PageRuntimeTool,
@@ -34,24 +36,31 @@ export function projectPageNativeTools(
         (capability): capability is PageNativeCapability =>
           capability.source === "native_webmcp",
       )
-      .map((capability) =>
-        Object.freeze({
-          tool: Object.freeze({
-            name: capability.name,
-            ...(capability.title === undefined
-              ? {}
-              : { title: capability.title }),
-            description: capability.description,
-            risk: "read" as const,
-            permissions: Object.freeze(["READ"] as const),
-            inputSchema: capability.inputSchema,
-            // Draft WebMCP does not advertise result schemas. The page channel
-            // still bounds and validates every returned JSON value.
-            outputSchema: UNCONSTRAINED_JSON_SCHEMA,
+      .flatMap((capability) => {
+        // Published under the reserved native namespace so a page cannot list
+        // a tool beside a reviewed pack's tool of the same name. Execution
+        // still addresses the page by the name the page itself declared.
+        const name = nativeToolName(snapshot.binding.origin, capability.name);
+        if (name === undefined) return [];
+        return [
+          Object.freeze({
+            tool: Object.freeze({
+              name,
+              ...(capability.title === undefined
+                ? {}
+                : { title: capability.title }),
+              description: capability.description,
+              risk: "read" as const,
+              permissions: Object.freeze(["READ"] as const),
+              inputSchema: capability.inputSchema,
+              // Draft WebMCP does not advertise result schemas. The page
+              // channel still bounds and validates every returned JSON value.
+              outputSchema: UNCONSTRAINED_JSON_SCHEMA,
+            }),
+            execute: pageExecution(snapshot, capability.name, invoker),
           }),
-          execute: pageExecution(snapshot, capability.name, invoker),
-        }),
-      ),
+        ];
+      }),
   );
 }
 
