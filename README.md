@@ -80,7 +80,10 @@ Pack development now has a separately versioned, closed Pack Manifest v1 contrac
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
 The FastMCP-style `MCPatch` authoring facade registers schema-inferred typed tools
 while strict lower-level primitives keep serializable metadata separate from
-reviewed compiled handlers. Pure exact URL matching and deterministic
+reviewed compiled handlers. The browser-free
+[declarative authoring API](docs/declarative-pack-authoring.md) produces validated,
+deterministic read-only bundle inputs and synthetic fixture suites. Pure exact URL
+matching and deterministic
 native-first capability resolution are also implemented. A deterministic fixture
 harness now preflights compatibility, permission ceilings, schemas, and fixtures,
 then emits payload-free evidence for reviewed compiled packs. One synthetic pack is
