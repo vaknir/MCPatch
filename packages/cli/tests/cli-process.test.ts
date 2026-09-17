@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  copyFile,
   mkdir,
   mkdtemp,
   readdir,
@@ -204,6 +205,49 @@ describe("community pack CLI process", () => {
     });
   });
 
+  it("prepares an unsigned reproducible submission and payload-free review report", async () => {
+    const root = await temporaryDirectory();
+    const target = await createPack(join(root, "submission-reader"));
+    commitPack(target);
+
+    const first = run(["pack", "submit", target]);
+    expect(first).toMatchObject({
+      status: 0,
+      stdout: {
+        status: "submitted",
+        fixtures: 1,
+        reproducible: true,
+        reused: false,
+        signed: false,
+      },
+    });
+    const result = first.stdout as { artifact: string; review: string };
+    const artifact = JSON.parse(await readFile(result.artifact, "utf8")) as {
+      manifest: { digest: string };
+      publisherSignature?: unknown;
+    };
+    expect(artifact).not.toHaveProperty("publisherSignature");
+    const reviewText = await readFile(result.review, "utf8");
+    const review = JSON.parse(reviewText) as {
+      authorityDigest: string;
+      artifact: { digest: string };
+      authority: { tools: Array<{ operation: { kind: string } }> };
+      fixtures: { passed: number; total: number };
+    };
+    expect(review).toMatchObject({
+      reviewReportVersion: 1,
+      artifact: { digest: artifact.manifest.digest },
+      authority: { tools: [{ operation: { kind: "read" } }] },
+      fixtures: { passed: 1, total: 1 },
+    });
+    expect(review.authorityDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(reviewText).not.toContain("Example title");
+    expect(run(["pack", "submit", target])).toMatchObject({
+      status: 0,
+      stdout: { reused: true },
+    });
+  });
+
   it("rejects unsafe source nodes and interrupted output staging", async () => {
     const root = await temporaryDirectory();
     const unsafe = await createPack(join(root, "unsafe-pack"));
@@ -383,7 +427,172 @@ describe("community pack CLI process", () => {
       },
     });
   });
+
+  it("reproduces reviewed source before maintainer-only registry publication", async () => {
+    const root = await temporaryDirectory();
+    const fixture = await createPublicationFixture(root);
+
+    const first = run(["registry", "publish", root], registryEnvironment());
+    expect(first).toMatchObject({
+      status: 0,
+      stdout: {
+        status: "published",
+        bundleDigests: [
+          "sha256:b54588584676e1d95a76f955a9efe08f2f67589ea45e273a96ec33bc6be5b29d",
+        ],
+        indexDigest:
+          "sha256:f5d48a77a99ae90eff47aa3be11d2c176285a86e94109aa49eb9319587889248",
+        packs: 1,
+        reproducedPacks: 1,
+        registryId: "mcpatch-registry",
+        reused: false,
+        sourceCommit: fixture.registryCommit,
+      },
+    });
+    expect(
+      run(["registry", "publish", root], registryEnvironment()),
+    ).toMatchObject({
+      status: 0,
+      stdout: { status: "published", reused: true },
+    });
+    const output = (first.stdout as { artifact: string }).artifact;
+    const emitted = Buffer.concat(
+      await Promise.all([
+        readFile(join(output, "v1", "index.json")),
+        readFile(join(output, "_headers")),
+      ]),
+    ).toString("utf8");
+    expect(emitted).not.toContain(
+      registryEnvironment().MCPATCH_REGISTRY_PRIVATE_KEY,
+    );
+    expect(emitted).not.toContain("Example title");
+  });
+
+  it("refuses dirty publication trees and mismatched reviewed authority", async () => {
+    const dirtyRoot = await temporaryDirectory();
+    await createPublicationFixture(dirtyRoot);
+    await writeFile(join(dirtyRoot, "unreviewed.txt"), "unreviewed");
+    expect(
+      run(["registry", "publish", dirtyRoot], registryEnvironment()),
+    ).toMatchObject({
+      status: 1,
+      stderr: {
+        status: "error",
+        code: "SOURCE_UNATTRIBUTED",
+        field: "repository",
+      },
+    });
+
+    const sourceRoot = await temporaryDirectory();
+    const sourceFixture = await createPublicationFixture(sourceRoot);
+    await writeFile(
+      join(sourceFixture.sourceDirectory, "README.md"),
+      "unreviewed source change",
+    );
+    expect(
+      run(["registry", "publish", sourceRoot], registryEnvironment()),
+    ).toMatchObject({
+      status: 1,
+      stderr: {
+        status: "error",
+        code: "SOURCE_UNATTRIBUTED",
+        field: "repository",
+      },
+    });
+
+    const reviewRoot = await temporaryDirectory();
+    const reviewFixture = await createPublicationFixture(reviewRoot);
+    const review = JSON.parse(
+      await readFile(reviewFixture.reviewPath, "utf8"),
+    ) as { authority: { tools: Array<{ description: string }> } };
+    const tool = review.authority.tools[0];
+    if (tool === undefined) throw new Error("review tool missing");
+    tool.description = "deceptive replacement";
+    await writeFile(reviewFixture.reviewPath, `${JSON.stringify(review)}\n`);
+    git(reviewRoot, ["add", "reviews"]);
+    git(reviewRoot, ["commit", "-qm", "test: substitute review"]);
+    expect(
+      run(["registry", "publish", reviewRoot], registryEnvironment()),
+    ).toMatchObject({
+      status: 1,
+      stderr: {
+        status: "error",
+        code: "REVIEW_REPORT_INVALID",
+        field: "registry.packs.reviewReport",
+      },
+    });
+  });
 });
+
+async function createPublicationFixture(root: string): Promise<{
+  readonly registryCommit: string;
+  readonly reviewPath: string;
+  readonly sourceDirectory: string;
+}> {
+  await mkdir(root, { recursive: true });
+  git(root, ["init", "-q"]);
+  git(root, ["config", "user.name", "MCPatch Test"]);
+  git(root, ["config", "user.email", "mcpatch@example.invalid"]);
+  await writeFile(join(root, ".gitignore"), "/registry-dist/\n/sources/\n");
+  const sources = join(root, "sources");
+  await mkdir(sources);
+  const pack = await createPack(join(sources, "registry-reader"));
+  commitPack(pack);
+  const submitted = run(["pack", "submit", pack]);
+  if (submitted.status !== 0) throw new Error("pack submission failed");
+  const submission = submitted.stdout as { artifact: string; review: string };
+  const content = parseDeclarativePackBundleContentBytes(
+    await readFile(submission.artifact),
+  );
+  const signed = await signDeclarativePackBundle(content, publisherKeys());
+  const inputs = join(root, "inputs");
+  const reviews = join(root, "reviews");
+  await mkdir(inputs);
+  await mkdir(reviews);
+  const bundlePath = join(inputs, "registry-reader.mcpack");
+  const reviewPath = join(reviews, "registry-reader.review.json");
+  await writeFile(bundlePath, serializeDeclarativePackBundle(signed));
+  await copyFile(submission.review, reviewPath);
+  await writeFile(
+    join(root, "mcpatch.registry.json"),
+    `${JSON.stringify({
+      registrySourceVersion: 2,
+      registryId: "mcpatch-registry",
+      publicationSequence: 8,
+      issuedAt: "2026-09-17T00:00:00.000Z",
+      expiresAt: "2026-09-24T00:00:00.000Z",
+      packs: [
+        {
+          source: "sources/registry-reader",
+          reviewReport: "reviews/registry-reader.review.json",
+          bundle: "inputs/registry-reader.mcpack",
+          publisherKey: encode(publisherKeys().publicKey),
+          trust: "REVIEWED_COMMUNITY",
+          verification: {
+            verifiedAt: "2026-09-16T23:00:00.000Z",
+            fixtureTestsPassed: 1,
+            fixtureTestsTotal: 1,
+            sourceCommit: content.metadata.sourceCommit,
+          },
+          revocation: { status: "ACTIVE" },
+        },
+      ],
+    })}\n`,
+  );
+  git(root, [
+    "add",
+    ".gitignore",
+    "inputs",
+    "reviews",
+    "mcpatch.registry.json",
+  ]);
+  git(root, ["commit", "-qm", "test: add reviewed publication"]);
+  return {
+    registryCommit: gitOutput(root, ["rev-parse", "HEAD"]),
+    reviewPath,
+    sourceDirectory: pack,
+  };
+}
 
 async function createRegistryFixture(root: string): Promise<{
   readonly bundlePath: string;
@@ -449,13 +658,25 @@ function commitPack(target: string): void {
   git(target, ["init", "-q"]);
   git(target, ["config", "user.name", "MCPatch Test"]);
   git(target, ["config", "user.email", "mcpatch@example.invalid"]);
-  git(target, ["add", "mcpatch.pack.json", "README.md", "package.json"]);
+  git(target, ["add", "."]);
   git(target, ["commit", "-qm", "test: add pack"]);
+}
+
+function gitOutput(directory: string, args: readonly string[]): string {
+  return execFileSync("git", ["-C", directory, ...args], {
+    encoding: "utf8",
+    stdio: "pipe",
+  }).trim();
 }
 
 function git(directory: string, args: readonly string[]): void {
   execFileSync("git", ["-C", directory, ...args], {
     encoding: "utf8",
+    env: {
+      ...process.env,
+      GIT_AUTHOR_DATE: "2026-09-17T00:00:00Z",
+      GIT_COMMITTER_DATE: "2026-09-17T00:00:00Z",
+    },
     stdio: "pipe",
   });
 }

@@ -67,7 +67,10 @@ The contracts are documented in
 wire and publisher contract in
 [community registry v1](docs/architecture/community-registry-v1.md), and the
 activation policy in
-[community pack updates](docs/architecture/community-pack-updates.md).
+[community pack updates](docs/architecture/community-pack-updates.md). Contributor
+submission and maintainer publication are documented in
+[community pack contributions](docs/community-pack-contributions.md) and
+[registry publishing](docs/registry-publishing.md).
 
 The supported transport proof is described in
 [docs/local-demo.md](docs/local-demo.md). Local packaging and registration are
@@ -102,8 +105,8 @@ fallback handlers cannot produce real-site results.
 
 Community authors can use the data-only
 [community pack CLI](docs/community-pack-cli.md) to create, validate, test, inspect,
-and reproducibly build a declarative pack without a browser or executable pack
-module.
+reproducibly build, and prepare an unsigned declarative submission without a browser
+or executable pack module.
 
 Those unsigned artifacts can be exercised through the real extension, bridge, and
 MCP path with the explicit

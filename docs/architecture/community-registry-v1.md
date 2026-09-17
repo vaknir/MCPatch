@@ -87,9 +87,18 @@ registry attestations, signs the bounded index, and atomically writes
 identical; any difference fails as dirty output. `_headers` records the required
 static media types and cache policy.
 
+Reviewed release publication uses source format v2 and
+`mcpatch registry publish <directory>`. It additionally requires clean registry and
+pack repositories, rebuilds the exact source commit, re-runs fixtures, and compares
+the generated payload-free review report before calling the same deterministic
+publisher. Contributor output remains unsigned and cannot invoke registry signing.
+The complete source layout, protected-key boundary, rotation, transfer, and
+revocation procedure is in [registry publishing](../registry-publishing.md).
+
 The checked-in production public key is a pre-release trust root whose private key
-is not in this repository. Production ceremony, rotation, and emergency operation
-remain release work under issues #152 and #166.
+is not in this repository. Production ceremony and emergency operation remain
+release work under issue #166; the deterministic local ceremony and rotation
+procedure are implemented under issue #152.
 
 ## Version and bounds
 

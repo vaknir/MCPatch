@@ -13,7 +13,8 @@ import { sourceCommit } from "./git-attribution.js";
 import { PACK_SOURCE_FILE } from "./model.js";
 import { preparePackSource } from "./source.js";
 import { syntheticFixtureRunner } from "./synthetic-runner.js";
-import { buildStaticRegistry } from "./registry.js";
+import { buildStaticRegistry, publishStaticRegistry } from "./registry.js";
+import { prepareSubmission } from "./submission.js";
 
 export interface CommandContext {
   readonly currentDirectory: string;
@@ -25,9 +26,13 @@ export async function executeCommand(
   context: CommandContext,
 ): Promise<Readonly<Record<string, unknown>>> {
   if (args[0] === "registry") {
-    if (args[1] !== "build" || args.length > 3) cliError("USAGE");
+    if ((args[1] !== "build" && args[1] !== "publish") || args.length > 3) {
+      cliError("USAGE");
+    }
     const target = resolveTargetDirectory(args[2], context.currentDirectory);
-    return buildStaticRegistry(target, context.environment);
+    return args[1] === "publish"
+      ? publishStaticRegistry(target, context.environment)
+      : buildStaticRegistry(target, context.environment);
   }
   if (args[0] !== "pack") cliError("USAGE");
   const command = args[1];
@@ -45,7 +50,8 @@ export async function executeCommand(
     command !== "validate" &&
     command !== "test" &&
     command !== "inspect" &&
-    command !== "build"
+    command !== "build" &&
+    command !== "submit"
   ) {
     cliError("USAGE");
   }
@@ -53,11 +59,14 @@ export async function executeCommand(
   const target = resolveTargetDirectory(args[2], context.currentDirectory);
   const loaded = await loadPackSource(target);
 
-  if (command === "build") {
+  if (command === "build" || command === "submit") {
     const commit = await sourceCommit(target, loaded.sourcePath, loaded.bytes);
     const pack = await preparePackSource(loaded.bytes, {
       sourceCommit: commit,
     });
+    if (command === "submit") {
+      return prepareSubmission(target, pack, commit);
+    }
     const filename = `${pack.manifest.publisher}.${pack.manifest.id}-${pack.manifest.version}.mcpack`;
     const written = await writeArtifact(
       target,
@@ -193,12 +202,14 @@ function scaffold(targetDirectory: string): Readonly<Record<string, string>> {
     scripts: {
       build: "mcpatch pack build .",
       inspect: "mcpatch pack inspect .",
+      submit: "mcpatch pack submit .",
       test: "mcpatch pack test .",
       validate: "mcpatch pack validate .",
     },
   };
   return Object.freeze({
     [PACK_SOURCE_FILE]: `${JSON.stringify(source, null, 2)}\n`,
+    ".gitignore": "/dist/\n/submission-dist/\n",
     "package.json": `${JSON.stringify(packageJson, null, 2)}\n`,
     "README.md": scaffoldReadme(id),
   });
@@ -217,5 +228,5 @@ function safeIdentifier(value: string): string {
 }
 
 function scaffoldReadme(id: string): string {
-  return `# ${id}\n\nThis directory contains one data-only MCPatch pack source. The fixture embedded in \`${PACK_SOURCE_FILE}\` is its deterministic browser-free test.\n\nRun:\n\n- \`mcpatch pack validate .\`\n- \`mcpatch pack test .\`\n- \`mcpatch pack inspect .\`\n- commit \`${PACK_SOURCE_FILE}\`, then run \`mcpatch pack build .\`\n\nBuild refuses untracked or modified source so the emitted unsigned local-development artifact is attributable to an exact Git commit. No command opens a browser, reads a browser profile, or performs network access.\n`;
+  return `# ${id}\n\nThis directory contains one data-only MCPatch pack source. The fixture embedded in \`${PACK_SOURCE_FILE}\` is its deterministic browser-free test.\n\nRun:\n\n- \`mcpatch pack validate .\`\n- \`mcpatch pack test .\`\n- \`mcpatch pack inspect .\`\n- commit the generated source, then run \`mcpatch pack submit .\`\n\nBuild and submission refuse unattributed source. Submission emits an unsigned bundle and payload-free review report for maintainer review. No command opens a browser, reads a browser profile, or performs network access.\n`;
 }

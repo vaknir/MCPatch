@@ -1,0 +1,57 @@
+name: Community pack proposal
+description: Propose a new declarative pack or a reviewed update
+title: "pack: "
+labels:
+  - community-pack
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not attach browser profiles, captures, cookies, tokens, real account data,
+        screenshots, copied page dumps, or credentials. Use invented fixtures only.
+  - type: input
+    id: identity
+    attributes:
+      label: Publisher, pack ID, and version
+      placeholder: publisher/example-reader 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Publisher owner
+      description: Account responsible for source and publisher-key custody.
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: User capability
+      description: Explain the typed tools and why visible page data is sufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Exact authority
+      description: List HTTPS origins/paths, operations, risks, permissions, schemas, and network policy.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Compatibility and fixture evidence
+      description: Provide source commit, digest, runtime/bridge range, invented fixture count, and local gate result. Do not paste payloads.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: Fixtures and reports contain only invented data and no retained session material.
+          required: true
+        - label: The pack is declarative and contains no downloaded executable code.
+          required: true
+        - label: Any authority or publisher-key change is explicitly identified.
+          required: true

@@ -8,6 +8,14 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A reproducible community contribution and publication workflow: `pack submit`
+  emits an unsigned canonical artifact plus payload-free authority report, while
+  maintainer-only `registry publish` requires clean exact source commits, re-runs
+  synthetic fixtures, reproduces reviewed bytes and metadata, verifies the separate
+  publisher signature, and only then applies registry signing. Contributor issue/PR
+  templates and key-rotation, transfer, fixture, and protected-release procedures
+  complete the review boundary.
+
 - Explicit community-pack upgrades with complete pinned authority records, strict
   SemVer upgrade selection, same-version identity-reuse rejection, one verified
   rollback artifact, transactional restoration after interrupted activation,
