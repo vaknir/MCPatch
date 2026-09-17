@@ -32,8 +32,9 @@ declarative operations versions are rejected.
 
 `execution.kind` is metadata, not a code-loading instruction:
 
-- `declarative` requires operations version `1` and is eligible for independent
-  delivery only after its fixed operation vocabulary exists;
+- `declarative` requires a supported operations version (`1` for reads or `2`
+  for reads plus typed same-origin navigation) and is eligible for independent
+  delivery only through its fixed operation vocabulary;
 - `bundled` means its handler is compiled into a reviewed extension build and the
   manifest cannot identify an entrypoint.
 
@@ -42,9 +43,9 @@ and additional fields are invalid. The contract never authorizes `eval`, dynamic
 code generation, downloaded JavaScript or WebAssembly, or an ambient browser API.
 
 The manifest is the versioned envelope, not the declarative operation payload. The
-fixed v1 program is embedded in `operations.program` in the one canonical bundle
+fixed program is embedded in `operations.program` in the one canonical bundle
 document; there is no archive path or URL capable of selecting code. See
-[Declarative Operations v1](declarative-operations.md).
+[Declarative Operations](declarative-operations.md).
 
 ## Origins, paths, and network policy
 
@@ -190,6 +191,7 @@ attestation carry whether an artifact is `OFFICIAL` or `REVIEWED_COMMUNITY`, whi
 the local installer marks an explicitly imported artifact
 `UNSIGNED_LOCAL_DEVELOPMENT`. Consumers must retain that provenance beside the
 manifest identity and must not infer it from the publisher string, name, or
-registry presence. Community declarative version 1 is read-only with
+registry presence. Community declarative Operations v1 is read-only; Operations
+v2 adds only an approved typed same-origin navigation. Both require
 `networkPolicy.extensionRequests: "none"`; registry control-plane access is not a
 pack permission.

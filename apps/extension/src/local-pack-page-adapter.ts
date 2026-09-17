@@ -6,6 +6,7 @@ import {
 } from "@mcpatch/sdk/runtime";
 
 import { DeclarativeDomAdapter } from "./declarative-dom-adapter.js";
+import { DeclarativeNavigationCoordinator } from "./declarative-navigation-coordinator.js";
 import {
   createDeclarativePageAdapter,
   DeclarativePackRuntime,
@@ -19,6 +20,7 @@ import {
   type PageAdapter,
 } from "./page-content-model.js";
 import { emptyPageAdapter } from "./page-content-runtime.js";
+import type { RealmNavigation } from "./realm-navigation.js";
 
 const INSTALL_ID = /^local\.[a-f0-9]{32}$/u;
 const MAX_LOCAL_PAGE_PACKS = 4;
@@ -37,14 +39,21 @@ export async function loadLocalPackPageAdapter(
   runtime: ChromePageClientRuntimeApi,
   document: Document,
   location: Location,
+  navigation?: RealmNavigation,
 ): Promise<PageAdapter> {
-  return loadDeclarativePackPageAdapter(runtime, document, location, {
-    contextPrefix: "local",
-    installId: INSTALL_ID,
-    maximumPacks: MAX_LOCAL_PAGE_PACKS,
-    requestType: "local_pack_content_config",
-    trust: new Set([LOCAL_PACK_TRUST]),
-  });
+  return loadDeclarativePackPageAdapter(
+    runtime,
+    document,
+    location,
+    {
+      contextPrefix: "local",
+      installId: INSTALL_ID,
+      maximumPacks: MAX_LOCAL_PAGE_PACKS,
+      requestType: "local_pack_content_config",
+      trust: new Set([LOCAL_PACK_TRUST]),
+    },
+    navigation,
+  );
 }
 
 export async function loadDeclarativePackPageAdapter(
@@ -52,6 +61,7 @@ export async function loadDeclarativePackPageAdapter(
   document: Document,
   location: Location,
   options: DeclarativePageSourceOptions,
+  navigation?: RealmNavigation,
 ): Promise<PageAdapter> {
   if (runtime.sendMessage === undefined) return emptyPageAdapter;
   const page = canonicalizePageLocation(location.href);
@@ -88,6 +98,14 @@ export async function loadDeclarativePackPageAdapter(
             : undefined;
         },
         document: new DeclarativeDomAdapter(document),
+        ...(navigation === undefined
+          ? {}
+          : {
+              navigation: new DeclarativeNavigationCoordinator(
+                record.bundle.manifest,
+                navigation,
+              ),
+            }),
       });
       adapters.push(createDeclarativePageAdapter(declarative));
     } catch {
@@ -115,6 +133,12 @@ export class CompositePageAdapter implements PageAdapter {
 
   authorizePackTools(tools: readonly string[]): void {
     for (const adapter of this.#adapters) adapter.authorizePackTools?.(tools);
+  }
+
+  bindContextRevocation(revoke: () => void): void {
+    for (const adapter of this.#adapters) {
+      adapter.bindContextRevocation?.(revoke);
+    }
   }
 
   async capabilities(signal: AbortSignal): Promise<readonly PageCapability[]> {

@@ -23,7 +23,7 @@ The closed [JSON Schema](../../packages/sdk/schema/v1/community-registry-index.s
 documents index v1. Runtime validation is stricter: it also requires canonical
 timestamps and origins, sorted unique publisher/pack/version releases, bounded
 version history, sorted unique origins/tools, a digest-derived
-bundle path, matching attestation fields, compatible read-only declarative packs,
+bundle path, matching attestation fields, compatible declarative packs,
 and all-successful fixture evidence.
 
 ## Independent proofs

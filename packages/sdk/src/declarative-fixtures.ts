@@ -1,9 +1,13 @@
-import type { JsonValue } from "./types.js";
+import type { JsonObject, JsonValue } from "./types.js";
 import type {
   BuiltDeclarativeFixture,
   DeclarativePackBuild,
 } from "./declarative-authoring.js";
-import type { DeclarativeOperation } from "./declarative-operations-types.js";
+import type {
+  DeclarativeNavigateOperation,
+  DeclarativeOperation,
+  DeclarativeReadOperation,
+} from "./declarative-operations-types.js";
 import type { SyntheticDocument } from "./declarative-synthetic-document.js";
 import { compileToolSchemas } from "./fixture-harness-validation.js";
 import {
@@ -12,10 +16,18 @@ import {
   validateJsonBounds,
 } from "./validation/primitives.js";
 
-export interface DeclarativeFixtureRunRequest {
-  readonly operation: DeclarativeOperation;
-  readonly document: SyntheticDocument;
-}
+export type DeclarativeFixtureRunRequest =
+  | Readonly<{
+      readonly kind: "navigate";
+      readonly operation: DeclarativeNavigateOperation;
+      readonly args: JsonObject;
+      readonly currentOrigin: string;
+    }>
+  | Readonly<{
+      readonly kind: "read";
+      readonly operation: DeclarativeReadOperation;
+      readonly document: SyntheticDocument;
+    }>;
 
 /** Implemented by the bounded interpreter; the harness owns all comparison logic. */
 export interface DeclarativeFixtureRunner {
@@ -59,7 +71,12 @@ async function runFixture(
   const identity = { id: fixture.id, tool: fixture.tool };
   const operation = operations.get(fixture.tool);
   const validator = validators.get(fixture.tool);
-  if (operation === undefined || validator === undefined) {
+  if (
+    operation === undefined ||
+    validator === undefined ||
+    operation.kind !== fixture.kind ||
+    !validator.input(fixture.input)
+  ) {
     return {
       ...identity,
       status: "failed" as const,
@@ -68,11 +85,25 @@ async function runFixture(
   }
   let result: JsonValue;
   try {
+    const request: DeclarativeFixtureRunRequest =
+      fixture.kind === "read" && operation.kind === "read"
+        ? {
+            kind: "read",
+            operation,
+            document: fixture.document,
+          }
+        : fixture.kind === "navigate" && operation.kind === "navigate"
+          ? {
+              kind: "navigate",
+              operation,
+              args: fixture.input,
+              currentOrigin: new URL(fixture.currentUrl).origin,
+            }
+          : (() => {
+              throw new TypeError("fixture operation mismatch");
+            })();
     result = await runner.run(
-      cloneAndFreeze({
-        operation,
-        document: fixture.document,
-      }) as DeclarativeFixtureRunRequest,
+      cloneAndFreeze(request) as DeclarativeFixtureRunRequest,
     );
   } catch {
     return {

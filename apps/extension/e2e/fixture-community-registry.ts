@@ -13,6 +13,7 @@ import {
 
 import {
   COMMUNITY_ORIGIN,
+  COMMUNITY_NAVIGATE_TOOL,
   COMMUNITY_REGISTRY_PUBLIC_KEY,
   COMMUNITY_TOOL,
 } from "./fixture-constants.js";
@@ -166,18 +167,20 @@ async function entry(
     publisherKey: bundle.publisherSignature.publicKey,
     trust: "REVIEWED_COMMUNITY",
     origins: [COMMUNITY_ORIGIN],
-    tools: bundle.manifest.tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      risk: tool.risk,
-      permissions: tool.permissions,
-    })),
+    tools: bundle.manifest.tools
+      .map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        risk: tool.risk,
+        permissions: tool.permissions,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name)),
     compatibility: bundle.manifest.compatibility,
     networkPolicy: bundle.manifest.networkPolicy,
     verification: {
       verifiedAt,
-      fixtureTestsPassed: 1,
-      fixtureTestsTotal: 1,
+      fixtureTestsPassed: bundle.manifest.fixtures.length,
+      fixtureTestsTotal: bundle.manifest.fixtures.length,
       sourceCommit: bundle.metadata.sourceCommit ?? "b".repeat(40),
     },
     revocation,
@@ -240,6 +243,7 @@ async function signedCommunityBundle(version: string, commitByte: string) {
   const operation = operations.program.operations[0];
   if (operation === undefined) throw new Error("fixture operation missing");
   operation["tool"] = COMMUNITY_TOOL;
+  if (version === "1.1.0") addNavigationAction(manifest, operations);
   source["metadata"] = {
     license: "MIT",
     sourceCommit: commitByte.repeat(40),
@@ -248,6 +252,71 @@ async function signedCommunityBundle(version: string, commitByte: string) {
   manifest["digest"] = await computeDeclarativePackBundleDigest(provisional);
   const content = parseDeclarativePackBundleContent(source);
   return signDeclarativePackBundle(content, publisherKeys());
+}
+
+function addNavigationAction(
+  manifest: Record<string, unknown>,
+  operations: { program: { operations: Array<Record<string, unknown>> } },
+): void {
+  manifest["execution"] = { kind: "declarative", operationsVersion: 2 };
+  const tools = manifest["tools"] as Array<Record<string, unknown>>;
+  tools.push({
+    name: COMMUNITY_NAVIGATE_TOOL,
+    description: "Open one typed item route on the current fixture origin.",
+    risk: "action",
+    permissions: ["ACTION"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["item"],
+      properties: {
+        item: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32,
+        },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["state", "url"],
+      properties: {
+        state: { const: "scheduled" },
+        url: { type: "string", maxLength: 2048 },
+      },
+    },
+  });
+  const fixtures = manifest["fixtures"] as Array<Record<string, unknown>>;
+  fixtures.push({
+    id: "open-item",
+    tool: COMMUNITY_NAVIGATE_TOOL,
+    input: { item: "next" },
+    expect: {
+      kind: "result",
+      result: {
+        state: "scheduled",
+        url: `${COMMUNITY_ORIGIN}/items/next`,
+      },
+    },
+  });
+  const program = operations.program as unknown as Record<string, unknown>;
+  program["version"] = 2;
+  operations.program.operations.push({
+    kind: "navigate",
+    tool: COMMUNITY_NAVIGATE_TOOL,
+    navigationVersion: 1,
+    path: {
+      segments: [
+        { kind: "literal", value: "items" },
+        { kind: "argument", name: "item" },
+      ],
+      trailingSlash: false,
+    },
+    query: [],
+  });
+  const sourceOperations = operations as unknown as Record<string, unknown>;
+  sourceOperations["operationsVersion"] = 2;
 }
 
 function canonicalTime(value: number): string {

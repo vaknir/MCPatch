@@ -13,8 +13,8 @@ The closed top-level shape is:
   "bundleVersion": 1,
   "manifest": "Pack Manifest v1",
   "operations": {
-    "operationsVersion": 1,
-    "program": "Declarative Operations v1"
+    "operationsVersion": "1 or 2",
+    "program": "the matching Declarative Operations program"
   },
   "metadata": {
     "license": "MIT",
@@ -148,13 +148,15 @@ explicitly rather than silently depending on a newer browser.
 
 ## Compatibility and migration
 
-The contained manifest must be Pack Manifest v1, declarative, and use
-operationsVersion: 1. Bundle version and operations version are independent;
-unknown values are rejected. Runtime and bridge compatibility use the manifest's
+The contained manifest must be Pack Manifest v1 and declarative. Bundle version
+and operations version are independent; this bundle revision accepts Operations
+v1 (read-only) and v2 (v1 reads plus typed approved same-origin navigation), and
+requires the manifest, operations envelope, and program versions to agree.
+Unknown combinations are rejected. Runtime and bridge compatibility use the manifest's
 closed-open runtime interval and closed bridge integer interval and are checked
-before installation. Version 1 is read-only by contract through
-networkPolicy.extensionRequests: none; actions and network authority require
-later separately reviewed contracts.
+before installation. Both operations versions retain
+`networkPolicy.extensionRequests: none`; navigation does not grant request or
+credential authority.
 
 Compatible metadata or validation hardening may ship without changing the bundle
 version. Any changed accepted meaning, digest projection, signature domain,
@@ -165,6 +167,6 @@ artifact inputs unless they are represented in the signed operations/manifest
 content.
 
 The fixed program contract is documented in
-[Declarative Operations v1](declarative-operations.md). It is the only location
+[Declarative Operations](declarative-operations.md). It is the only location
 for the canonical read-only AST; there is no archive path, module, script, or
 second program file.

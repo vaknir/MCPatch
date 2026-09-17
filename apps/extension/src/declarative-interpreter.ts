@@ -1,7 +1,7 @@
 import type { JsonObject, JsonValue } from "@mcpatch/protocol";
 import type {
-  DeclarativeOperation,
   DeclarativeProjection,
+  DeclarativeReadOperation,
   DeclarativeScalarSource,
   DeclarativeScope,
 } from "@mcpatch/sdk/runtime";
@@ -18,7 +18,7 @@ const NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/u;
 const PERCENTAGE = /^(?:0|[1-9]\d*)(?:\.\d+)?%?$/u;
 
 export async function discoverDeclarativeOperation(
-  operation: DeclarativeOperation,
+  operation: DeclarativeReadOperation,
   adapter: DeclarativeDocumentAdapter,
   budget: DeclarativeExecutionBudget,
 ): Promise<boolean> {
@@ -36,7 +36,7 @@ export async function discoverDeclarativeOperation(
 }
 
 export async function executeDeclarativeOperation(
-  operation: DeclarativeOperation,
+  operation: DeclarativeReadOperation,
   outputSchema: JsonObject,
   adapter: DeclarativeDocumentAdapter,
   budget: DeclarativeExecutionBudget,
@@ -155,7 +155,7 @@ export async function executeDeclarativeOperation(
 
   async function locate(
     parent: DeclarativeNodeHandle | undefined,
-    locator: DeclarativeOperation["scope"]["locator"],
+    locator: DeclarativeReadOperation["scope"]["locator"],
     maximum: number,
   ): Promise<readonly DeclarativeNodeHandle[]> {
     budget.check();

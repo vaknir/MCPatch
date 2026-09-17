@@ -1,6 +1,11 @@
 import { demoPack } from "@mcpatch/example-packs";
 import { PROTOCOL_VERSION } from "@mcpatch/protocol";
 
+import { ApprovalController } from "../src/approval-controller.js";
+import type {
+  ChromeApprovalRuntimeApi,
+  ChromeApprovalTabsApi,
+} from "../src/approval-model.js";
 import type { ChromeEnablementApi } from "../src/enablement-model.js";
 import { PackEnablementController } from "../src/pack-enablement.js";
 import { PackContentCatalog } from "../src/pack-content-catalog.js";
@@ -26,15 +31,17 @@ import { fixtureLocalBundle } from "./fixture-local-bundle.js";
 import { fixturePack } from "./fixture-pack.js";
 
 declare const chrome: Omit<ChromeEnablementApi, "lifecycle"> & {
-  readonly runtime: ExtensionRuntimeApi & ChromeRuntimeMessageApi;
-  readonly tabs: ChromeCommunityTabsApi;
+  readonly runtime: ExtensionRuntimeApi &
+    ChromeApprovalRuntimeApi &
+    ChromeRuntimeMessageApi;
+  readonly tabs: ChromeApprovalTabsApi & ChromeCommunityTabsApi;
 };
 
 const packs = Object.freeze([demoPack, fixturePack]);
 const runtimeOptions = Object.freeze({
   runtimeVersion: "0.1.0",
   bridgeProtocolVersion: PROTOCOL_VERSION,
-  allowedPermissions: Object.freeze(["READ"] as const),
+  allowedPermissions: Object.freeze(["ACTION", "READ"] as const),
 });
 const contentCatalog = new PackContentCatalog(
   chrome.scripting,
@@ -100,6 +107,7 @@ contentCatalog.setAuthorities([
 
 void FIXTURE_MARKER;
 startExtensionRuntime(chrome.runtime, {
+  approvalSurface: new ApprovalController(chrome.runtime, chrome.tabs),
   compiledPacks: packs,
   compiledPackRuntimeOptions: runtimeOptions,
   pageAuthority: contentCatalog.authority,

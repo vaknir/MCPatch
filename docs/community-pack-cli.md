@@ -34,11 +34,12 @@ synthetic document, one expected result, and package scripts for the remaining
 commands.
 
 `validate` applies strict duplicate-key JSON decoding plus the canonical manifest,
-Declarative Operations v1, schema, compatibility, permission, and bundle-content
+the selected Declarative Operations version, schema, compatibility, permission, and bundle-content
 validators. Errors contain only a stable code and static field; rejected fixture
 values are not copied into output.
 
-`test` executes every synthetic fixture through the browser-free v1 read semantics
+`test` executes every synthetic fixture through browser-free declarative read or
+typed URL-construction semantics
 and then checks the result with the declared output schema and exact expectation.
 It requires no authenticated site, browser, Playwright process, or network access.
 

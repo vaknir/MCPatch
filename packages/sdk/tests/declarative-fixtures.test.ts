@@ -67,7 +67,10 @@ describe("declarative synthetic fixtures", () => {
       run(request) {
         expect(Object.isFrozen(request)).toBe(true);
         expect(request.operation.tool).toBe("example.title");
-        expect(request.document.url).toBe("https://example.test/");
+        expect(request.kind).toBe("read");
+        expect(request.kind === "read" ? request.document.url : undefined).toBe(
+          "https://example.test/",
+        );
         return { title: "Fixture" };
       },
     });

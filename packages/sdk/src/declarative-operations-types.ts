@@ -1,9 +1,10 @@
 import type { JsonObject, JsonValue } from "./types.js";
 
-export const DECLARATIVE_OPERATIONS_PROGRAM_VERSION = 1 as const;
+export const DECLARATIVE_OPERATIONS_PROGRAM_VERSION = 2 as const;
+export type DeclarativeOperationsProgramVersion = 1 | 2;
 
-/** The v1 language has no action, script, expression, or network operation. */
-export type DeclarativeOperationKind = "read";
+/** The language exposes bounded reads and v2's single typed navigation action. */
+export type DeclarativeOperationKind = "navigate" | "read";
 
 export const DECLARATIVE_ARIA_ROLES = [
   "alert",
@@ -224,16 +225,41 @@ export type DeclarativeObjectField = Readonly<{
   readonly value: DeclarativeProjection;
 }>;
 
-export type DeclarativeOperation = Readonly<{
-  readonly kind: DeclarativeOperationKind;
+export type DeclarativeReadOperation = Readonly<{
+  readonly kind: "read";
   readonly tool: string;
   readonly availability: DeclarativeAvailability;
   readonly scope: DeclarativeScope;
   readonly projection: DeclarativeProjection;
 }>;
 
+export type DeclarativeNavigationValue =
+  | Readonly<{ readonly kind: "argument"; readonly name: string }>
+  | Readonly<{ readonly kind: "literal"; readonly value: string }>;
+
+export type DeclarativeNavigationPath = Readonly<{
+  readonly segments: readonly DeclarativeNavigationValue[];
+  readonly trailingSlash: boolean;
+}>;
+
+export type DeclarativeNavigationQuery = Readonly<{
+  readonly key: string;
+  readonly value: DeclarativeNavigationValue;
+}>;
+
+export type DeclarativeNavigateOperation = Readonly<{
+  readonly kind: "navigate";
+  readonly tool: string;
+  readonly navigationVersion: 1;
+  readonly path: DeclarativeNavigationPath;
+  readonly query: readonly DeclarativeNavigationQuery[];
+}>;
+
+export type DeclarativeOperation =
+  DeclarativeNavigateOperation | DeclarativeReadOperation;
+
 export type DeclarativeOperationsProgram = Readonly<{
-  readonly version: typeof DECLARATIVE_OPERATIONS_PROGRAM_VERSION;
+  readonly version: DeclarativeOperationsProgramVersion;
   readonly operations: readonly DeclarativeOperation[];
 }>;
 

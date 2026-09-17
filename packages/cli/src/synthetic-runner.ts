@@ -1,4 +1,6 @@
 import {
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
   MAX_ATTRIBUTE_CHARS,
   MAX_NODE_VISITS,
   MAX_OUTPUT_BYTES,
@@ -26,7 +28,7 @@ class SyntheticExecutionError extends Error {
   }
 }
 
-/** Deterministic, browser-free implementation of the v1 read semantics. */
+/** Deterministic, browser-free implementation of declarative fixture semantics. */
 export const syntheticFixtureRunner: DeclarativeFixtureRunner = Object.freeze({
   run(request: DeclarativeFixtureRunRequest) {
     return runSyntheticFixture(request);
@@ -36,6 +38,15 @@ export const syntheticFixtureRunner: DeclarativeFixtureRunner = Object.freeze({
 export function runSyntheticFixture(
   request: DeclarativeFixtureRunRequest,
 ): JsonValue {
+  if (request.kind === "navigate") {
+    return declarativeNavigationResult(
+      createDeclarativeNavigationUrl(
+        request.operation,
+        request.args,
+        request.currentOrigin,
+      ),
+    );
+  }
   const { operation } = request;
   if (
     locate(

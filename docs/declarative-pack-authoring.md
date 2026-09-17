@@ -1,8 +1,8 @@
 # Declarative pack authoring
 
-`@mcpatch/sdk/declarative` builds a read-only community pack as data. It has no
+`@mcpatch/sdk/declarative` builds a community pack as data. It has no
 handler callback, browser object, document, or network client. Finalization runs the
-same Pack Manifest v1, Declarative Operations v1, bundle, and JSON Schema checks
+same Pack Manifest v1, Declarative Operations, bundle, and JSON Schema checks
 used at the runtime boundary.
 
 This complete unknown-site pack reads one heading from one explicit HTTPS origin:
@@ -98,3 +98,57 @@ const evidence = await verifyDeclarativeFixtures(pack, {
 The runner boundary grants no extension internals. It receives only one validated
 operation and one immutable synthetic document. The harness independently validates
 the returned value against the declared output schema and exact fixture result.
+
+## Add a typed navigation action
+
+`defineNavigationTool` is the only side effect available to a declarative pack.
+The caller supplies values, not a URL; the pack owns the static same-origin route:
+
+```ts
+import { defineNavigationTool } from "@mcpatch/sdk/declarative";
+
+const changeSymbol = defineNavigationTool({
+  name: "charts.change_symbol",
+  description: "Open a chart for one exchange-qualified symbol",
+  risk: "action",
+  permissions: ["ACTION"],
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["symbol", "market"],
+    properties: {
+      symbol: { type: "string", minLength: 1, maxLength: 32 },
+      market: {
+        type: "string",
+        minLength: 1,
+        maxLength: 8,
+        enum: ["US", "UK"],
+      },
+    },
+  },
+  navigation: {
+    navigationVersion: 1,
+    path: {
+      segments: [
+        { kind: "literal", value: "chart" },
+        { kind: "argument", name: "symbol" },
+      ],
+      trailingSlash: false,
+    },
+    query: [{ key: "market", value: { kind: "argument", name: "market" } }],
+  },
+  fixtures: [
+    {
+      id: "change-symbol",
+      currentUrl: "https://charts.example/chart/OLD",
+      input: { symbol: "NASDAQ:AAPL", market: "US" },
+      expectedUrl: "https://charts.example/chart/NASDAQ%3AAAPL?market=US",
+    },
+  ],
+});
+```
+
+Including this tool makes the generated pack use Operations v2. Read-only packs
+remain v1. Every argument must appear exactly once in the path or a statically
+named query entry. Runtime calls require the normal extension-owned one-time
+ACTION approval; successful tool output says only that navigation was scheduled.

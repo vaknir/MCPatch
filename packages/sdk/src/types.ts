@@ -30,7 +30,7 @@ export interface PackCompatibility {
 
 export type PackExecution =
   | { readonly kind: "bundled" }
-  | { readonly kind: "declarative"; readonly operationsVersion: 1 };
+  | { readonly kind: "declarative"; readonly operationsVersion: 1 | 2 };
 
 export interface PackPathRule {
   readonly kind: "exact" | "prefix";

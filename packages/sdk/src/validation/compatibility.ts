@@ -86,7 +86,7 @@ export function validateExecution(
       "execution",
     );
     if (checked.issue !== undefined) return checked.issue;
-    return value.operationsVersion === 1
+    return value.operationsVersion === 1 || value.operationsVersion === 2
       ? undefined
       : issue("UNSUPPORTED_VERSION", "execution.operationsVersion");
   }

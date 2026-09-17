@@ -416,10 +416,12 @@ The policy vocabulary begins with these non-exclusive classes:
 Risk labels shown to users are derived from permissions and reviewed metadata. They
 do not replace enforcement.
 
-Community declarative packs begin with `READ` only and
-`networkPolicy.extensionRequests: "none"`. Declarative actions and external
-network methods require their own future ADR and cannot be smuggled in through
-registry metadata or a schema.
+Community declarative Operations v1 remains `READ` only. Operations v2 adds one
+`ACTION` primitive: an approved, typed same-origin navigation whose static URL
+shape is signed by the pack and whose old document is revoked before navigation.
+Both require `networkPolicy.extensionRequests: "none"`. External network methods
+and any other action primitive require a future ADR and cannot be smuggled in
+through registry metadata or a schema.
 
 ## Residual risks
 

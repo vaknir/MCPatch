@@ -78,6 +78,7 @@ export {
 export {
   BUNDLE_SIGNATURE_VERSION,
   DECLARATIVE_OPERATIONS_VERSION,
+  DECLARATIVE_OPERATIONS_VERSIONS,
   DECLARATIVE_PACK_BUNDLE_VERSION,
   REGISTRY_ATTESTATION_VERSION,
   DeclarativePackBundleValidationError,
@@ -131,3 +132,8 @@ export {
   DECLARATIVE_OUTPUT_ATTRIBUTES,
 } from "./declarative-operations-types.js";
 export type * from "./declarative-operations-types.js";
+export {
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
+} from "./declarative-navigation.js";
+export type * from "./declarative-navigation.js";

@@ -6,6 +6,24 @@ import { preparePackSource } from "../src/source.js";
 import { syntheticFixtureRunner } from "../src/synthetic-runner.js";
 
 describe("synthetic declarative runner", () => {
+  it("constructs typed navigation fixtures without a browser or page automation", async () => {
+    const pack = await preparePackSource(navigationSource());
+
+    await expect(
+      verifyDeclarativeFixtures(pack, syntheticFixtureRunner),
+    ).resolves.toEqual({
+      passed: true,
+      fixtures: [
+        {
+          id: "change-symbol",
+          tool: "example.change_symbol",
+          status: "passed",
+        },
+      ],
+    });
+    expect(pack.bundleContent.operations.operationsVersion).toBe(2);
+  });
+
   it("executes a bounded descendant list through the authored fixture harness", async () => {
     const pack = await preparePackSource(
       source({
@@ -210,6 +228,78 @@ function source(fixture: FixtureSource): string {
             id: "fixture",
             document: fixture.document,
             result: fixture.result,
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function navigationSource(): string {
+  return JSON.stringify({
+    sourceVersion: 1,
+    publisher: "example",
+    id: "navigation-pack",
+    name: "Navigation pack",
+    description: "Typed navigation fixture",
+    version: "0.1.0",
+    compatibility: {
+      runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
+      bridgeProtocol: {
+        minimum: PROTOCOL_VERSION,
+        maximum: PROTOCOL_VERSION,
+      },
+    },
+    matches: [
+      {
+        origin: "https://example.test",
+        paths: [{ kind: "prefix", path: "/chart/" }],
+      },
+    ],
+    metadata: { license: "MIT" },
+    tools: [
+      {
+        name: "example.change_symbol",
+        description: "Open one reviewed symbol chart",
+        risk: "action",
+        permissions: ["ACTION"],
+        inputSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["symbol", "market"],
+          properties: {
+            symbol: {
+              type: "string",
+              minLength: 1,
+              maxLength: 32,
+            },
+            market: {
+              type: "string",
+              minLength: 1,
+              maxLength: 8,
+              enum: ["US", "UK"],
+            },
+          },
+        },
+        navigation: {
+          navigationVersion: 1,
+          path: {
+            segments: [
+              { kind: "literal", value: "chart" },
+              { kind: "argument", name: "symbol" },
+            ],
+            trailingSlash: false,
+          },
+          query: [
+            { key: "market", value: { kind: "argument", name: "market" } },
+          ],
+        },
+        fixtures: [
+          {
+            id: "change-symbol",
+            currentUrl: "https://example.test/chart/OLD",
+            input: { symbol: "NASDAQ:AAPL", market: "US" },
+            expectedUrl: "https://example.test/chart/NASDAQ%3AAAPL?market=US",
           },
         ],
       },

@@ -70,6 +70,7 @@ export class PageContentRuntime {
       throw new TypeError("page retry delays must not be empty");
     }
     for (const delay of this.#retryDelaysMs) validateTimer(delay);
+    this.#adapter.bindContextRevocation?.(() => this.stop());
     options.lifecycle?.addEventListener("pagehide", () => this.stop(), {
       once: true,
     });

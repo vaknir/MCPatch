@@ -34,7 +34,7 @@ export interface CommunityArtifactRecord {
   readonly digest: string;
   readonly publisherKey: string;
   readonly trust: CommunityPackTrust;
-  readonly operationsVersion: 1;
+  readonly operationsVersion: 1 | 2;
   readonly origins: readonly string[];
   readonly bundleBase64: string;
 }

@@ -103,6 +103,8 @@ await copyFile(
   new URL("fixture-control.html", distributionDirectory),
 );
 for (const artifact of [
+  "approval.html",
+  "approval-page.js",
   "approval.css",
   "community-review.html",
   "community-review.js",

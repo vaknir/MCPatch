@@ -14,6 +14,7 @@ import {
 } from "@mcpatch/sdk";
 import {
   buildDeclarativePack,
+  defineNavigationTool,
   defineReadTool,
   locator,
   projection,
@@ -22,7 +23,7 @@ import {
   syntheticDocument,
   type DeclarativeFixture,
   type DeclarativePackBuild,
-  type DeclarativeReadToolDefinition,
+  type DeclarativeToolDefinition,
   type LocatorBuilder,
   type ProjectionBuilder,
   type ScalarSourceBuilder,
@@ -56,6 +57,16 @@ const TOOL_FIELDS = [
   "availability",
   "scope",
   "projection",
+  "fixtures",
+] as const;
+const NAVIGATION_TOOL_FIELDS = [
+  "name",
+  "title",
+  "description",
+  "risk",
+  "permissions",
+  "inputSchema",
+  "navigation",
   "fixtures",
 ] as const;
 const FIXTURE_FIELDS = ["id", "document", "result"] as const;
@@ -118,10 +129,9 @@ export async function preparePackSource(
   return build;
 }
 
-function readTool(
-  value: unknown,
-  field: string,
-): DeclarativeReadToolDefinition {
+function readTool(value: unknown, field: string): DeclarativeToolDefinition {
+  const candidate = dataObject(value, field);
+  if (candidate.risk === "action") return readNavigationTool(candidate, field);
   const tool = exactObject(value, TOOL_FIELDS, ["title"], field);
   const fixtures = readArray(
     tool.fixtures,
@@ -146,6 +156,45 @@ function readTool(
     availability: readLocator(tool.availability, `${field}.availability`),
     scope: readScope(tool.scope, `${field}.scope`, 0),
     projection: readProjection(tool.projection, `${field}.projection`, 0),
+    fixtures,
+  });
+}
+
+function readNavigationTool(
+  value: unknown,
+  field: string,
+): DeclarativeToolDefinition {
+  const tool = exactObject(value, NAVIGATION_TOOL_FIELDS, ["title"], field);
+  const fixtures = readArray(
+    tool.fixtures,
+    `${field}.fixtures`,
+    1,
+    MAX_SOURCE_FIXTURES,
+  ).map((fixture, index) => {
+    const fixtureField = `${field}.fixtures[${index}]`;
+    const checked = exactObject(
+      fixture,
+      ["id", "currentUrl", "input", "expectedUrl"],
+      [],
+      fixtureField,
+    );
+    return {
+      id: checked.id as string,
+      currentUrl: checked.currentUrl as string,
+      input: checked.input as JsonObject,
+      expectedUrl: checked.expectedUrl as string,
+    };
+  });
+  return defineNavigationTool({
+    name: tool.name as string,
+    ...(Object.hasOwn(tool, "title") ? { title: tool.title as string } : {}),
+    description: tool.description as string,
+    risk: tool.risk as "action",
+    permissions: tool.permissions as readonly ["ACTION"],
+    inputSchema: tool.inputSchema as JsonObject,
+    navigation: tool.navigation as Parameters<
+      typeof defineNavigationTool
+    >[0]["navigation"],
     fixtures,
   });
 }
