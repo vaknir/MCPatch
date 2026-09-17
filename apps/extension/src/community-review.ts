@@ -50,7 +50,12 @@ install.addEventListener("click", () => {
         showFailure(result.error.code);
         return;
       }
-      status.textContent = "The verified pack is installed and enabled.";
+      status.textContent =
+        selected.kind === "rollback"
+          ? "The verified rollback is active."
+          : selected.kind === "update"
+            ? "The verified update is active."
+            : "The verified pack is installed and enabled.";
       status.className = "alert alert-success";
       status.hidden = false;
       install.textContent = "Installed";
@@ -87,6 +92,7 @@ async function load(): Promise<void> {
 
 function render(value: CommunityPackReview): void {
   text("trust", value.trust);
+  text("change-kind", value.kind.toUpperCase());
   text("identity-title", value.name);
   text("description", value.description);
   text("identity", `${value.publisher}/${value.id}`);
@@ -116,6 +122,20 @@ function render(value: CommunityPackReview): void {
     `Bridge protocol ${value.compatibility.bridgeProtocol.minimum}–${value.compatibility.bridgeProtocol.maximum}`,
   );
   text("source-commit", `Source commit: ${value.verification.sourceCommit}`);
+  const current = element("current-artifact");
+  current.hidden = value.current === undefined;
+  if (value.current !== undefined) {
+    text(
+      "current-version",
+      `${value.current.version} · ${value.current.digest}`,
+    );
+  }
+  install.textContent =
+    value.kind === "rollback"
+      ? "Activate verified rollback"
+      : value.kind === "update"
+        ? "Grant exact origins and update"
+        : "Grant exact origins and install";
   element("freshness-warning").hidden = value.freshness !== "cached";
   replaceChildren(
     element("paths"),

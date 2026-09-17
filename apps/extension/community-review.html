@@ -38,6 +38,7 @@
         <div class="card-body gap-5">
           <div class="flex flex-wrap items-center gap-3">
             <span id="trust" class="badge badge-info"></span>
+            <span id="change-kind" class="badge badge-outline"></span>
             <h2 id="identity-title" class="card-title"></h2>
           </div>
           <p id="description" class="text-base-content/70"></p>
@@ -55,6 +56,13 @@
           </dl>
         </div>
       </section>
+
+      <div id="current-artifact" role="status" class="alert alert-info" hidden>
+        <span>
+          Currently active: <strong id="current-version"></strong>. Activation
+          replaces authority only after every check succeeds.
+        </span>
+      </div>
 
       <section
         class="card bg-base-100 shadow"

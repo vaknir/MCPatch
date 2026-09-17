@@ -29,7 +29,11 @@ import {
   FIXTURE_WAIT_TOOL,
   OTHER_ORIGIN,
 } from "./fixture-constants.js";
-import { communityRegistryFixture } from "./fixture-community-registry.js";
+import {
+  communityRegistryFixture,
+  type CommunityRegistryFixture,
+  type CommunityRegistryFixtureStage,
+} from "./fixture-community-registry.js";
 import { McpStdioClient, structuredContent } from "./mcp-client.js";
 
 const extensionPath = fileURLToPath(
@@ -63,6 +67,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
   const fixtureHtml = await readFile(fixtureHtmlPath, "utf8");
   const fixtureCss = await readFile(fixtureCssPath, "utf8");
   const registry = await communityRegistryFixture();
+  const registryState = { current: registry.initial };
   const registryRequests: string[] = [];
   const profile = testInfo.outputPath("chromium-profile");
   let runtimeDirectory: string | undefined;
@@ -87,6 +92,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       fixtureHtml,
       fixtureCss,
       registry,
+      registryState,
       registryRequests,
     );
     const worker =
@@ -242,7 +248,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     );
     await expect
       .poll(() => communityCandidateStatus(worker))
-      .toEqual({ candidate: true, installed: 0, sequence: 1 });
+      .toMatchObject({ candidate: true, installed: 0, sequence: 1 });
     await expect
       .poll(
         () =>
@@ -291,7 +297,78 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     ).toMatchObject({
       text: expect.stringContaining("Synthetic website state"),
     });
-    expect(registryRequests).toEqual(["/v1/index.json", registry.bundlePath]);
+
+    await review.close();
+    registryState.current = registry.update;
+    await communityPage.bringToFront();
+    await triggerCommunityDiscovery(
+      worker,
+      await activeTabId(worker),
+      `${COMMUNITY_ORIGIN}/portfolio`,
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({
+        candidate: true,
+        candidateKind: "update",
+        candidateVersion: "1.1.0",
+        installed: 1,
+        installedVersion: "1.0.0",
+        sequence: 2,
+      });
+    const updateReview = await waitForCommunityReview(context, extensionId);
+    await expect(updateReview.locator("#change-kind")).toHaveText("UPDATE");
+    await expect(updateReview.locator("#current-version")).toContainText(
+      "1.0.0",
+    );
+    await updateReview.locator("#install").click();
+    await expect(updateReview.locator("#status")).toHaveText(
+      "The verified update is active.",
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({
+        candidate: false,
+        enabled: true,
+        hasPrevious: true,
+        installed: 1,
+        installedVersion: "1.1.0",
+        sequence: 2,
+      });
+    await communityPage.reload();
+    await expectTools(client, [demoTool, COMMUNITY_TOOL]);
+    expect(
+      structuredContent(await client.callTool(COMMUNITY_TOOL).response),
+    ).toMatchObject({
+      text: expect.stringContaining("Synthetic website state"),
+    });
+
+    await updateReview.close();
+    registryState.current = registry.revoked;
+    await communityPage.bringToFront();
+    await triggerCommunityDiscovery(
+      worker,
+      await activeTabId(worker),
+      `${COMMUNITY_ORIGIN}/portfolio`,
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({
+        candidate: false,
+        enabled: false,
+        installed: 1,
+        installedVersion: "1.1.0",
+        sequence: 3,
+      });
+    await expectTools(client, [demoTool]);
+    await expect.poll(() => registeredContentScriptCount(worker)).toBe(0);
+    expect(registryRequests).toEqual([
+      "/v1/index.json",
+      registry.initialBundlePath,
+      "/v1/index.json",
+      registry.updateBundlePath,
+      "/v1/index.json",
+    ]);
   } finally {
     await mcp?.close();
     await context?.close();
@@ -326,11 +403,8 @@ async function installNetworkBoundary(
   context: BrowserContext,
   fixtureHtml: string,
   fixtureCss: string,
-  registry: {
-    readonly bundleBytes: Uint8Array;
-    readonly bundlePath: string;
-    readonly indexBytes: Uint8Array;
-  },
+  registry: CommunityRegistryFixture,
+  registryState: { current: CommunityRegistryFixtureStage },
   registryRequests: string[],
 ): Promise<void> {
   await context.route("**/*", async (route) => {
@@ -342,10 +416,8 @@ async function installNetworkBoundary(
     if (url.origin === COMMUNITY_REGISTRY_ORIGIN) {
       const body =
         url.pathname === "/v1/index.json"
-          ? registry.indexBytes
-          : url.pathname === registry.bundlePath
-            ? registry.bundleBytes
-            : undefined;
+          ? registryState.current.indexBytes
+          : registry.bundles.get(url.pathname);
       if (body === undefined) {
         await route.abort("blockedbyclient");
         return;
@@ -453,7 +525,12 @@ async function communityCandidateStatus(worker: {
   ): Promise<Result>;
 }): Promise<{
   readonly candidate: boolean;
+  readonly candidateKind?: string;
+  readonly candidateVersion?: string;
+  readonly enabled?: boolean;
+  readonly hasPrevious?: boolean;
   readonly installed: number;
+  readonly installedVersion?: string;
   readonly sequence: number;
 }> {
   return worker.evaluate(async () => {
@@ -466,24 +543,76 @@ async function communityCandidateStatus(worker: {
         };
       };
     };
-    const key = "mcpatch.community-packs.v1";
+    const key = "mcpatch.community-packs.v2";
     const stored = await scope.chrome.storage.local.get(key);
     const state = stored[key] as
       | {
-          readonly candidate?: unknown;
+          readonly candidate?: {
+            readonly kind?: unknown;
+            readonly version?: unknown;
+          };
           readonly highWaterSequence?: unknown;
-          readonly installed?: readonly unknown[];
+          readonly installed?: readonly {
+            readonly enabled?: unknown;
+            readonly previous?: unknown;
+            readonly version?: unknown;
+          }[];
         }
       | undefined;
+    const installed = state?.installed?.[0];
     return {
       candidate: state?.candidate !== undefined,
+      ...(typeof state?.candidate?.kind === "string"
+        ? { candidateKind: state.candidate.kind }
+        : {}),
+      ...(typeof state?.candidate?.version === "string"
+        ? { candidateVersion: state.candidate.version }
+        : {}),
+      ...(typeof installed?.enabled === "boolean"
+        ? { enabled: installed.enabled }
+        : {}),
+      ...(installed === undefined
+        ? {}
+        : { hasPrevious: installed.previous !== undefined }),
       installed: Array.isArray(state?.installed) ? state.installed.length : -1,
+      ...(typeof installed?.version === "string"
+        ? { installedVersion: installed.version }
+        : {}),
       sequence:
         typeof state?.highWaterSequence === "number"
           ? state.highWaterSequence
           : -1,
     };
   });
+}
+
+async function waitForCommunityReview(
+  context: BrowserContext,
+  id: string,
+): Promise<Page> {
+  await expect
+    .poll(
+      () =>
+        context
+          .pages()
+          .filter((page) =>
+            page
+              .url()
+              .startsWith(`chrome-extension://${id}/community-review.html`),
+          ).length,
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(0);
+  const page = context
+    .pages()
+    .findLast((candidate) =>
+      candidate
+        .url()
+        .startsWith(`chrome-extension://${id}/community-review.html`),
+    );
+  if (page === undefined) throw new Error("community review page missing");
+  await page.waitForLoadState("domcontentloaded");
+  return page;
 }
 
 async function expectTools(

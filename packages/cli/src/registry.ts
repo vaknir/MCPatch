@@ -31,6 +31,7 @@ const REGISTRY_OUTPUT_DIRECTORY = "registry-dist";
 const CURRENT_RUNTIME_VERSION = "0.1.0";
 const REGISTRY_PRIVATE_KEY_ENV = "MCPATCH_REGISTRY_PRIVATE_KEY";
 const REGISTRY_PUBLIC_KEY_ENV = "MCPATCH_REGISTRY_PUBLIC_KEY";
+const MAX_REGISTRY_VERSIONS_PER_PACK = 3;
 const UTF8 = new TextEncoder();
 
 type RegistryEnvironment = Readonly<Record<string, string | undefined>>;
@@ -181,11 +182,20 @@ export async function buildStaticRegistry(
       ]),
     ),
   );
-  if (
-    new Set(entries.map((entry) => `${entry.publisher}/${entry.id}`)).size !==
-    entries.length
-  ) {
-    cliError("REGISTRY_SOURCE_INVALID", "registry.packs");
+  const artifacts = new Set<string>();
+  const versionCounts = new Map<string, number>();
+  for (const entry of entries) {
+    const identity = `${entry.publisher}/${entry.id}`;
+    const artifact = `${identity}/${entry.version}`;
+    const versionCount = (versionCounts.get(identity) ?? 0) + 1;
+    if (
+      artifacts.has(artifact) ||
+      versionCount > MAX_REGISTRY_VERSIONS_PER_PACK
+    ) {
+      cliError("REGISTRY_SOURCE_INVALID", "registry.packs");
+    }
+    artifacts.add(artifact);
+    versionCounts.set(identity, versionCount);
   }
   const content: CommunityRegistryIndexContent = {
     indexVersion: COMMUNITY_REGISTRY_INDEX_VERSION,

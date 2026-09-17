@@ -8,6 +8,7 @@ import {
   signRegistryAttestation,
   type CommunityRegistryIndexContent,
   type CommunityRegistryPackEntry,
+  type DeclarativePackBundle,
 } from "@mcpatch/sdk";
 
 import {
@@ -17,25 +18,151 @@ import {
 } from "./fixture-constants.js";
 import { fixtureLocalBundle } from "./fixture-local-bundle.js";
 
-export async function communityRegistryFixture(now = new Date()): Promise<{
+export interface CommunityRegistryFixtureStage {
+  readonly indexBytes: Uint8Array;
+  readonly publicationSequence: number;
+}
+
+export interface CommunityRegistryFixture {
   readonly bundleBytes: Uint8Array;
   readonly bundlePath: string;
+  readonly bundles: ReadonlyMap<string, Uint8Array>;
   readonly indexBytes: Uint8Array;
-}> {
-  const bundle = await signedCommunityBundle();
+  readonly initial: CommunityRegistryFixtureStage;
+  readonly update: CommunityRegistryFixtureStage;
+  readonly revoked: CommunityRegistryFixtureStage;
+  readonly initialBundlePath: string;
+  readonly updateBundlePath: string;
+}
+
+export async function communityRegistryFixture(
+  now = new Date(),
+): Promise<CommunityRegistryFixture> {
+  const initialBundle = await signedCommunityBundle("1.0.0", "b");
+  const updateBundle = await signedCommunityBundle("1.1.0", "c");
   const issuedAt = canonicalTime(now.getTime() - 60 * 60 * 1_000);
   const expiresAt = canonicalTime(now.getTime() + 24 * 60 * 60 * 1_000);
-  const identity = {
-    publisher: bundle.manifest.publisher,
-    id: bundle.manifest.id,
-    version: bundle.manifest.version,
-    bundleDigest: bundle.manifest.digest,
+  const initial = await stage(
+    1,
+    [artifact(initialBundle, { status: "ACTIVE" })],
+    issuedAt,
+    expiresAt,
+    now,
+  );
+  const update = await stage(
+    2,
+    [
+      artifact(initialBundle, { status: "ACTIVE" }),
+      artifact(updateBundle, { status: "ACTIVE" }),
+    ],
+    issuedAt,
+    expiresAt,
+    now,
+  );
+  const revoked = await stage(
+    3,
+    [
+      artifact(initialBundle, { status: "ACTIVE" }),
+      artifact(updateBundle, {
+        status: "REVOKED",
+        revokedAt: canonicalTime(now.getTime() - 90 * 60 * 1_000),
+        reason: "SECURITY",
+      }),
+    ],
+    issuedAt,
+    expiresAt,
+    now,
+  );
+  if (encode(registryKeys().publicKey) !== COMMUNITY_REGISTRY_PUBLIC_KEY) {
+    throw new Error("fixture registry key mismatch");
+  }
+  const initialIdentity = identity(initialBundle);
+  const updateIdentity = identity(updateBundle);
+  return Object.freeze({
+    bundleBytes: serializeDeclarativePackBundle(initialBundle),
+    bundlePath: communityBundlePath(initialIdentity),
+    bundles: new Map([
+      [
+        communityBundlePath(initialIdentity),
+        serializeDeclarativePackBundle(initialBundle),
+      ],
+      [
+        communityBundlePath(updateIdentity),
+        serializeDeclarativePackBundle(updateBundle),
+      ],
+    ]),
+    initial,
+    indexBytes: initial.indexBytes,
+    update,
+    revoked,
+    initialBundlePath: communityBundlePath(initialIdentity),
+    updateBundlePath: communityBundlePath(updateIdentity),
+  });
+}
+
+async function stage(
+  publicationSequence: number,
+  artifacts: readonly Artifact[],
+  issuedAt: string,
+  expiresAt: string,
+  now: Date,
+): Promise<CommunityRegistryFixtureStage> {
+  const packs = await Promise.all(
+    artifacts.map(({ bundle, revocation }) =>
+      entry(
+        bundle,
+        publicationSequence,
+        issuedAt,
+        expiresAt,
+        canonicalTime(now.getTime() - 2 * 60 * 60 * 1_000),
+        revocation,
+      ),
+    ),
+  );
+  const content: CommunityRegistryIndexContent = {
+    indexVersion: 1,
+    registryId: "mcpatch-registry",
+    publicationSequence,
+    issuedAt,
+    expiresAt,
+    packs: packs.sort((left, right) =>
+      left.version.localeCompare(right.version),
+    ),
   };
-  const entry: CommunityRegistryPackEntry = {
-    ...identity,
+  const index = await signCommunityRegistryIndex(content, registryKeys());
+  return Object.freeze({
+    indexBytes: new TextEncoder().encode(JSON.stringify(index)),
+    publicationSequence,
+  });
+}
+
+type Revocation = CommunityRegistryPackEntry["revocation"];
+type Artifact = Readonly<{
+  readonly bundle: DeclarativePackBundle;
+  readonly revocation: Revocation;
+}>;
+
+function artifact(
+  bundle: DeclarativePackBundle,
+  revocation: Revocation,
+): Artifact {
+  return Object.freeze({ bundle, revocation });
+}
+
+async function entry(
+  bundle: DeclarativePackBundle,
+  publicationSequence: number,
+  issuedAt: string,
+  expiresAt: string,
+  verifiedAt: string,
+  revocation: Revocation,
+): Promise<CommunityRegistryPackEntry> {
+  const bundleIdentity = identity(bundle);
+  return {
+    ...bundleIdentity,
     name: bundle.manifest.name,
     description: bundle.manifest.description,
-    bundlePath: communityBundlePath(identity),
+    bundlePath: communityBundlePath(bundleIdentity),
     publisherKey: bundle.publisherSignature.publicKey,
     trust: "REVIEWED_COMMUNITY",
     origins: [COMMUNITY_ORIGIN],
@@ -48,18 +175,18 @@ export async function communityRegistryFixture(now = new Date()): Promise<{
     compatibility: bundle.manifest.compatibility,
     networkPolicy: bundle.manifest.networkPolicy,
     verification: {
-      verifiedAt: canonicalTime(now.getTime() - 2 * 60 * 60 * 1_000),
+      verifiedAt,
       fixtureTestsPassed: 1,
       fixtureTestsTotal: 1,
       sourceCommit: bundle.metadata.sourceCommit ?? "b".repeat(40),
     },
-    revocation: { status: "ACTIVE" },
+    revocation,
     attestation: await signRegistryAttestation(
       {
         attestationVersion: 1,
         registryId: "mcpatch-registry",
-        ...identity,
-        publicationSequence: 1,
+        ...bundleIdentity,
+        publicationSequence,
         reviewState: "REVIEWED_COMMUNITY",
         issuedAt,
         expiresAt,
@@ -67,26 +194,18 @@ export async function communityRegistryFixture(now = new Date()): Promise<{
       registryKeys(),
     ),
   };
-  const content: CommunityRegistryIndexContent = {
-    indexVersion: 1,
-    registryId: "mcpatch-registry",
-    publicationSequence: 1,
-    issuedAt,
-    expiresAt,
-    packs: [entry],
-  };
-  const index = await signCommunityRegistryIndex(content, registryKeys());
-  if (encode(registryKeys().publicKey) !== COMMUNITY_REGISTRY_PUBLIC_KEY) {
-    throw new Error("fixture registry key mismatch");
-  }
-  return Object.freeze({
-    bundleBytes: serializeDeclarativePackBundle(bundle),
-    bundlePath: entry.bundlePath,
-    indexBytes: new TextEncoder().encode(JSON.stringify(index)),
-  });
 }
 
-async function signedCommunityBundle() {
+function identity(bundle: DeclarativePackBundle) {
+  return {
+    publisher: bundle.manifest.publisher,
+    id: bundle.manifest.id,
+    version: bundle.manifest.version,
+    bundleDigest: bundle.manifest.digest,
+  };
+}
+
+async function signedCommunityBundle(version: string, commitByte: string) {
   const source = structuredClone(fixtureLocalBundle) as unknown as Record<
     string,
     unknown
@@ -96,7 +215,8 @@ async function signedCommunityBundle() {
   manifest["id"] = "visible-page";
   manifest["name"] = "Chromium signed community fixture";
   manifest["description"] =
-    "Read visible text through a dynamically installed signed registry pack.";
+    `Read visible text through signed registry pack version ${version}.`;
+  manifest["version"] = version;
   manifest["digest"] = `sha256:${"0".repeat(64)}`;
   manifest["matches"] = [
     {
@@ -122,7 +242,7 @@ async function signedCommunityBundle() {
   operation["tool"] = COMMUNITY_TOOL;
   source["metadata"] = {
     license: "MIT",
-    sourceCommit: "b".repeat(40),
+    sourceCommit: commitByte.repeat(40),
   };
   const provisional = parseDeclarativePackBundleContent(source);
   manifest["digest"] = await computeDeclarativePackBundleDigest(provisional);

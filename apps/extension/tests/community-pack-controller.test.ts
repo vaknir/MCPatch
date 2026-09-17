@@ -125,6 +125,7 @@ describe("reviewed community pack controller", () => {
     restoredApi.permissions.granted.add(`${LOCAL_ORIGIN}/*`);
     const offline = first.client;
     offline.failNetwork = true;
+    offline.indexCalls = 0;
     const content = new PackContentCatalog(
       restoredApi.scripting,
       restoredApi.permissions,
@@ -161,7 +162,7 @@ describe("reviewed community pack controller", () => {
     expect(stored(state.api).candidate?.candidateToken).toBe(state.token);
   });
 
-  it("fails closed when dynamic content registration fails", async () => {
+  it("fails closed and preserves only the inactive candidate when dynamic content registration fails", async () => {
     const state = await stagedSetup();
     state.api.permissions.granted.add(`${LOCAL_ORIGIN}/*`);
     state.api.scripting.throwRegister = true;
@@ -179,9 +180,8 @@ describe("reviewed community pack controller", () => {
       state.controller.authority.authorize(pageIdentity()),
     ).toBeUndefined();
     expect(state.api.scripting.registrations.size).toBe(0);
-    expect(state.api.storage.data).not.toHaveProperty(
-      COMMUNITY_PACK_STORAGE_KEY,
-    );
+    expect(stored(state.api).installed).toEqual([]);
+    expect(stored(state.api).candidate?.candidateToken).toBe(state.token);
   });
 
   it("fails closed when cached freshness expires", async () => {
@@ -224,6 +224,234 @@ describe("reviewed community pack controller", () => {
     collision.controller.handleAction({ id: 7, url: LOCAL_URL });
     await settle(collision.controller);
     expect(collision.api.tabs.created).toEqual([]);
+  });
+
+  it("activates a reviewed upgrade and retains exactly one explicit rollback", async () => {
+    const state = await installedSetup();
+    const original = state.bundle;
+    const update = state.client.publishVersion("2.0.0");
+    state.api.tabs.created.length = 0;
+
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const updateReview = latestReview(state.api);
+    const updateToken = new URL(updateReview).searchParams.get("candidate");
+    if (updateToken === null) throw new Error("update candidate missing");
+    await expect(
+      state.message<CommunityPackReview>(
+        { type: "community_pack_review_get", candidateToken: updateToken },
+        reviewSender(updateReview),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      value: {
+        kind: "update",
+        version: "2.0.0",
+        current: { version: original.manifest.version },
+      },
+    });
+    await expect(
+      state.message(
+        { type: "community_pack_install", candidateToken: updateToken },
+        reviewSender(updateReview),
+      ),
+    ).resolves.toEqual({ ok: true, value: { installed: true } });
+    await settle(state.controller);
+
+    expect(stored(state.api).installed[0]).toMatchObject({
+      version: "2.0.0",
+      digest: update.manifest.digest,
+      operationsVersion: 1,
+      origins: [LOCAL_ORIGIN],
+      trust: "REVIEWED_COMMUNITY",
+      previous: {
+        version: original.manifest.version,
+        digest: original.manifest.digest,
+      },
+    });
+    expect(state.definitions.replace).toHaveBeenLastCalledWith([update]);
+
+    state.api.tabs.created.length = 0;
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const rollbackReview = latestReview(state.api);
+    const rollbackToken = new URL(rollbackReview).searchParams.get("candidate");
+    if (rollbackToken === null) throw new Error("rollback candidate missing");
+    await expect(
+      state.message<CommunityPackReview>(
+        { type: "community_pack_review_get", candidateToken: rollbackToken },
+        reviewSender(rollbackReview),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      value: { kind: "rollback", version: original.manifest.version },
+    });
+    await state.message(
+      { type: "community_pack_install", candidateToken: rollbackToken },
+      reviewSender(rollbackReview),
+    );
+    await settle(state.controller);
+    expect(stored(state.api).installed[0]).toMatchObject({
+      version: original.manifest.version,
+    });
+    expect(stored(state.api).installed[0]?.previous).toBeUndefined();
+  });
+
+  it("refuses a downgrade and failed permission expansion without changing active authority", async () => {
+    const state = await installedSetup();
+    state.client.publishVersion("1.0.0");
+    state.api.tabs.created.length = 0;
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    expect(state.api.tabs.created).toEqual([]);
+    expect(stored(state.api).installed[0]?.version).toBe("1.2.3");
+
+    state.client.publishVersion("2.0.0", "https://expanded.example.com");
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const reviewUrl = latestReview(state.api);
+    const token = new URL(reviewUrl).searchParams.get("candidate");
+    if (token === null) throw new Error("expanded candidate missing");
+    await expect(
+      state.message(
+        { type: "community_pack_install", candidateToken: token },
+        reviewSender(reviewUrl),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "PERMISSION_REQUIRED" },
+    });
+    expect(stored(state.api).installed[0]?.version).toBe("1.2.3");
+    expect(state.controller.authority.authorize(pageIdentity())).toEqual({
+      packTools: new Set([LOCAL_TOOL]),
+    });
+  });
+
+  it("never offers a revoked previous artifact as rollback", async () => {
+    const state = await installedSetup();
+    state.client.publishVersion("2.0.0");
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const updateReview = latestReview(state.api);
+    const updateToken = new URL(updateReview).searchParams.get("candidate");
+    if (updateToken === null) throw new Error("update candidate missing");
+    await state.message(
+      { type: "community_pack_install", candidateToken: updateToken },
+      reviewSender(updateReview),
+    );
+    await settle(state.controller);
+
+    state.client.revokeVersion("1.2.3");
+    state.api.tabs.created.length = 0;
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+
+    expect(state.api.tabs.created).toEqual([]);
+    expect(stored(state.api).installed[0]).toMatchObject({
+      enabled: true,
+      version: "2.0.0",
+      previous: { version: "1.2.3" },
+    });
+    expect(state.controller.authority.authorize(pageIdentity())).toEqual({
+      packTools: new Set([LOCAL_TOOL]),
+    });
+  });
+
+  it("stages the retained verified rollback from local bytes while offline", async () => {
+    const state = await installedSetup();
+    state.client.publishVersion("2.0.0");
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const updateReview = latestReview(state.api);
+    const updateToken = new URL(updateReview).searchParams.get("candidate");
+    if (updateToken === null) throw new Error("update candidate missing");
+    await state.message(
+      { type: "community_pack_install", candidateToken: updateToken },
+      reviewSender(updateReview),
+    );
+    await settle(state.controller);
+
+    state.client.failNetwork = true;
+    state.api.tabs.created.length = 0;
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const rollbackReview = latestReview(state.api);
+    const rollbackToken = new URL(rollbackReview).searchParams.get("candidate");
+    if (rollbackToken === null) throw new Error("rollback candidate missing");
+    await expect(
+      state.message<CommunityPackReview>(
+        { type: "community_pack_review_get", candidateToken: rollbackToken },
+        reviewSender(rollbackReview),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      value: { freshness: "cached", kind: "rollback", version: "1.2.3" },
+    });
+  });
+
+  it("revokes active authority and emits only bounded identity status", async () => {
+    const state = await installedSetup();
+    const revokeOrigin = vi.fn();
+    const audit = vi.fn();
+    state.controller.setHooks({ revokeOrigin, audit });
+    state.client.revokeVersion(state.bundle.manifest.version);
+
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+
+    expect(
+      state.controller.authority.authorize(pageIdentity()),
+    ).toBeUndefined();
+    expect(state.api.scripting.registrations.size).toBe(0);
+    expect(stored(state.api).installed[0]).toMatchObject({ enabled: false });
+    expect(revokeOrigin).toHaveBeenCalledWith(LOCAL_ORIGIN);
+    expect(audit).toHaveBeenCalledWith({
+      eventVersion: 1,
+      type: "REVOKED",
+      publisher: "example",
+      id: "read-page",
+      version: state.bundle.manifest.version,
+      digest: state.bundle.manifest.digest,
+      status: "REVOKED",
+    });
+    expect(Object.keys(audit.mock.calls[0]?.[0] ?? {}).sort()).toEqual([
+      "digest",
+      "eventVersion",
+      "id",
+      "publisher",
+      "status",
+      "type",
+      "version",
+    ]);
+  });
+
+  it("restores the active artifact when candidate runtime activation fails", async () => {
+    const state = await installedSetup();
+    state.client.publishVersion("2.0.0");
+    state.controller.handleAction({ id: 7, url: LOCAL_URL });
+    await settle(state.controller);
+    const reviewUrl = latestReview(state.api);
+    const token = new URL(reviewUrl).searchParams.get("candidate");
+    if (token === null) throw new Error("update candidate missing");
+    state.definitions.replace.mockImplementation(
+      async (bundles: readonly DeclarativePackBundleContent[]) =>
+        bundles.every((bundle) => bundle.manifest.version !== "2.0.0"),
+    );
+
+    await expect(
+      state.message(
+        { type: "community_pack_install", candidateToken: token },
+        reviewSender(reviewUrl),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "STORAGE_INVALID" },
+    });
+    await settle(state.controller);
+    expect(stored(state.api).installed[0]?.version).toBe("1.2.3");
+    expect(state.controller.authority.authorize(pageIdentity())).toEqual({
+      packTools: new Set([LOCAL_TOOL]),
+    });
   });
 
   it("rejects hostile extension senders and malformed messages", async () => {
@@ -311,7 +539,8 @@ async function installedSetup() {
 class FakeRegistryClient {
   readonly bundle: DeclarativePackBundleContent;
   readonly fullBundle: DeclarativePackBundle;
-  readonly indexValue: CommunityRegistryIndex;
+  readonly bundles = new Map<string, DeclarativePackBundleContent>();
+  indexValue: CommunityRegistryIndex;
   failCache = false;
   failNetwork = false;
   rejectIndex = false;
@@ -319,17 +548,8 @@ class FakeRegistryClient {
 
   constructor(bundle: DeclarativePackBundleContent, duplicate: boolean) {
     this.bundle = bundle;
-    this.fullBundle = {
-      ...bundle,
-      publisherSignature: {
-        signatureVersion: 1,
-        algorithm: "Ed25519",
-        publisher: bundle.manifest.publisher,
-        keyId: `ed25519:${bundle.manifest.publisher}:sha256:${"1".repeat(64)}`,
-        publicKey: "A".repeat(43),
-        signature: "A".repeat(86),
-      },
-    };
+    this.bundles.set(bundle.manifest.version, bundle);
+    this.fullBundle = fullBundle(bundle);
     const entry = registryEntry(bundle);
     this.indexValue = {
       indexVersion: 1,
@@ -349,6 +569,65 @@ class FakeRegistryClient {
     };
   }
 
+  publishVersion(
+    version: string,
+    extraOrigin?: string,
+  ): DeclarativePackBundleContent {
+    const bundle: DeclarativePackBundleContent = {
+      ...this.bundle,
+      manifest: {
+        ...this.bundle.manifest,
+        version,
+        digest: `sha256:${(version.startsWith("2") ? "b" : "c").repeat(64)}`,
+        matches:
+          extraOrigin === undefined
+            ? this.bundle.manifest.matches
+            : [
+                ...this.bundle.manifest.matches,
+                { origin: extraOrigin, paths: [{ kind: "prefix", path: "/" }] },
+              ],
+      },
+    };
+    this.bundles.set(version, bundle);
+    this.publish([...this.indexValue.packs, registryEntry(bundle)]);
+    return bundle;
+  }
+
+  revokeVersion(version: string): void {
+    this.publish(
+      this.indexValue.packs.map((entry) =>
+        entry.version === version
+          ? {
+              ...entry,
+              revocation: {
+                status: "REVOKED" as const,
+                revokedAt: "2026-09-17T00:00:00.000Z",
+                reason: "SECURITY" as const,
+              },
+            }
+          : entry,
+      ),
+    );
+  }
+
+  private publish(packs: readonly CommunityRegistryPackEntry[]): void {
+    const publicationSequence = this.indexValue.publicationSequence + 1;
+    this.indexValue = {
+      ...this.indexValue,
+      publicationSequence,
+      packs: packs
+        .map((entry) => ({
+          ...entry,
+          attestation: { ...entry.attestation, publicationSequence },
+        }))
+        .sort((left, right) => left.version.localeCompare(right.version)),
+      signature: {
+        ...this.indexValue.signature,
+        signature: publicationSequence.toString(16).padStart(86, "B"),
+      },
+    };
+  }
+
   async index(): Promise<CommunityRegistryIndex> {
     this.indexCalls += 1;
     if (this.failNetwork) throw new RegistryClientError("NETWORK_REJECTED");
@@ -356,18 +635,23 @@ class FakeRegistryClient {
     return this.indexValue;
   }
 
-  async indexFromCache(): Promise<CommunityRegistryIndex> {
+  async indexFromCache(
+    bytes: string | Uint8Array,
+  ): Promise<CommunityRegistryIndex> {
     if (this.failCache) throw new Error("stale");
-    return this.indexValue;
+    const json =
+      typeof bytes === "string" ? bytes : new TextDecoder().decode(bytes);
+    return JSON.parse(json) as CommunityRegistryIndex;
   }
 
   async pack(
     _index: CommunityRegistryIndex,
     entry: CommunityRegistryPackEntry,
   ) {
+    const bundle = this.bundleFor(entry);
     return {
-      bundle: this.fullBundle,
-      content: this.bundle,
+      bundle: fullBundle(bundle),
+      content: bundle,
       entry,
       indexSequence: 7,
     };
@@ -377,13 +661,38 @@ class FakeRegistryClient {
     _index: CommunityRegistryIndex,
     entry: CommunityRegistryPackEntry,
   ) {
+    const bundle = this.bundleFor(entry);
     return {
-      bundle: this.fullBundle,
-      content: this.bundle,
+      bundle: fullBundle(bundle),
+      content: bundle,
       entry,
       indexSequence: 7,
     };
   }
+
+  private bundleFor(
+    entry: CommunityRegistryPackEntry,
+  ): DeclarativePackBundleContent {
+    const bundle = this.bundles.get(entry.version);
+    if (bundle === undefined) throw new Error("fixture bundle missing");
+    return bundle;
+  }
+}
+
+function fullBundle(
+  bundle: DeclarativePackBundleContent,
+): DeclarativePackBundle {
+  return {
+    ...bundle,
+    publisherSignature: {
+      signatureVersion: 1,
+      algorithm: "Ed25519",
+      publisher: bundle.manifest.publisher,
+      keyId: `ed25519:${bundle.manifest.publisher}:sha256:${"1".repeat(64)}`,
+      publicKey: "A".repeat(43),
+      signature: "A".repeat(86),
+    },
+  };
 }
 
 function registryEntry(
@@ -400,7 +709,7 @@ function registryEntry(
     bundlePath: "/v1/bundles/example/read-page/bundle.mcpack",
     publisherKey: "A".repeat(43),
     trust: "REVIEWED_COMMUNITY",
-    origins: [LOCAL_ORIGIN],
+    origins: [...new Set(manifest.matches.map((match) => match.origin))].sort(),
     tools: manifest.tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
@@ -492,6 +801,12 @@ function stored(api: FakeEnablementApi) {
 
 function reviewSender(url: string): ChromeMessageSender {
   return { id: "mcpatch-test", url };
+}
+
+function latestReview(api: FakeCommunityPackApi): string {
+  const url = api.tabs.created.at(-1);
+  if (url === undefined) throw new Error("review URL missing");
+  return url;
 }
 
 function contentSender(): ChromeMessageSender {

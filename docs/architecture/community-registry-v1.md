@@ -21,7 +21,8 @@ Requests omit credentials and referrers and use a ten-second deadline.
 
 The closed [JSON Schema](../../packages/sdk/schema/v1/community-registry-index.schema.json)
 documents index v1. Runtime validation is stricter: it also requires canonical
-timestamps and origins, sorted unique identities/origins/tools, a digest-derived
+timestamps and origins, sorted unique publisher/pack/version releases, bounded
+version history, sorted unique origins/tools, a digest-derived
 bundle path, matching attestation fields, compatible read-only declarative packs,
 and all-successful fixture evidence.
 
@@ -65,8 +66,9 @@ Installed bytes, the signed index, and its high-water sequence live in
 trusted-context-only extension storage. Startup re-verifies every cryptographic and
 semantic proof from bytes. A valid fresh cached artifact may run offline and is
 shown as cached; expiry, corruption, incompatibility, permission loss, or an invalid
-record revokes authority before script cleanup. Updates and emergency revocation
-are intentionally completed in issue #151.
+record revokes authority before script cleanup. Explicit updates, one bounded
+rollback, interrupted-activation recovery, and revoke-before-cleanup behavior are
+defined in [community pack updates](community-pack-updates.md).
 
 ## Static publisher
 
@@ -95,6 +97,7 @@ remain release work under issues #152 and #166.
 - Registry signature version: `1`
 - Maximum index body: 1 MiB
 - Maximum entries: 256
+- Maximum versions per publisher/pack identity: 3
 - Maximum installed community packs: 4
 - Maximum origins per entry: 16
 - Maximum summarized tools per entry: 64
