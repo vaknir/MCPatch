@@ -20,6 +20,7 @@ import {
 
 import {
   COMMUNITY_ORIGIN,
+  COMMUNITY_NAVIGATE_TOOL,
   COMMUNITY_REGISTRY_ORIGIN,
   COMMUNITY_TOOL,
   FIXTURE_LOCAL_TOOL,
@@ -69,6 +70,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
   const registry = await communityRegistryFixture();
   const registryState = { current: registry.initial };
   const registryRequests: string[] = [];
+  const navigationGate = deferredGate();
   const profile = testInfo.outputPath("chromium-profile");
   let runtimeDirectory: string | undefined;
   let context: BrowserContext | undefined;
@@ -94,6 +96,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       registry,
       registryState,
       registryRequests,
+      navigationGate.promise,
     );
     const worker =
       context.serviceWorkers()[0] ??
@@ -336,12 +339,44 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
         sequence: 2,
       });
     await communityPage.reload();
-    await expectTools(client, [demoTool, COMMUNITY_TOOL]);
+    await expectTools(client, [
+      demoTool,
+      COMMUNITY_NAVIGATE_TOOL,
+      COMMUNITY_TOOL,
+    ]);
     expect(
       structuredContent(await client.callTool(COMMUNITY_TOOL).response),
     ).toMatchObject({
       text: expect.stringContaining("Synthetic website state"),
     });
+
+    const navigation = client.callTool(
+      COMMUNITY_NAVIGATE_TOOL,
+      { item: "next" },
+      15_000,
+    );
+    const approval = await waitForApproval(context, extensionId);
+    await expect(approval.locator("#tool")).toHaveText(COMMUNITY_NAVIGATE_TOOL);
+    await expect(approval.locator("#origin")).toHaveText(COMMUNITY_ORIGIN);
+    await expect(approval.locator("#args")).toContainText('"item": "next"');
+    await approval.locator("#approve").click();
+    expect(structuredContent(await navigation.response)).toEqual({
+      state: "scheduled",
+      url: `${COMMUNITY_ORIGIN}/items/next`,
+    });
+    await expectTools(client, [demoTool]);
+    navigationGate.release();
+    await communityPage.waitForURL(`${COMMUNITY_ORIGIN}/items/next`);
+    await expect
+      .poll(() =>
+        communityPage.locator("html").getAttribute("data-fixture-runtime"),
+      )
+      .toBe("ready");
+    await expectTools(client, [
+      demoTool,
+      COMMUNITY_NAVIGATE_TOOL,
+      COMMUNITY_TOOL,
+    ]);
 
     await updateReview.close();
     registryState.current = registry.revoked;
@@ -370,6 +405,7 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       "/v1/index.json",
     ]);
   } finally {
+    navigationGate.release();
     await mcp?.close();
     await context?.close();
     await rm(profile, { recursive: true, force: true });
@@ -406,6 +442,7 @@ async function installNetworkBoundary(
   registry: CommunityRegistryFixture,
   registryState: { current: CommunityRegistryFixtureStage },
   registryRequests: string[],
+  navigationReady: Promise<void>,
 ): Promise<void> {
   await context.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -453,6 +490,9 @@ async function installNetworkBoundary(
       });
       return;
     }
+    if (url.origin === COMMUNITY_ORIGIN && url.pathname === "/items/next") {
+      await navigationReady;
+    }
     await route.fulfill({
       body: fixtureHtml,
       contentType: "text/html; charset=utf-8",
@@ -463,6 +503,44 @@ async function installNetworkBoundary(
       status: 200,
     });
   });
+}
+
+async function waitForApproval(
+  context: BrowserContext,
+  id: string,
+): Promise<Page> {
+  await expect
+    .poll(
+      () =>
+        context
+          .pages()
+          .find((page) =>
+            page.url().startsWith(`chrome-extension://${id}/approval.html?`),
+          )
+          ?.url(),
+      { timeout: 10_000 },
+    )
+    .toBeTruthy();
+  const approval = context
+    .pages()
+    .find((page) =>
+      page.url().startsWith(`chrome-extension://${id}/approval.html?`),
+    );
+  if (approval === undefined) throw new Error("approval page missing");
+  await approval.waitForLoadState("domcontentloaded");
+  await expect(approval.locator("#approve")).toBeEnabled();
+  return approval;
+}
+
+function deferredGate(): {
+  readonly promise: Promise<void>;
+  readonly release: () => void;
+} {
+  let release: () => void = () => void 0;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return Object.freeze({ promise, release });
 }
 
 async function activeTabId(worker: {

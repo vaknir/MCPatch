@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   communityBundlePath,
+  computeDeclarativePackBundleDigest,
+  parseDeclarativePackBundleContent,
   signCommunityRegistryIndex,
   signDeclarativePackBundle,
   signRegistryAttestation,
@@ -19,6 +21,8 @@ import {
   type RegistryFetch,
   type RegistryFetchResponse,
 } from "../src/community-registry-client.js";
+import { validateDeclarativeRuntimePacks } from "../src/compiled-pack-validation.js";
+import { supportsRuntimeSchema } from "../src/runtime-schema.js";
 import { localBundle } from "./support/local-pack.js";
 import { communityRegistryFixture } from "../e2e/fixture-community-registry.js";
 import {
@@ -107,6 +111,38 @@ describe("fixed-origin community registry client", () => {
     ).resolves.toMatchObject({
       content: { manifest: { publisher: "community", id: "visible-page" } },
     });
+
+    const updateBytes = fixture.bundles.get(fixture.updateBundlePath);
+    if (updateBytes === undefined) throw new Error("update bundle missing");
+    const updateBundle = JSON.parse(
+      new TextDecoder().decode(updateBytes),
+    ) as DeclarativePackBundle;
+    const updateContent = {
+      bundleVersion: updateBundle.bundleVersion,
+      manifest: updateBundle.manifest,
+      operations: updateBundle.operations,
+      metadata: updateBundle.metadata,
+    };
+    const parsedUpdate = parseDeclarativePackBundleContent(updateContent);
+    await expect(
+      computeDeclarativePackBundleDigest(parsedUpdate),
+    ).resolves.toBe(parsedUpdate.manifest.digest);
+    expect(
+      parsedUpdate.manifest.tools.map((tool) => ({
+        input: supportsRuntimeSchema(tool.inputSchema),
+        output: supportsRuntimeSchema(tool.outputSchema),
+        permissions: tool.permissions,
+      })),
+    ).toEqual([
+      { input: true, output: true, permissions: ["READ"] },
+      { input: true, output: true, permissions: ["ACTION"] },
+    ]);
+    await expect(
+      validateDeclarativeRuntimePacks([updateContent], {
+        ...runtimeOptions(),
+        allowedPermissions: ["ACTION", "READ"],
+      }),
+    ).resolves.toHaveLength(1);
   });
 
   it("fetches and verifies an index and exact immutable publisher-signed bundle", async () => {

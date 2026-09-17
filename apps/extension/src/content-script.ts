@@ -45,11 +45,13 @@ async function bootstrap(): Promise<void> {
     chrome.runtime,
     globalThis.document,
     globalThis.location,
+    navigation,
   );
   const community = await loadCommunityPackPageAdapter(
     chrome.runtime,
     globalThis.document,
     globalThis.location,
+    navigation,
   );
   const adapter = new CompositePageAdapter([reviewed, local, community]);
   const runtime = new PageContentRuntime(chrome.runtime, adapter, {

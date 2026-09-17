@@ -1,6 +1,8 @@
 import type { JsonObject, JsonValue } from "@mcpatch/protocol";
 import {
   canonicalizePageLocation,
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
   computeDeclarativePackBundleDigest,
   packMatchesLocation,
   parseDeclarativePackBundleContent,
@@ -28,6 +30,8 @@ import {
   discoverDeclarativeOperation,
   executeDeclarativeOperation,
 } from "./declarative-interpreter.js";
+import type { DeclarativeNavigationCoordinator } from "./declarative-navigation-coordinator.js";
+import { matchesDeclarativeOutputSchema } from "./declarative-output-schema.js";
 
 const TOOL_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/u;
 
@@ -47,6 +51,7 @@ export interface DeclarativePackRuntimeOptions {
   readonly currentBinding: () => DeclarativeRuntimeBinding | undefined;
   readonly document: DeclarativeDocumentAdapter;
   readonly limits?: Partial<DeclarativeRuntimeLimits>;
+  readonly navigation?: DeclarativeNavigationCoordinator;
 }
 
 interface RuntimeTool {
@@ -63,6 +68,7 @@ export class DeclarativePackRuntime {
   readonly #currentBinding: () => DeclarativeRuntimeBinding | undefined;
   readonly #document: DeclarativeDocumentAdapter;
   readonly #limits: DeclarativeRuntimeLimits;
+  readonly #navigation: DeclarativeNavigationCoordinator | undefined;
   readonly #tools: ReadonlyMap<string, RuntimeTool>;
   readonly #active = new Set<AbortController>();
   #revoked = false;
@@ -77,6 +83,7 @@ export class DeclarativePackRuntime {
     this.#currentBinding = options.currentBinding;
     this.#document = options.document;
     this.#limits = limits;
+    this.#navigation = options.navigation;
     this.#tools = operationMap(bundle);
   }
 
@@ -118,11 +125,12 @@ export class DeclarativePackRuntime {
       const capabilities: PageCapability[] = [];
       for (const [name, tool] of this.#tools) {
         if (
-          await discoverDeclarativeOperation(
+          tool.operation.kind === "navigate" ||
+          (await discoverDeclarativeOperation(
             tool.operation,
             this.#document,
             budget,
-          )
+          ))
         ) {
           capabilities.push(Object.freeze({ source: "pack", name }));
         }
@@ -136,21 +144,57 @@ export class DeclarativePackRuntime {
     args: JsonObject,
     signal: AbortSignal,
   ): Promise<JsonValue> {
-    if (!emptyDataObject(args)) {
-      throw new DeclarativeRuntimeError("INVALID_PAGE_VALUE");
-    }
     const tool = this.#tools.get(toolName);
     if (tool === undefined) {
       throw new DeclarativeRuntimeError("CAPABILITY_UNAVAILABLE");
     }
-    return this.#run(signal, (budget) =>
-      executeDeclarativeOperation(
-        tool.operation,
-        tool.manifest.outputSchema,
-        this.#document,
-        budget,
-      ),
-    );
+    if (!matchesDeclarativeOutputSchema(tool.manifest.inputSchema, args)) {
+      throw new DeclarativeRuntimeError("INVALID_PAGE_VALUE");
+    }
+    const operation = tool.operation;
+    if (operation.kind === "read") {
+      if (!emptyDataObject(args)) {
+        throw new DeclarativeRuntimeError("INVALID_PAGE_VALUE");
+      }
+      return this.#run(signal, (budget) =>
+        executeDeclarativeOperation(
+          operation,
+          tool.manifest.outputSchema,
+          this.#document,
+          budget,
+        ),
+      );
+    }
+    const navigation = this.#navigation;
+    if (navigation === undefined) {
+      throw new DeclarativeRuntimeError("CAPABILITY_UNAVAILABLE");
+    }
+    let url: string;
+    try {
+      url = createDeclarativeNavigationUrl(
+        operation,
+        args,
+        this.#binding.origin,
+      );
+    } catch {
+      throw new DeclarativeRuntimeError("INVALID_PAGE_VALUE");
+    }
+    const result = declarativeNavigationResult(url);
+    if (!matchesDeclarativeOutputSchema(tool.manifest.outputSchema, result)) {
+      throw new DeclarativeRuntimeError("RESULT_INVALID");
+    }
+    await this.#run(signal, async () => result);
+    this.#assertCurrent();
+    try {
+      navigation.schedule(url, signal);
+    } catch {
+      throw new DeclarativeRuntimeError("CAPABILITY_UNAVAILABLE");
+    }
+    return result;
+  }
+
+  bindContextRevocation(revoke: () => void): void {
+    this.#navigation?.bindContextRevocation(revoke);
   }
 
   revoke(): void {
@@ -239,6 +283,9 @@ export function createDeclarativePageAdapter(
         throw new TypeError("declarative tool authorization was rejected");
       }
       authorized = new Set(tools);
+    },
+    bindContextRevocation(revoke) {
+      runtime.bindContextRevocation(revoke);
     },
     async capabilities(signal) {
       try {

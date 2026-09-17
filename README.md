@@ -91,7 +91,8 @@ The FastMCP-style `MCPatch` authoring facade registers schema-inferred typed too
 while strict lower-level primitives keep serializable metadata separate from
 reviewed compiled handlers. The browser-free
 [declarative authoring API](docs/declarative-pack-authoring.md) produces validated,
-deterministic read-only bundle inputs and synthetic fixture suites. Pure exact URL
+deterministic bundle inputs and synthetic fixture suites for bounded reads and
+approved typed same-origin navigation. Pure exact URL
 matching and deterministic
 native-first capability resolution are also implemented. A deterministic fixture
 harness now preflights compatibility, permission ceilings, schemas, and fixtures,

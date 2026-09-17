@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 
 import type { JsonObject } from "@mcpatch/protocol";
+import {
+  buildDeclarativePack,
+  defineNavigationTool,
+} from "@mcpatch/sdk/declarative";
 import type {
   DeclarativeLocator,
   DeclarativeOperation,
@@ -26,6 +30,7 @@ import {
   DeclarativePackRuntime,
   type DeclarativeRuntimeBinding,
 } from "../src/declarative-pack-runtime.js";
+import { DeclarativeNavigationCoordinator } from "../src/declarative-navigation-coordinator.js";
 
 interface FixtureNode {
   readonly attributes?: Readonly<Record<string, string>>;
@@ -458,7 +463,112 @@ describe("declarative pack runtime", () => {
       { source: "pack", name: "example.items.current" },
     ]);
   });
+
+  it("constructs one typed URL and schedules it only after context revocation is bound", async () => {
+    const bundle = await navigationBundle();
+    const current = Object.freeze({
+      ...binding(bundle.manifest.digest),
+      origin: "https://example.test",
+      path: "/chart/OLD",
+    });
+    const events: string[] = [];
+    const deferred: Array<() => void> = [];
+    const navigation = new DeclarativeNavigationCoordinator(
+      bundle.manifest,
+      { assign: (url) => events.push(`navigate:${url}`) },
+      (run) => deferred.push(run),
+    );
+    const runtime = await DeclarativePackRuntime.create({
+      binding: current,
+      bundle: bundle.bundleContent,
+      currentBinding: () => current,
+      document: new FixtureDocument([]),
+      navigation,
+    });
+    const adapter = createDeclarativePageAdapter(runtime);
+    adapter.authorizePackTools?.(["example.change_symbol"]);
+    adapter.bindContextRevocation?.(() => events.push("revoke"));
+
+    await expect(adapter.capabilities(signal())).resolves.toEqual([
+      { source: "pack", name: "example.change_symbol" },
+    ]);
+    await expect(
+      adapter.execute(
+        "example.change_symbol",
+        { symbol: "NASDAQ:AAPL" },
+        signal(),
+      ),
+    ).resolves.toEqual({
+      state: "scheduled",
+      url: "https://example.test/chart/NASDAQ%3AAAPL",
+    });
+    expect(events).toEqual([]);
+    deferred[0]?.();
+    expect(events).toEqual([
+      "revoke",
+      "navigate:https://example.test/chart/NASDAQ%3AAAPL",
+    ]);
+  });
 });
+
+async function navigationBundle() {
+  const tool = defineNavigationTool({
+    name: "example.change_symbol",
+    description: "Open a symbol chart",
+    risk: "action",
+    permissions: ["ACTION"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["symbol"],
+      properties: {
+        symbol: {
+          type: "string",
+          minLength: 1,
+          maxLength: 32,
+        },
+      },
+    },
+    navigation: {
+      navigationVersion: 1,
+      path: {
+        segments: [
+          { kind: "literal", value: "chart" },
+          { kind: "argument", name: "symbol" },
+        ],
+        trailingSlash: false,
+      },
+      query: [],
+    },
+    fixtures: [
+      {
+        id: "symbol",
+        currentUrl: "https://example.test/chart/OLD",
+        input: { symbol: "NASDAQ:AAPL" },
+        expectedUrl: "https://example.test/chart/NASDAQ%3AAAPL",
+      },
+    ],
+  });
+  return buildDeclarativePack({
+    publisher: "example",
+    id: "navigation",
+    name: "Navigation",
+    description: "Typed navigation",
+    version: "0.1.0",
+    compatibility: {
+      runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
+      bridgeProtocol: { minimum: 2, maximum: 2 },
+    },
+    matches: [
+      {
+        origin: "https://example.test",
+        paths: [{ kind: "prefix", path: "/chart/" }],
+      },
+    ],
+    metadata: { license: "MIT" },
+    tools: [tool],
+  });
+}
 
 async function execute(
   projection: DeclarativeProjection,

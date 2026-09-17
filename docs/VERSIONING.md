@@ -2,32 +2,35 @@
 
 ## Version domains
 
-MCPatch has five independent compatibility domains.
+MCPatch has eight independent compatibility domains.
 
-| Domain                | Format           | Initial value | Changes when                                                       |
-| --------------------- | ---------------- | ------------- | ------------------------------------------------------------------ |
-| Product release       | SemVer           | `0.1.0`       | Installable MCPatch behavior is released                           |
-| Rust/npm package      | SemVer           | `0.1.0`       | A package API or implementation is released                        |
-| Bridge protocol       | Positive integer | `2`           | Bridge↔extension wire compatibility changes                        |
-| Page protocol         | Positive integer | `2`           | Service worker↔content-runtime compatibility changes               |
-| Pack manifest         | Positive integer | `1`           | Pack manifest interpretation changes incompatibly                  |
-| External MCP revision | Date string      | `2026-07-28`  | The upstream MCP specification publishes and MCPatch adopts a date |
+| Domain                 | Format           | Initial value | Changes when                                                       |
+| ---------------------- | ---------------- | ------------- | ------------------------------------------------------------------ |
+| Product release        | SemVer           | `0.1.0`       | Installable MCPatch behavior is released                           |
+| Rust/npm package       | SemVer           | `0.1.0`       | A package API or implementation is released                        |
+| Bridge protocol        | Positive integer | `2`           | Bridge↔extension wire compatibility changes                        |
+| Page protocol          | Positive integer | `2`           | Service worker↔content-runtime compatibility changes               |
+| Pack manifest          | Positive integer | `1`           | Pack manifest interpretation changes incompatibly                  |
+| Declarative bundle     | Positive integer | `1`           | Canonical artifact/signature interpretation changes incompatibly   |
+| Declarative operations | Positive integer | `1`, `2`      | Accepted declarative authority or operation meaning changes        |
+| External MCP revision  | Date string      | `2026-07-28`  | The upstream MCP specification publishes and MCPatch adopts a date |
 
-Declarative Pack Bundle v1 is an additional artifact domain. It is independent
-from Pack Manifest v1 and Declarative Operations v1. Its canonical projection,
+Declarative Pack Bundle v1 is independent from Pack Manifest v1 and Declarative
+Operations. Its canonical projection,
 digest domains, signature envelope, and registry-attestation separation are
 documented in [Declarative Pack Bundle v1](architecture/declarative-pack-bundle.md).
 Unknown bundle or operations versions fail closed; a change to accepted authority
 or cryptographic projection requires a new version.
 
-Declarative Operations v1 was reserved by the pre-release bundle contract; this
-unreleased 0.1.0 implementation establishes its initial concrete read-only,
+Declarative Operations v1 establishes the concrete read-only,
 non-computational AST embedded in
 `operations.program`. Its selector, projection, resource-limit, output-schema,
-and permission semantics are versioned together. Tightening rejection of data
-that is already outside the v1 language is compatible hardening; accepting a new
-operation, side effect, dynamic reference, or authority requires a new operations
-version and migration note.
+and permission semantics are versioned together. Operations v2 retains v1 reads
+and adds only typed, approved same-origin navigation. Read-only packs remain v1;
+packs containing navigation declare v2 in the manifest, bundle envelope, and
+program. Tightening rejection of data already outside a versioned language is
+compatible hardening; accepting another operation, side effect, dynamic reference,
+or authority requires a new operations version and migration note.
 
 Product and package SemVer may align for early releases but are not required to.
 Bridge, page, and pack-manifest protocol numbers never derive from package versions.

@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Declarative Operations v2 typed same-origin navigation actions, with static
+  signed path/query templates, bounded component-encoded arguments, ACTION-only
+  one-time approval, revoke-before-navigation document lifecycle, SDK and CLI
+  fixture support, and a disposable Chromium proof through the real MCP bridge.
+  Operations v1 read-only packs remain byte- and behavior-compatible.
+
 - A reproducible community contribution and publication workflow: `pack submit`
   emits an unsigned canonical artifact plus payload-free authority report, while
   maintainer-only `registry publish` requires clean exact source commits, re-runs

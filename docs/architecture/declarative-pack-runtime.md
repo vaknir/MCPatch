@@ -1,6 +1,6 @@
 # Declarative pack runtime
 
-The Declarative Operations v1 interpreter is packaged with the extension and runs
+The Declarative Operations interpreter is packaged with the extension and runs
 inside its isolated content world. A downloaded pack supplies data only. It cannot
 add JavaScript, selectors outside the closed locator grammar, browser APIs, or a
 new execution primitive.
@@ -54,6 +54,12 @@ Number, percentage, and boolean parsing follows the Operations v1 contract.
 Generated data is checked against the declared tool output schema again before it
 can cross the page channel. All failures collapse to stable codes without DOM
 text, selector literals, arguments, or results.
+
+Operations v2 navigation bypasses the document adapter entirely. The runtime
+constructs one URL from the signed static template and validated arguments,
+returns only a scheduled acknowledgement, and asks the navigation coordinator to
+revoke the old page runtime before one deferred captured `location.assign`.
+There is no generic navigation, selector mutation, form, click, or request API.
 
 ## Runtime separation
 

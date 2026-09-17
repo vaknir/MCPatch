@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+
+import { Ajv2020, type AnySchema } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
 import {
   buildDeclarativePack,
+  defineNavigationTool,
   defineReadTool,
   locator,
   projection,
@@ -24,6 +28,19 @@ const compatibility = {
   runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
   bridgeProtocol: { minimum: 1, maximum: 1 },
 } as const;
+const bundleSchema = JSON.parse(
+  readFileSync(
+    new URL(
+      "../schema/v1/declarative-pack-bundle.schema.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+) as AnySchema;
+const validateBundleSchema = new Ajv2020({
+  strict: true,
+  validateFormats: false,
+}).compile(bundleSchema);
 
 function titleTool() {
   const heading = locator.role("heading", { name: "Page title" });
@@ -88,6 +105,113 @@ async function build(
 }
 
 describe("declarative authoring", () => {
+  it("builds a versioned typed navigation action with signed fixture evidence", async () => {
+    const changeSymbol = defineNavigationTool({
+      name: "example.change_symbol",
+      description: "Open one reviewed symbol chart",
+      risk: "action",
+      permissions: ["ACTION"],
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["symbol", "market"],
+        properties: {
+          symbol: {
+            type: "string",
+            minLength: 1,
+            maxLength: 32,
+          },
+          market: {
+            type: "string",
+            minLength: 1,
+            maxLength: 8,
+            enum: ["US", "UK"],
+          },
+        },
+      },
+      navigation: {
+        navigationVersion: 1,
+        path: {
+          segments: [
+            { kind: "literal", value: "chart" },
+            { kind: "argument", name: "symbol" },
+          ],
+          trailingSlash: false,
+        },
+        query: [{ key: "market", value: { kind: "argument", name: "market" } }],
+      },
+      fixtures: [
+        {
+          id: "change-symbol",
+          currentUrl: "https://example.test/chart/OLD",
+          input: { symbol: "NASDAQ:AAPL", market: "US" },
+          expectedUrl: "https://example.test/chart/NASDAQ%3AAAPL?market=US",
+        },
+      ],
+    });
+    const pack = await buildDeclarativePack({
+      publisher: "example",
+      id: "navigation",
+      name: "Navigation example",
+      description: "One typed navigation",
+      version: "0.1.0",
+      compatibility: {
+        runtime: { minimum: "0.1.0", maximumExclusive: "0.2.0" },
+        bridgeProtocol: { minimum: 2, maximum: 2 },
+      },
+      matches: [
+        {
+          origin: "https://example.test",
+          paths: [{ kind: "prefix", path: "/chart/" }],
+        },
+      ],
+      metadata: { license: "MIT" },
+      tools: [changeSymbol],
+    });
+
+    expect(pack.manifest.execution).toEqual({
+      kind: "declarative",
+      operationsVersion: 2,
+    });
+    expect(pack.program).toMatchObject({
+      version: 2,
+      operations: [
+        {
+          kind: "navigate",
+          navigationVersion: 1,
+          tool: "example.change_symbol",
+        },
+      ],
+    });
+    expect(pack.manifest.fixtures).toEqual([
+      {
+        id: "change-symbol",
+        tool: "example.change_symbol",
+        input: { symbol: "NASDAQ:AAPL", market: "US" },
+        expect: {
+          kind: "result",
+          result: {
+            state: "scheduled",
+            url: "https://example.test/chart/NASDAQ%3AAAPL?market=US",
+          },
+        },
+      },
+    ]);
+    expect(
+      validateBundleSchema({
+        ...pack.bundleContent,
+        publisherSignature: {
+          signatureVersion: 1,
+          algorithm: "Ed25519",
+          publisher: "example",
+          keyId: `ed25519:example:sha256:${"a".repeat(64)}`,
+          publicKey: "A".repeat(43),
+          signature: "A".repeat(86),
+        },
+      }),
+      JSON.stringify(validateBundleSchema.errors),
+    ).toBe(true);
+  });
   it("builds deterministic validated deeply frozen artifacts", async () => {
     const first = await build();
     const second = await build();
@@ -102,9 +226,13 @@ describe("declarative authoring", () => {
     expect(JSON.parse(first.buildInput)).toEqual(first.bundleContent);
     expect(Object.isFrozen(first)).toBe(true);
     expect(Object.isFrozen(first.manifest.tools[0]?.outputSchema)).toBe(true);
-    expect(Object.isFrozen(first.fixtures[0]?.document.root.children)).toBe(
-      true,
-    );
+    const fixture = first.fixtures[0];
+    expect(fixture?.kind).toBe("read");
+    expect(
+      fixture?.kind === "read"
+        ? Object.isFrozen(fixture.document.root.children)
+        : false,
+    ).toBe(true);
   });
 
   it("snapshots caller-owned data before asynchronous digesting", async () => {
@@ -189,7 +317,11 @@ describe("declarative authoring", () => {
       ],
     });
     const result = await build([tool] as const);
-    expect(result.program.operations[0]?.projection).toMatchObject({
+    const operation = result.program.operations[0];
+    expect(operation?.kind).toBe("read");
+    expect(
+      operation?.kind === "read" ? operation.projection : undefined,
+    ).toMatchObject({
       kind: "object",
       fields: [
         {

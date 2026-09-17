@@ -219,7 +219,7 @@ function parseArtifact(
     typeof value.publisherKey !== "string" ||
     !/^[A-Za-z0-9_-]{43}$/u.test(value.publisherKey) ||
     (value.trust !== "OFFICIAL" && value.trust !== "REVIEWED_COMMUNITY") ||
-    value.operationsVersion !== 1 ||
+    (value.operationsVersion !== 1 && value.operationsVersion !== 2) ||
     !validOrigins(value.origins) ||
     !validBase64(value.bundleBase64, MAX_DECLARATIVE_BUNDLE_BYTES)
   ) {

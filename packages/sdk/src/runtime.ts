@@ -81,3 +81,8 @@ export {
   MAX_TEXT_CHARS,
 } from "./declarative-operations-limits.js";
 export type * from "./declarative-operations-types.js";
+export {
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
+} from "./declarative-navigation.js";
+export type * from "./declarative-navigation.js";

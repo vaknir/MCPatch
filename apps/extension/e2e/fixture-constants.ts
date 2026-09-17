@@ -7,6 +7,7 @@ export const COMMUNITY_REGISTRY_ORIGIN =
 export const COMMUNITY_REGISTRY_PUBLIC_KEY =
   "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg";
 export const COMMUNITY_TOOL = "community.visible_text";
+export const COMMUNITY_NAVIGATE_TOOL = "community.open_item";
 export const FIXTURE_PERMISSION = `${FIXTURE_ORIGIN}/*`;
 export const FIXTURE_STATE_TOOL = "fixture.current_state";
 export const FIXTURE_WAIT_TOOL = "fixture.wait";

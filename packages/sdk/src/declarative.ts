@@ -1,6 +1,7 @@
 export {
   EMPTY_INPUT_SCHEMA,
   buildDeclarativePack,
+  defineNavigationTool,
   defineReadTool,
 } from "./declarative-authoring.js";
 export type * from "./declarative-authoring.js";

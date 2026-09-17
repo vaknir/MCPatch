@@ -1,6 +1,6 @@
-# Declarative Operations v1
+# Declarative Operations v1 and v2
 
-Declarative Operations v1 is the separately versioned, read-only language stored
+Declarative Operations is the separately versioned data language stored
 at `operations.program` inside the canonical `.mcpack` JSON document. It is a
 closed data contract, not a source file or an execution entrypoint. Unknown
 operation versions, kinds, fields, selector forms, and projection forms fail
@@ -8,7 +8,7 @@ closed.
 
 ## Program shape
 
-The program is `{ "version": 1, "operations": [...] }`. There is exactly one
+An Operations v1 program is `{ "version": 1, "operations": [...] }`. There is exactly one
 `read` operation for every manifest tool: no undeclared tool, duplicate tool, or
 missing tool is accepted. Declarative tools must have an empty closed object input
 schema, `risk: "read"`, exactly `permissions: ["READ"]`, and the enclosing
@@ -42,6 +42,38 @@ property path, or arbitrary attribute name. Locator attributes and output
 attributes use separate allowlists. Output attributes are limited to visible,
 non-secret values: `alt`, `aria-label`, `aria-valuemax`, `aria-valuemin`,
 `aria-valuenow`, `aria-valuetext`, `datetime`, `role`, and `title`.
+
+## Operations v2: typed same-origin navigation
+
+Operations v2 keeps every v1 read and adds exactly one side-effecting operation,
+`navigate`, whose own contract is `navigationVersion: 1`. A navigation tool must
+declare `risk: "action"`, exactly `permissions: ["ACTION"]`, and a closed object
+input whose required properties are strings bounded from 1 through 256 Unicode
+code points. A property may additionally use a finite string `enum`; regexes and
+every other schema keyword are rejected.
+
+The destination is not a URL supplied by the caller. It consists of an already
+authorized manifest origin, a static sequence of path components, argument or
+literal component values, and unique static query keys. Dynamic path values may
+not contain path, query, fragment, traversal, backslash, control, encoded-path,
+absolute-URL, or protocol-relative syntax. Every value is independently
+URL-component encoded, credentials and fragments are impossible, and the final
+canonical HTTPS URL is limited to 2,048 code points. Arguments cannot choose a
+scheme, host, port, userinfo, query key, or template shape.
+
+The operation returns only `{ "state": "scheduled", "url": "..." }`. This is
+an acknowledgement that one navigation was queued, never a claim that the
+destination loaded or succeeded. The extension defers the attempt until the MCP
+result can be sent, revokes the exact old page context, and then invokes the one
+captured browser navigation primitive. Cancellation before that deferred attempt
+performs neither revocation nor navigation. Any destination tools appear only
+after a new content-script handshake.
+
+The bridge applies the existing ACTION policy before dispatch: approval binds the
+tool, canonical argument hash, origin, exact context revision, pack digest,
+expiry, requester, and one use. Declarative packs receive no click, form,
+selector mutation, arbitrary URL, fetch, redirect, cookie, token, or JavaScript
+execution primitive.
 
 ## Exact limits
 
@@ -88,7 +120,8 @@ community artifact.
 ## Versioning
 
 `operationsVersion` is independent from bundle, manifest, bridge, page protocol,
-and pack SemVer. Operations v1 is read-only and same-origin with no pack network
+and pack SemVer. Operations v1 is read-only. Operations v2 adds only the
+argument-bound same-origin navigation contract above; it adds no pack network
 authority. Any new operation kind, selector capability, side effect, output
 meaning, or bound that changes accepted authority requires a new operations version
 and migration note. The v1 schema is embedded in the self-contained

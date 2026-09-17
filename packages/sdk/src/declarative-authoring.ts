@@ -18,8 +18,13 @@ import {
 } from "./declarative-builders.js";
 import type {
   DeclarativeOperation,
+  DeclarativeNavigateOperation,
   DeclarativeOperationsProgram,
 } from "./declarative-operations-types.js";
+import {
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
+} from "./declarative-navigation.js";
 import type { InferPackOutput } from "./schema-inference.js";
 import {
   syntheticDocument,
@@ -59,6 +64,16 @@ const TOOL_FIELDS = [
   "availability",
   "scope",
   "projection",
+  "fixtures",
+] as const;
+const NAVIGATION_TOOL_FIELDS = [
+  "name",
+  "title",
+  "description",
+  "risk",
+  "permissions",
+  "inputSchema",
+  "navigation",
   "fixtures",
 ] as const;
 const PACK_FIELDS = [
@@ -111,16 +126,62 @@ export interface DeclarativeReadToolDefinition<TName extends string = string> {
   readonly name: TName;
 }
 
+export interface DeclarativeNavigationFixture {
+  readonly id: string;
+  readonly currentUrl: string;
+  readonly input: JsonObject;
+  readonly expectedUrl: string;
+}
+
+export interface DeclarativeNavigationToolInput<
+  TName extends string,
+  TInputSchema extends JsonObject,
+> {
+  readonly name: TName;
+  readonly title?: string;
+  readonly description: string;
+  readonly risk: "action";
+  readonly permissions: readonly ["ACTION"];
+  readonly inputSchema: TInputSchema;
+  readonly navigation: Omit<DeclarativeNavigateOperation, "kind" | "tool">;
+  readonly fixtures: readonly DeclarativeNavigationFixture[];
+}
+
+export interface DeclarativeNavigationToolDefinition<
+  TName extends string = string,
+> {
+  readonly name: TName;
+}
+
+export type DeclarativeToolDefinition =
+  DeclarativeNavigationToolDefinition | DeclarativeReadToolDefinition;
+
+type StoredFixture =
+  | Readonly<{
+      readonly kind: "read";
+      readonly id: string;
+      readonly document: SyntheticDocument;
+      readonly input: JsonObject;
+      readonly result: JsonValue;
+    }>
+  | Readonly<{
+      readonly kind: "navigate";
+      readonly id: string;
+      readonly currentUrl: string;
+      readonly input: JsonObject;
+      readonly result: JsonValue;
+    }>;
+
 interface StoredTool {
   readonly manifest: PackToolManifest;
   readonly operation: DeclarativeOperation;
-  readonly fixtures: readonly DeclarativeFixture[];
+  readonly fixtures: readonly StoredFixture[];
 }
 
 const storedTools = new WeakMap<object, StoredTool>();
 
 export interface DeclarativePackInput<
-  TTools extends readonly DeclarativeReadToolDefinition[],
+  TTools extends readonly DeclarativeToolDefinition[],
 > {
   readonly publisher: string;
   readonly id: string;
@@ -133,9 +194,8 @@ export interface DeclarativePackInput<
   readonly tools: TTools;
 }
 
-export interface BuiltDeclarativeFixture extends DeclarativeFixture {
-  readonly tool: string;
-}
+export type BuiltDeclarativeFixture = StoredFixture &
+  Readonly<{ readonly tool: string }>;
 
 export interface DeclarativePackBuild {
   readonly manifest: PackManifest;
@@ -211,6 +271,89 @@ export function defineReadTool<
   }) as DeclarativeReadToolDefinition<TName>;
   storedTools.set(
     definition,
+    Object.freeze({
+      manifest,
+      operation,
+      fixtures: Object.freeze(
+        fixtures.map((fixture) =>
+          Object.freeze({
+            kind: "read" as const,
+            id: fixture.id,
+            document: fixture.document,
+            input: EMPTY_INPUT_SCHEMA.properties,
+            result: fixture.result,
+          }),
+        ),
+      ),
+    }),
+  );
+  TOOL_DEFINITIONS.add(definition);
+  return definition;
+}
+
+const NAVIGATION_OUTPUT_SCHEMA = Object.freeze({
+  type: "object" as const,
+  additionalProperties: false as const,
+  required: Object.freeze(["state", "url"]),
+  properties: Object.freeze({
+    state: Object.freeze({ const: "scheduled" }),
+    url: Object.freeze({ type: "string", maxLength: 2048 }),
+  }),
+});
+
+/** Defines one approved same-origin URL construction action. */
+export function defineNavigationTool<
+  const TName extends string,
+  const TInputSchema extends JsonObject,
+>(
+  input: DeclarativeNavigationToolInput<TName, TInputSchema>,
+): DeclarativeNavigationToolDefinition<TName> {
+  const source = authoringObject(
+    input,
+    NAVIGATION_TOOL_FIELDS,
+    new Set(["title"]),
+    "tool",
+  );
+  if (
+    source.risk !== "action" ||
+    !Array.isArray(source.permissions) ||
+    source.permissions.length !== 1 ||
+    source.permissions[0] !== "ACTION" ||
+    !Array.isArray(source.fixtures) ||
+    source.fixtures.length === 0
+  ) {
+    reject("INVALID_PERMISSION", "tool.permissions");
+  }
+  const manifest = cloneAndFreeze({
+    name: source.name,
+    ...(Object.hasOwn(source, "title") ? { title: source.title } : {}),
+    description: source.description,
+    risk: source.risk,
+    permissions: source.permissions,
+    inputSchema: source.inputSchema,
+    outputSchema: NAVIGATION_OUTPUT_SCHEMA,
+  }) as PackToolManifest;
+  const navigation = source.navigation as Omit<
+    DeclarativeNavigateOperation,
+    "kind" | "tool"
+  >;
+  const operation = cloneAndFreeze({
+    kind: "navigate",
+    tool: source.name,
+    ...navigation,
+  }) as DeclarativeNavigateOperation;
+  if (validateJsonBounds({ manifest, operation }) !== undefined) {
+    reject("INVALID_TYPE", "tool");
+  }
+  const fixtures = (source.fixtures as readonly unknown[]).map(
+    (fixture, index) =>
+      validateNavigationFixture(fixture, operation, `tool.fixtures[${index}]`),
+  );
+  const definition = Object.freeze({
+    name: source.name,
+  }) as DeclarativeNavigationToolDefinition<TName>;
+  storedTools.set(
+    definition,
     Object.freeze({ manifest, operation, fixtures: Object.freeze(fixtures) }),
   );
   TOOL_DEFINITIONS.add(definition);
@@ -219,7 +362,7 @@ export function defineReadTool<
 
 /** Finalizes one deterministic, validated unsigned bundle build input. */
 export async function buildDeclarativePack<
-  const TTools extends readonly DeclarativeReadToolDefinition[],
+  const TTools extends readonly DeclarativeToolDefinition[],
 >(input: DeclarativePackInput<TTools>): Promise<DeclarativePackBuild> {
   const source = authoringObject(input, PACK_FIELDS, new Set(), "pack");
   if (!Array.isArray(source.tools) || source.tools.length === 0) {
@@ -234,22 +377,25 @@ export async function buildDeclarativePack<
     if (stored === undefined) reject("INVALID_TYPE", `pack.tools[${index}]`);
     return stored;
   });
+  const operationsVersion = tools.some(
+    (tool) => tool.operation.kind === "navigate",
+  )
+    ? 2
+    : 1;
   const program: DeclarativeOperationsProgram = {
-    version: 1,
+    version: operationsVersion,
     operations: tools.map((tool) => tool.operation),
   };
   const fixtures: BuiltDeclarativeFixture[] = tools.flatMap((tool) =>
     tool.fixtures.map((fixture) => ({
-      id: fixture.id,
+      ...fixture,
       tool: tool.manifest.name,
-      document: fixture.document,
-      result: fixture.result,
     })),
   );
   const manifestFixtures: PackFixture[] = fixtures.map((fixture) => ({
     id: fixture.id,
     tool: fixture.tool,
-    input: {},
+    input: fixture.input,
     expect: { kind: "result", result: fixture.result },
   }));
   const manifest: PackManifest = {
@@ -261,7 +407,7 @@ export async function buildDeclarativePack<
     version: source.version as string,
     digest: `sha256:${"0".repeat(64)}`,
     compatibility: source.compatibility as PackCompatibility,
-    execution: { kind: "declarative", operationsVersion: 1 },
+    execution: { kind: "declarative", operationsVersion },
     matches: source.matches as readonly PackMatch[],
     networkPolicy: { extensionRequests: "none" },
     tools: tools.map((tool) => tool.manifest),
@@ -270,7 +416,7 @@ export async function buildDeclarativePack<
   const initial = cloneAndFreeze({
     bundleVersion: 1,
     manifest,
-    operations: { operationsVersion: 1, program },
+    operations: { operationsVersion, program },
     metadata: source.metadata as DeclarativePackBundleMetadata,
   }) as DeclarativePackBundleContent;
   validateContent(initial);
@@ -289,6 +435,50 @@ export async function buildDeclarativePack<
     bundleContent: content,
     buildInput: canonicalizeOrThrow(content),
   }) as DeclarativePackBuild;
+}
+
+function validateNavigationFixture(
+  value: unknown,
+  operation: DeclarativeNavigateOperation,
+  field: string,
+): StoredFixture {
+  const fixture = authoringObject(
+    value,
+    ["id", "currentUrl", "input", "expectedUrl"],
+    new Set(),
+    field,
+  );
+  if (
+    typeof fixture.id !== "string" ||
+    typeof fixture.currentUrl !== "string" ||
+    typeof fixture.expectedUrl !== "string" ||
+    !isRecord(fixture.input)
+  ) {
+    reject("INVALID_TYPE", field);
+  }
+  let origin: string;
+  try {
+    origin = new URL(fixture.currentUrl as string).origin;
+    if (
+      createDeclarativeNavigationUrl(
+        operation,
+        fixture.input as JsonObject,
+        origin,
+      ) !== fixture.expectedUrl
+    ) {
+      reject("INVALID_VALUE", `${field}.expectedUrl`);
+    }
+  } catch (error) {
+    if (error instanceof DeclarativePackBundleValidationError) throw error;
+    reject("INVALID_VALUE", `${field}.expectedUrl`);
+  }
+  return cloneAndFreeze({
+    kind: "navigate",
+    id: fixture.id,
+    currentUrl: fixture.currentUrl,
+    input: fixture.input,
+    result: declarativeNavigationResult(fixture.expectedUrl as string),
+  }) as StoredFixture;
 }
 
 function validateFixture(value: unknown, field: string): DeclarativeFixture {
@@ -319,7 +509,11 @@ function validateFixtureSchemas(
   if (compiled.invalidTools.size > 0) reject("INVALID_SCHEMA", "tools");
   for (const fixture of fixtures) {
     const validators = compiled.validators.get(fixture.tool);
-    if (validators === undefined || !validators.output(fixture.result)) {
+    if (
+      validators === undefined ||
+      !validators.input(fixture.input) ||
+      !validators.output(fixture.result)
+    ) {
       reject("INVALID_SCHEMA", "fixtures");
     }
   }
@@ -330,7 +524,9 @@ function validateFixtureLocations(
   fixtures: readonly BuiltDeclarativeFixture[],
 ): void {
   for (const fixture of fixtures) {
-    const location = canonicalizePageLocation(fixture.document.url);
+    const location = canonicalizePageLocation(
+      fixture.kind === "read" ? fixture.document.url : fixture.currentUrl,
+    );
     if (!location.ok || !packMatchesLocation(manifest, location.location)) {
       reject("INVALID_REFERENCE", "fixtures.document.url");
     }
