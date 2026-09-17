@@ -62,9 +62,8 @@ async function setEnabled(enabled: boolean): Promise<void> {
 }
 
 async function refreshStatus(): Promise<void> {
-  const granted = await chrome.permissions.contains({
-    origins: [FIXTURE_PERMISSION],
-  });
+  const inventory = await chrome.permissions.getAll();
+  const granted = inventory.origins?.includes(FIXTURE_PERMISSION) === true;
   const stored = await chrome.storage.local.get(ENABLEMENT_STORAGE_KEY);
   const state = stored[ENABLEMENT_STORAGE_KEY];
   const requested =

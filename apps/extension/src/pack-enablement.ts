@@ -4,7 +4,6 @@ import type {
 } from "./page-context-model.js";
 import {
   ENABLEMENT_STORAGE_KEY,
-  REGISTRATION_PREFIX,
   type ChromeActionTab,
   type ChromeEnablementApi,
   type EnabledPackRecord,
@@ -15,7 +14,8 @@ import {
   type ReviewedPackSite,
 } from "./enablement-model.js";
 import { showEnablementAction, validActionTabId } from "./enablement-action.js";
-import { reconcileContentScripts } from "./enablement-registration.js";
+import { hasExactHostPermissions } from "./exact-host-permissions.js";
+import type { PackContentSource } from "./pack-content-catalog.js";
 import {
   createEnablementState,
   EMPTY_ENABLEMENT_STATE,
@@ -28,6 +28,7 @@ import { recordForSite } from "./reviewed-pack-catalog.js";
 export class PackEnablementController implements PackEnablementRuntime {
   readonly #api: ChromeEnablementApi;
   readonly #catalog: PackSiteCatalog;
+  readonly #content: PackContentSource;
   readonly #effective = new Map<string, ReviewedPackSite>();
   readonly #pendingSites = new Set<string>();
   readonly #requested = new Map<string, EnabledPackRecord>();
@@ -40,9 +41,14 @@ export class PackEnablementController implements PackEnablementRuntime {
     authorize: (identity: PageSenderIdentity) => this.#authorize(identity),
   };
 
-  constructor(api: ChromeEnablementApi, catalog: PackSiteCatalog) {
+  constructor(
+    api: ChromeEnablementApi,
+    catalog: PackSiteCatalog,
+    content: PackContentSource,
+  ) {
     this.#api = api;
     this.#catalog = catalog;
+    this.#content = content;
   }
 
   start(): void {
@@ -206,21 +212,8 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#writeState(createEnablementState(records));
     await this.#reconcile();
 
-    const needed = this.#neededPermissionPatterns();
-    const removable = site.permissionPatterns.filter(
-      (pattern) => !needed.has(pattern),
-    );
-    if (removable.length > 0) {
-      try {
-        await this.#api.permissions.remove({
-          origins: removable,
-        });
-      } catch {
-        // Local state and script authority are already revoked. Permission cleanup
-        // is best-effort and is reconciled again below.
-      }
-      await this.#reconcile();
-    }
+    await this.#content.removeUnusedPermissions(site.permissionPatterns);
+    await this.#reconcile();
     await showEnablementAction(this.#api.action, tabId, "disabled", site);
   }
 
@@ -274,9 +267,10 @@ export class PackEnablementController implements PackEnablementRuntime {
       const key = site.permissionPatterns.join("\u0000");
       let granted = grants.get(key);
       if (granted === undefined) {
-        granted = await this.#api.permissions.contains({
-          origins: site.permissionPatterns,
-        });
+        granted = await hasExactHostPermissions(
+          this.#api.permissions,
+          site.permissionPatterns,
+        );
         grants.set(key, granted);
       }
     }
@@ -287,23 +281,19 @@ export class PackEnablementController implements PackEnablementRuntime {
     );
   }
 
-  #neededPermissionPatterns(): ReadonlySet<string> {
-    const patterns = new Set<string>();
-    for (const record of this.#requested.values()) {
-      const site = this.#catalog.resolve(record);
-      if (site !== undefined) {
-        for (const pattern of site.permissionPatterns) patterns.add(pattern);
-      }
-    }
-    return patterns;
-  }
-
   async #reconcileScripts(sites: readonly ReviewedPackSite[]): Promise<void> {
-    await reconcileContentScripts(
-      this.#api.scripting,
-      sites,
-      this.#effective.values(),
-      (origin) => this.#invalidateOrigin(origin),
+    await this.#content.replace(
+      sites.map((site) => ({
+        fingerprint: JSON.stringify([
+          "reviewed",
+          site.key,
+          site.manifest.version,
+          site.manifest.digest,
+        ]),
+        matches: site.scriptMatches,
+        origin: site.origin,
+        permissionPatterns: site.permissionPatterns,
+      })),
     );
   }
 
@@ -331,13 +321,7 @@ export class PackEnablementController implements PackEnablementRuntime {
     this.#requested.clear();
     for (const origin of origins) this.#revoke(origin);
     try {
-      const current = await this.#api.scripting.getRegisteredContentScripts();
-      const ids = current
-        .filter((script) => script.id.startsWith(REGISTRATION_PREFIX))
-        .map((script) => script.id);
-      if (ids.length > 0) {
-        await this.#api.scripting.unregisterContentScripts({ ids });
-      }
+      await this.#content.replace([]);
     } catch {
       // The controller remains unavailable and exposes no page authority.
     }

@@ -3,6 +3,7 @@ import { PROTOCOL_VERSION } from "@mcpatch/protocol";
 
 import type { ChromeEnablementApi } from "../src/enablement-model.js";
 import { PackEnablementController } from "../src/pack-enablement.js";
+import { PackContentCatalog } from "../src/pack-content-catalog.js";
 import { createReviewedPackCatalog } from "../src/reviewed-pack-catalog.js";
 import {
   startExtensionRuntime,
@@ -26,6 +27,10 @@ const runtimeOptions = Object.freeze({
   bridgeProtocolVersion: PROTOCOL_VERSION,
   allowedPermissions: Object.freeze(["READ"] as const),
 });
+const contentCatalog = new PackContentCatalog(
+  chrome.scripting,
+  chrome.permissions,
+);
 const enablement = new PackEnablementController(
   {
     action: chrome.action,
@@ -35,13 +40,10 @@ const enablement = new PackEnablementController(
     storage: chrome.storage,
   },
   createReviewedPackCatalog(packs, runtimeOptions, [FIXTURE_ORIGIN]),
+  contentCatalog.createSource("reviewed"),
 );
-
-void FIXTURE_MARKER;
-startExtensionRuntime(chrome.runtime, {
-  compiledPacks: packs,
-  compiledPackRuntimeOptions: runtimeOptions,
-  pageAuthority: {
+contentCatalog.setAuthorities([
+  {
     authorize(identity) {
       const authorization = enablement.authority.authorize(identity);
       if (authorization === undefined) return undefined;
@@ -50,10 +52,18 @@ startExtensionRuntime(chrome.runtime, {
       });
     },
   },
+]);
+
+void FIXTURE_MARKER;
+startExtensionRuntime(chrome.runtime, {
+  compiledPacks: packs,
+  compiledPackRuntimeOptions: runtimeOptions,
+  pageAuthority: contentCatalog.authority,
   onPackRuntime(runtime) {
     void runtime.replaceDeclarativeDefinitions([fixtureLocalBundle]);
   },
   onPageContextOwner(owner) {
+    contentCatalog.setRevokeOrigin((origin) => owner.revokeOrigin(origin));
     enablement.setHooks({
       revokeOrigin(origin) {
         owner.revokeOrigin(origin);
