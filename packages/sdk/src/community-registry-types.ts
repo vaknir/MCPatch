@@ -8,6 +8,7 @@ import type { RegistryAttestation } from "./declarative-bundle-types.js";
 
 export const COMMUNITY_REGISTRY_INDEX_VERSION = 1 as const;
 export const COMMUNITY_REGISTRY_SIGNATURE_VERSION = 1 as const;
+export const MAX_COMMUNITY_REGISTRY_VERSIONS_PER_PACK = 3;
 
 export type CommunityPackTrust = "OFFICIAL" | "REVIEWED_COMMUNITY";
 

@@ -6,6 +6,7 @@ import {
 import {
   COMMUNITY_PACK_STATE_VERSION,
   MAX_COMMUNITY_PACKS,
+  type CommunityArtifactRecord,
   type CommunityCandidateRecord,
   type CommunityInstalledRecord,
   type CommunityPackState,
@@ -115,36 +116,31 @@ function parseInstalled(value: unknown): CommunityInstalledRecord | undefined {
     !exactFields(value, [
       "installId",
       "enabled",
-      "publisher",
-      "id",
-      "version",
-      "digest",
-      "bundleBase64",
+      ...ARTIFACT_FIELDS,
+      ...(value.previous === undefined ? [] : ["previous"]),
     ]) ||
     typeof value.installId !== "string" ||
     !/^registry\.[a-f0-9]{32}$/u.test(value.installId) ||
-    typeof value.enabled !== "boolean" ||
-    typeof value.publisher !== "string" ||
-    !/^[a-z][a-z0-9]{0,63}$/u.test(value.publisher) ||
-    typeof value.id !== "string" ||
-    !/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/u.test(value.id) ||
-    typeof value.version !== "string" ||
-    value.version.length > 64 ||
-    !SEMVER.test(value.version) ||
-    typeof value.digest !== "string" ||
-    !/^sha256:[a-f0-9]{64}$/u.test(value.digest) ||
-    !validBase64(value.bundleBase64, MAX_DECLARATIVE_BUNDLE_BYTES)
+    typeof value.enabled !== "boolean"
+  ) {
+    return undefined;
+  }
+  const artifact = parseArtifact(value);
+  const previous =
+    value.previous === undefined
+      ? undefined
+      : parseArtifact(value.previous, true);
+  if (
+    artifact === undefined ||
+    (value.previous !== undefined && previous === undefined)
   ) {
     return undefined;
   }
   return Object.freeze({
     installId: value.installId,
     enabled: value.enabled,
-    publisher: value.publisher,
-    id: value.id,
-    version: value.version,
-    digest: value.digest,
-    bundleBase64: value.bundleBase64,
+    ...artifact,
+    ...(previous === undefined ? {} : { previous }),
   });
 }
 
@@ -153,19 +149,21 @@ function parseCandidate(value: unknown): CommunityCandidateRecord | undefined {
     !dataObject(value) ||
     !exactFields(value, [
       "candidateToken",
+      "kind",
       "installId",
       "expiresAt",
       "indexSequence",
-      "publisher",
-      "id",
-      "version",
-      "digest",
+      ...ARTIFACT_FIELDS,
       "targetUrl",
-      "bundleBase64",
       "freshness",
     ]) ||
     typeof value.candidateToken !== "string" ||
     !/^candidate\.[a-f0-9]{32}$/u.test(value.candidateToken) ||
+    (value.kind !== "install" &&
+      value.kind !== "update" &&
+      value.kind !== "rollback") ||
+    typeof value.installId !== "string" ||
+    !/^registry\.[a-f0-9]{32}$/u.test(value.installId) ||
     typeof value.expiresAt !== "number" ||
     !Number.isSafeInteger(value.expiresAt) ||
     value.expiresAt < 0 ||
@@ -176,29 +174,95 @@ function parseCandidate(value: unknown): CommunityCandidateRecord | undefined {
   ) {
     return undefined;
   }
-  const installed = parseInstalled({
+  const artifact = parseArtifact(value);
+  if (artifact === undefined) return undefined;
+  return Object.freeze({
+    candidateToken: value.candidateToken,
+    kind: value.kind,
     installId: value.installId,
-    enabled: false,
+    expiresAt: value.expiresAt,
+    indexSequence: value.indexSequence,
+    ...artifact,
+    targetUrl: value.targetUrl,
+    freshness: value.freshness,
+  });
+}
+
+const ARTIFACT_FIELDS = [
+  "publisher",
+  "id",
+  "version",
+  "digest",
+  "publisherKey",
+  "trust",
+  "operationsVersion",
+  "origins",
+  "bundleBase64",
+] as const;
+
+function parseArtifact(
+  value: unknown,
+  requireExactFields = false,
+): CommunityArtifactRecord | undefined {
+  if (
+    !dataObject(value) ||
+    (requireExactFields && !exactFields(value, ARTIFACT_FIELDS)) ||
+    typeof value.publisher !== "string" ||
+    !/^[a-z][a-z0-9]{0,63}$/u.test(value.publisher) ||
+    typeof value.id !== "string" ||
+    !/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/u.test(value.id) ||
+    typeof value.version !== "string" ||
+    value.version.length > 64 ||
+    !SEMVER.test(value.version) ||
+    typeof value.digest !== "string" ||
+    !/^sha256:[a-f0-9]{64}$/u.test(value.digest) ||
+    typeof value.publisherKey !== "string" ||
+    !/^[A-Za-z0-9_-]{43}$/u.test(value.publisherKey) ||
+    (value.trust !== "OFFICIAL" && value.trust !== "REVIEWED_COMMUNITY") ||
+    value.operationsVersion !== 1 ||
+    !validOrigins(value.origins) ||
+    !validBase64(value.bundleBase64, MAX_DECLARATIVE_BUNDLE_BYTES)
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
     publisher: value.publisher,
     id: value.id,
     version: value.version,
     digest: value.digest,
+    publisherKey: value.publisherKey,
+    trust: value.trust,
+    operationsVersion: value.operationsVersion,
+    origins: Object.freeze([...value.origins]),
     bundleBase64: value.bundleBase64,
   });
-  if (installed === undefined) return undefined;
-  return Object.freeze({
-    candidateToken: value.candidateToken,
-    installId: installed.installId,
-    expiresAt: value.expiresAt,
-    indexSequence: value.indexSequence,
-    publisher: installed.publisher,
-    id: installed.id,
-    version: installed.version,
-    digest: installed.digest,
-    targetUrl: value.targetUrl,
-    bundleBase64: installed.bundleBase64,
-    freshness: value.freshness,
-  });
+}
+
+function validOrigins(value: unknown): value is string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 16) {
+    return false;
+  }
+  let previous = "";
+  for (const origin of value) {
+    if (typeof origin !== "string" || origin.length > 2_048) return false;
+    try {
+      const url = new URL(origin);
+      if (
+        url.protocol !== "https:" ||
+        url.origin !== origin ||
+        url.username !== "" ||
+        url.password !== "" ||
+        url.port !== "" ||
+        (previous !== "" && previous >= origin)
+      ) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+    previous = origin;
+  }
+  return true;
 }
 
 export function decodeCommunityBase64(

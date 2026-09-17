@@ -21,32 +21,39 @@ import type {
 } from "./local-pack-model.js";
 import type { PageAuthority } from "./page-context-model.js";
 
-export const COMMUNITY_PACK_STORAGE_KEY = "mcpatch.community-packs.v1";
-export const COMMUNITY_PACK_STATE_VERSION = 1 as const;
+export const LEGACY_COMMUNITY_PACK_STORAGE_KEY = "mcpatch.community-packs.v1";
+export const COMMUNITY_PACK_STORAGE_KEY = "mcpatch.community-packs.v2";
+export const COMMUNITY_PACK_STATE_VERSION = 2 as const;
 export const MAX_COMMUNITY_PACKS = 4;
 export const COMMUNITY_CANDIDATE_TTL_MS = 5 * 60 * 1_000;
 
-export interface CommunityInstalledRecord {
-  readonly installId: string;
-  readonly enabled: boolean;
+export interface CommunityArtifactRecord {
   readonly publisher: string;
   readonly id: string;
   readonly version: string;
   readonly digest: string;
+  readonly publisherKey: string;
+  readonly trust: CommunityPackTrust;
+  readonly operationsVersion: 1;
+  readonly origins: readonly string[];
   readonly bundleBase64: string;
 }
 
-export interface CommunityCandidateRecord {
+export interface CommunityInstalledRecord extends CommunityArtifactRecord {
+  readonly installId: string;
+  readonly enabled: boolean;
+  readonly previous?: CommunityArtifactRecord;
+}
+
+export type CommunityCandidateKind = "install" | "rollback" | "update";
+
+export interface CommunityCandidateRecord extends CommunityArtifactRecord {
   readonly candidateToken: string;
+  readonly kind: CommunityCandidateKind;
   readonly installId: string;
   readonly expiresAt: number;
   readonly indexSequence: number;
-  readonly publisher: string;
-  readonly id: string;
-  readonly version: string;
-  readonly digest: string;
   readonly targetUrl: string;
-  readonly bundleBase64: string;
   readonly freshness: "cached" | "online";
 }
 
@@ -71,6 +78,11 @@ export interface CommunityPackReviewTool {
 
 export interface CommunityPackReview {
   readonly candidateToken: string;
+  readonly kind: CommunityCandidateKind;
+  readonly current?: Readonly<{
+    readonly version: string;
+    readonly digest: string;
+  }>;
   readonly publisher: string;
   readonly id: string;
   readonly name: string;
@@ -144,7 +156,23 @@ export interface ChromeCommunityPackApi {
 
 export interface CommunityPackHooks {
   readonly revokeOrigin?: (origin: string) => void;
+  readonly audit?: (event: CommunityPackAuditEvent) => void;
 }
+
+export type CommunityPackAuditEvent = Readonly<{
+  readonly eventVersion: 1;
+  readonly type:
+    | "ACTIVATED"
+    | "CANDIDATE_STAGED"
+    | "DISABLED"
+    | "REVOKED"
+    | "ROLLBACK_STAGED";
+  readonly publisher: string;
+  readonly id: string;
+  readonly version: string;
+  readonly digest: string;
+  readonly status: "ACTIVE" | "CANDIDATE" | "DENIED" | "REVOKED";
+}>;
 
 export interface EffectiveCommunityPack {
   readonly record: CommunityInstalledRecord;

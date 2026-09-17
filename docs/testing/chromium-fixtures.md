@@ -40,7 +40,10 @@ The scenario proves:
 - fixed-origin signed registry fetch, publisher and registry signature
   verification, extension-owned community review, dynamic declarative
   installation, exact-origin registration, MCP discovery, and complete MCP call;
-  and
+- a separately reviewed higher-version update while the old artifact remains
+  authoritative, followed by an MCP call proving the new artifact is active;
+- signed emergency revocation of the active update, including immediate capability
+  removal without fetching or executing replacement bytes; and
 - realm lockdown blocking every network primitive and `document.cookie` from a
   pack handler on a real page, via the `fixture.realm_probe` tool, while the
   credential-free DOM read still succeeds.
@@ -60,6 +63,13 @@ control page still writes
 the same closed enablement record used by production, and disable still exercises
 production reconciliation and revocation. Unit tests separately exercise optional
 permission grant, denial, removal, startup reconciliation, and corruption.
+
+The community-pack fixture uses durable state version 2. Its installed record pins
+publisher, pack ID, semantic version, digest, operations version, reviewed origins,
+publisher key, trust state, and verified bundle bytes. Update candidates remain
+separate from active authority until a new review is accepted. Deterministic tests
+also cover the bounded offline rollback path because that recovery branch does not
+need a second browser-owned permission prompt.
 
 The community review still runs and verifies that the controller accepts only the
 exact pre-granted pattern; controller tests separately prove grant and denial from

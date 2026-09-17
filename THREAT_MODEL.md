@@ -216,6 +216,12 @@ Mitigations:
   publication sequence, compatibility, and revocation locally before presentation;
 - keep registry control-plane traffic separate from pack `EXTERNAL_NETWORK`
   authority; community read-only packs cannot invoke it;
+- reject reuse of one publisher/pack/version identity for different bytes and bound
+  signed history to three releases per identity;
+- stage every higher release as non-authoritative until explicit extension-owned
+  review, retaining at most one still-valid rollback artifact; and
+- adopt a newer valid signed index before discovery so emergency revocation closes
+  authority before script and permission cleanup.
 - stage candidates separately from active bytes and require explicit review for any
   digest or authority change; and
 - reject invalid, conflicting, rolled-back, or partial records before installation.

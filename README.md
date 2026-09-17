@@ -65,7 +65,9 @@ The contracts are documented in
 [ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md), and the
 [community pack lifecycle](docs/architecture/community-pack-lifecycle.md), with the
 wire and publisher contract in
-[community registry v1](docs/architecture/community-registry-v1.md).
+[community registry v1](docs/architecture/community-registry-v1.md), and the
+activation policy in
+[community pack updates](docs/architecture/community-pack-updates.md).
 
 The supported transport proof is described in
 [docs/local-demo.md](docs/local-demo.md). Local packaging and registration are

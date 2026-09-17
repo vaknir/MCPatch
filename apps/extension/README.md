@@ -114,7 +114,8 @@ bundle before opening `community-review.html`; only that extension page can requ
 the displayed exact origin. Startup and offline restore re-verify the index,
 attestation, publisher signature, digest, compatibility, permission inventory, and
 packaged content registration. See
-[Community registry v1](../../docs/architecture/community-registry-v1.md).
+[Community registry v1](../../docs/architecture/community-registry-v1.md) and
+[community pack updates](../../docs/architecture/community-pack-updates.md).
 
 ADR 0008 fixes the Phase 6 direction: `storage` and `scripting` are baseline
 permissions, while each site remains an optional HTTPS host grant. Reviewed

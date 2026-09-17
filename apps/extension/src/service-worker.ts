@@ -127,6 +127,9 @@ startExtensionRuntime(chrome.runtime, {
       },
     });
     communityPacks.setHooks({
+      audit(event) {
+        console.info("MCPatch community lifecycle", event);
+      },
       revokeOrigin(origin) {
         owner.revokeOrigin(origin);
       },

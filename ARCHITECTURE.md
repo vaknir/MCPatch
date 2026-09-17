@@ -120,6 +120,8 @@ Runtime operation can continue offline only for a previously verified, fresh, an
 unrevoked cached artifact, with freshness visible to the user.
 The exact index, transport, publisher, cache, and install contracts are in
 [Community registry v1](docs/architecture/community-registry-v1.md).
+Its immutable update, bounded rollback, and emergency revocation state machine is
+specified in [community pack updates](docs/architecture/community-pack-updates.md).
 
 ## Capability resolution
 

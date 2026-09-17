@@ -8,6 +8,13 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Explicit community-pack upgrades with complete pinned authority records, strict
+  SemVer upgrade selection, same-version identity-reuse rejection, one verified
+  rollback artifact, transactional restoration after interrupted activation,
+  startup refresh, and signed emergency revocation before context/script cleanup.
+  The real Chromium fixture now proves install, reviewed update, MCP invocation,
+  revocation, and MCP capability removal through the complete bridge path.
+
 - A fixed-origin signed static community registry with bounded versioned index
   schema, independent publisher signatures and registry attestations, immutable
   digest-addressed bundles, rollback/freshness enforcement, credential-free strict

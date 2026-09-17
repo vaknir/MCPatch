@@ -4,8 +4,6 @@ import {
   canonicalizePageLocation,
   packMatchesLocation,
   type CommunityRegistryIndex,
-  type CommunityRegistryPackEntry,
-  type DeclarativePackBundleContent,
 } from "@mcpatch/sdk/runtime";
 
 import {
@@ -21,12 +19,21 @@ import {
   communityPackSuccess as success,
 } from "./community-pack-messages.js";
 import {
+  artifactRecord,
+  selectCommunityCandidate,
+  validCommunityActivation,
+  withoutInstallState,
+} from "./community-pack-lifecycle.js";
+import {
   COMMUNITY_CANDIDATE_TTL_MS,
   COMMUNITY_PACK_STORAGE_KEY,
+  LEGACY_COMMUNITY_PACK_STORAGE_KEY,
   MAX_COMMUNITY_PACKS,
   type ChromeCommunityPackApi,
   type ChromeMessageSender,
   type CommunityCandidateRecord,
+  type CommunityInstalledRecord,
+  type CommunityPackAuditEvent,
   type CommunityPackHooks,
   type CommunityPackRequest,
   type CommunityPackResult,
@@ -48,22 +55,16 @@ import {
   communityIdentity,
   communityPackReview,
 } from "./community-pack-projection.js";
+import {
+  verifyCommunityPackState,
+  type VerifiedCommunityPackSnapshot,
+} from "./community-pack-state-verifier.js";
 import type { DeclarativeDefinitionSource } from "./declarative-definition-catalog.js";
 import type { PackContentSource } from "./pack-content-catalog.js";
 import type {
   PageAuthorization,
   PageSenderIdentity,
 } from "./page-context-model.js";
-
-interface VerifiedSnapshot {
-  readonly index?: CommunityRegistryIndex;
-  readonly installed: readonly EffectiveCommunityPack[];
-  readonly candidate?: Readonly<{
-    readonly record: CommunityCandidateRecord;
-    readonly entry: CommunityRegistryPackEntry;
-    readonly bundle: DeclarativePackBundleContent;
-  }>;
-}
 
 export interface CommunityPackControllerOptions {
   readonly client: CommunityRegistryClient;
@@ -118,9 +119,11 @@ export class CommunityPackController implements CommunityPackRuntime {
       return true;
     });
     this.#api.lifecycle.onInstalled.addListener(() =>
-      this.#invalidateAndQueue(),
+      this.#invalidateAndQueue(true),
     );
-    this.#api.lifecycle.onStartup.addListener(() => this.#invalidateAndQueue());
+    this.#api.lifecycle.onStartup.addListener(() =>
+      this.#invalidateAndQueue(true),
+    );
     this.#api.permissions.onAdded.addListener(() => this.#invalidateAndQueue());
     this.#api.permissions.onRemoved.addListener(() =>
       this.#invalidateAndQueue(),
@@ -133,7 +136,7 @@ export class CommunityPackController implements CommunityPackRuntime {
         this.#invalidateAndQueue();
       }
     });
-    this.#queue(() => this.#reconcile());
+    this.#queue(() => this.#reconcileAndRefresh());
   }
 
   setHooks(hooks: CommunityPackHooks): void {
@@ -224,6 +227,9 @@ export class CommunityPackController implements CommunityPackRuntime {
           throw new Error("registry sequence equivocation");
         }
       }
+      if (!(await this.#adoptIndex(index, now))) {
+        throw new Error("registry index could not be activated");
+      }
     } catch (error) {
       if (
         !(error instanceof RegistryClientError) ||
@@ -231,7 +237,12 @@ export class CommunityPackController implements CommunityPackRuntime {
       ) {
         throw error;
       }
-      const cached = await this.#snapshot(this.#state, now);
+      const cached = await verifyCommunityPackState(
+        this.#state,
+        now,
+        this.#options.client,
+        this.#options.reviewedIdentities,
+      );
       if (cached.index === undefined) {
         throw new Error("registry unavailable", { cause: error });
       }
@@ -240,34 +251,34 @@ export class CommunityPackController implements CommunityPackRuntime {
     }
     const page = canonicalizePageLocation(url);
     if (!page.ok) throw new Error("page unavailable");
-    const candidates = index.packs.filter(
-      (entry) =>
-        entry.revocation.status === "ACTIVE" &&
-        entry.origins.includes(page.location.origin),
+    const selection = selectCommunityCandidate(
+      index,
+      this.#state.installed,
+      page.location.origin,
     );
-    if (candidates.length !== 1) {
-      await showEnablementAction(
-        this.#api.action,
-        tabId,
-        candidates.length === 0 ? "unsupported" : "unavailable",
-      );
+    if (selection.status !== "candidate") {
+      await showEnablementAction(this.#api.action, tabId, selection.status);
       return;
     }
-    const entry = candidates[0];
-    if (entry === undefined) return;
+    const { entry, existing, kind } = selection;
     if (this.#options.reviewedIdentities.has(communityIdentity(entry))) {
       throw new Error("reviewed identity collision");
     }
-    const verified = await this.#options.client.pack(index, entry, now);
+    const verified =
+      kind === "rollback" && existing?.previous !== undefined
+        ? await this.#options.client.verifyPackBytes(
+            index,
+            entry,
+            decodeCommunityBase64(
+              existing.previous.bundleBase64,
+              MAX_DECLARATIVE_BUNDLE_BYTES,
+            ),
+            now,
+          )
+        : await this.#options.client.pack(index, entry, now);
     if (!packMatchesLocation(verified.content.manifest, page.location)) {
       await showEnablementAction(this.#api.action, tabId, "unsupported");
       return;
-    }
-    const existing = this.#state.installed.find(
-      (record) => communityIdentity(record) === communityIdentity(entry),
-    );
-    if (existing !== undefined && existing.digest !== entry.bundleDigest) {
-      throw new Error("updates require separate review");
     }
     if (
       existing === undefined &&
@@ -276,19 +287,20 @@ export class CommunityPackController implements CommunityPackRuntime {
       throw new Error("community pack limit reached");
     }
     const token = `candidate.${this.#options.randomId()}`;
+    const bundleBase64 =
+      kind === "rollback" && existing?.previous !== undefined
+        ? existing.previous.bundleBase64
+        : encodeCommunityBase64(
+            new TextEncoder().encode(JSON.stringify(verified.bundle)),
+          );
     const candidate: CommunityCandidateRecord = Object.freeze({
       candidateToken: token,
+      kind,
       installId: existing?.installId ?? `registry.${this.#options.randomId()}`,
       expiresAt: this.#options.now() + COMMUNITY_CANDIDATE_TTL_MS,
       indexSequence: index.publicationSequence,
-      publisher: entry.publisher,
-      id: entry.id,
-      version: entry.version,
-      digest: entry.bundleDigest,
+      ...artifactRecord(entry, verified.content, bundleBase64),
       targetUrl: url,
-      bundleBase64: encodeCommunityBase64(
-        new TextEncoder().encode(JSON.stringify(verified.bundle)),
-      ),
       freshness,
     });
     const state = createCommunityPackState({
@@ -301,6 +313,11 @@ export class CommunityPackController implements CommunityPackRuntime {
       candidate,
     });
     if (!(await this.#commit(state))) throw new Error("candidate rejected");
+    this.#audit(
+      candidate,
+      kind === "rollback" ? "ROLLBACK_STAGED" : "CANDIDATE_STAGED",
+      "CANDIDATE",
+    );
     const reviewUrl = new URL(
       this.#api.runtime.getURL("community-review.html"),
     );
@@ -309,12 +326,65 @@ export class CommunityPackController implements CommunityPackRuntime {
     await showEnablementAction(this.#api.action, tabId, "disabled");
   }
 
+  async #adoptIndex(
+    index: CommunityRegistryIndex,
+    now: Date,
+  ): Promise<boolean> {
+    for (const record of this.#state.installed) {
+      const entry = communityEntryFor(index, record);
+      if (record.enabled && entry?.revocation.status === "REVOKED") {
+        this.#audit(record, "REVOKED", "REVOKED");
+      }
+    }
+    const state = createCommunityPackState({
+      highWaterSequence: index.publicationSequence,
+      indexBase64: encodeCommunityBase64(
+        new TextEncoder().encode(JSON.stringify(index)),
+      ),
+      indexVerifiedAt: now.toISOString(),
+      installed: this.#state.installed,
+    });
+    return this.#commit(state);
+  }
+
+  async #reconcileAndRefresh(): Promise<void> {
+    await this.#reconcile();
+    if (!this.#ready || this.#state.installed.length === 0) return;
+    const now = new Date(this.#options.now());
+    try {
+      const index = await this.#options.client.index(
+        this.#state.highWaterSequence,
+        now,
+      );
+      if (
+        index.publicationSequence === this.#state.highWaterSequence &&
+        this.#state.indexBase64 !== undefined
+      ) {
+        const current = await this.#options.client.indexFromCache(
+          decodeCommunityBase64(
+            this.#state.indexBase64,
+            MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
+          ),
+          this.#state.highWaterSequence,
+          now,
+        );
+        if (current.signature.signature !== index.signature.signature) return;
+      }
+      await this.#adoptIndex(index, now);
+    } catch {
+      // A failed refresh cannot replace or extend cached authority. Its signed
+      // freshness deadline still governs the already reconciled artifact.
+    }
+  }
+
   async #review(
     token: string,
   ): Promise<CommunityPackResult<CommunityPackReview>> {
-    const snapshot = await this.#snapshot(
+    const snapshot = await verifyCommunityPackState(
       this.#state,
       new Date(this.#options.now()),
+      this.#options.client,
+      this.#options.reviewedIdentities,
     );
     const candidate = snapshot.candidate;
     if (
@@ -325,15 +395,21 @@ export class CommunityPackController implements CommunityPackRuntime {
     ) {
       return failure("CANDIDATE_EXPIRED");
     }
-    return success(communityPackReview(candidate, snapshot.index));
+    const current = this.#state.installed.find(
+      (record) =>
+        communityIdentity(record) === communityIdentity(candidate.entry),
+    );
+    return success(communityPackReview(candidate, snapshot.index, current));
   }
 
   async #install(
     token: string,
   ): Promise<CommunityPackResult<{ readonly installed: true }>> {
-    const snapshot = await this.#snapshot(
+    const snapshot = await verifyCommunityPackState(
       this.#state,
       new Date(this.#options.now()),
+      this.#options.client,
+      this.#options.reviewedIdentities,
     );
     const candidate = snapshot.candidate;
     if (
@@ -347,22 +423,34 @@ export class CommunityPackController implements CommunityPackRuntime {
     if (!(await hasExactHostPermissions(this.#api.permissions, patterns))) {
       return failure("PERMISSION_REQUIRED");
     }
+    const current = this.#state.installed.find(
+      (record) =>
+        communityIdentity(record) === communityIdentity(candidate.entry),
+    );
+    if (!validCommunityActivation(candidate.record, current)) {
+      return failure("COLLISION");
+    }
+    const previousState = this.#state;
     const records = new Map(
       this.#state.installed.map((record) => [
         communityIdentity(record),
         record,
       ]),
     );
+    const artifact = artifactRecord(
+      candidate.entry,
+      candidate.bundle,
+      candidate.record.bundleBase64,
+    );
     records.set(
       communityIdentity(candidate.entry),
       Object.freeze({
         installId: candidate.record.installId,
         enabled: true,
-        publisher: candidate.entry.publisher,
-        id: candidate.entry.id,
-        version: candidate.entry.version,
-        digest: candidate.entry.bundleDigest,
-        bundleBase64: candidate.record.bundleBase64,
+        ...artifact,
+        ...(candidate.record.kind === "update" && current !== undefined
+          ? { previous: withoutInstallState(current) }
+          : {}),
       }),
     );
     const state = createCommunityPackState({
@@ -375,8 +463,29 @@ export class CommunityPackController implements CommunityPackRuntime {
           }),
       installed: records.values(),
     });
-    if (!(await this.#commit(state))) return failure("STORAGE_INVALID");
+    if (!(await this.#commit(state))) {
+      await this.#restore(previousState);
+      return failure("STORAGE_INVALID");
+    }
+    this.#audit(artifact, "ACTIVATED", "ACTIVE");
+    if (current !== undefined) {
+      await this.#options.content.removeUnusedPermissions(
+        current.origins.map((origin) => `${origin}/*`),
+      );
+    }
     return success(Object.freeze({ installed: true as const }));
+  }
+
+  async #restore(state: CommunityPackState): Promise<void> {
+    try {
+      await this.#api.storage.local.set({
+        [COMMUNITY_PACK_STORAGE_KEY]: state,
+      });
+      await this.#reconcile();
+      if (!this.#ready) throw new Error("community state restore failed");
+    } catch {
+      await this.#failClosed(true);
+    }
   }
 
   async #commit(state: CommunityPackState): Promise<boolean> {
@@ -397,9 +506,14 @@ export class CommunityPackController implements CommunityPackRuntime {
       accessLevel: "TRUSTED_CONTEXTS",
     });
     const stored = await this.#readState();
-    let snapshot: VerifiedSnapshot;
+    let snapshot: VerifiedCommunityPackSnapshot;
     try {
-      snapshot = await this.#snapshot(stored, new Date(this.#options.now()));
+      snapshot = await verifyCommunityPackState(
+        stored,
+        new Date(this.#options.now()),
+        this.#options.client,
+        this.#options.reviewedIdentities,
+      );
     } catch {
       await this.#failClosed(true);
       return;
@@ -439,9 +553,6 @@ export class CommunityPackController implements CommunityPackRuntime {
       throw new Error("community definitions rejected");
     }
     const finalIds = new Set(final.map(({ record }) => record.installId));
-    const validIds = new Set(
-      snapshot.installed.map(({ record }) => record.installId),
-    );
     const normalized = createCommunityPackState({
       highWaterSequence: stored.highWaterSequence,
       ...(stored.indexBase64 === undefined
@@ -450,13 +561,11 @@ export class CommunityPackController implements CommunityPackRuntime {
             indexBase64: stored.indexBase64,
             indexVerifiedAt: stored.indexVerifiedAt,
           }),
-      installed: stored.installed
-        .filter((record) => validIds.has(record.installId))
-        .map((record) =>
-          record.enabled && !finalIds.has(record.installId)
-            ? Object.freeze({ ...record, enabled: false })
-            : record,
-        ),
+      installed: stored.installed.map((record) =>
+        record.enabled && !finalIds.has(record.installId)
+          ? Object.freeze({ ...record, enabled: false })
+          : record,
+      ),
       ...(snapshot.candidate === undefined
         ? {}
         : { candidate: snapshot.candidate.record }),
@@ -471,92 +580,12 @@ export class CommunityPackController implements CommunityPackRuntime {
     this.#ready = true;
   }
 
-  async #snapshot(
-    state: CommunityPackState,
-    now: Date,
-  ): Promise<VerifiedSnapshot> {
-    if (state.indexBase64 === undefined) {
-      if (
-        state.highWaterSequence !== 0 ||
-        state.installed.length !== 0 ||
-        state.candidate !== undefined
-      ) {
-        throw new Error("community state has no index");
-      }
-      return Object.freeze({ installed: Object.freeze([]) });
-    }
-    const indexBytes = decodeCommunityBase64(
-      state.indexBase64,
-      MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
-    );
-    const index = await this.#options.client.indexFromCache(
-      indexBytes,
-      state.highWaterSequence,
-      now,
-    );
-    if (index.publicationSequence !== state.highWaterSequence) {
-      throw new Error("community state sequence mismatch");
-    }
-    const installed: EffectiveCommunityPack[] = [];
-    for (const record of state.installed) {
-      if (this.#options.reviewedIdentities.has(communityIdentity(record))) {
-        throw new Error("reviewed identity collision");
-      }
-      const entry = communityEntryFor(index, record);
-      if (entry === undefined || entry.revocation.status !== "ACTIVE") continue;
-      const verified = await this.#options.client.verifyPackBytes(
-        index,
-        entry,
-        decodeCommunityBase64(
-          record.bundleBase64,
-          MAX_DECLARATIVE_BUNDLE_BYTES,
-        ),
-        now,
-      );
-      installed.push({ record, entry, bundle: verified.content });
-    }
-    let candidate: VerifiedSnapshot["candidate"];
-    if (
-      state.candidate !== undefined &&
-      state.candidate.expiresAt > now.getTime() &&
-      state.candidate.indexSequence === index.publicationSequence
-    ) {
-      const entry = communityEntryFor(index, state.candidate);
-      if (entry !== undefined && entry.revocation.status === "ACTIVE") {
-        const verified = await this.#options.client.verifyPackBytes(
-          index,
-          entry,
-          decodeCommunityBase64(
-            state.candidate.bundleBase64,
-            MAX_DECLARATIVE_BUNDLE_BYTES,
-          ),
-          now,
-        );
-        const page = canonicalizePageLocation(state.candidate.targetUrl);
-        if (
-          page.ok &&
-          packMatchesLocation(verified.content.manifest, page.location)
-        ) {
-          candidate = Object.freeze({
-            record: state.candidate,
-            entry,
-            bundle: verified.content,
-          });
-        }
-      }
-    }
-    return Object.freeze({
-      index,
-      installed: Object.freeze(installed),
-      ...(candidate === undefined ? {} : { candidate }),
-    });
-  }
-
   async #readState(): Promise<CommunityPackState> {
     const container = await this.#api.storage.local.get(
       COMMUNITY_PACK_STORAGE_KEY,
     );
     if (!Object.hasOwn(container, COMMUNITY_PACK_STORAGE_KEY)) {
+      await this.#api.storage.local.remove(LEGACY_COMMUNITY_PACK_STORAGE_KEY);
       return EMPTY_COMMUNITY_PACK_STATE;
     }
     const state = parseCommunityPackState(
@@ -641,6 +670,12 @@ export class CommunityPackController implements CommunityPackRuntime {
   }
 
   #replaceEffective(records: readonly EffectiveCommunityPack[]): void {
+    const removed = [...this.#effective.values()].filter(
+      ({ record }) =>
+        !records.some(
+          (candidate) => candidate.record.installId === record.installId,
+        ),
+    );
     const previous = new Set(
       [...this.#effective.values()].flatMap(({ entry }) => entry.origins),
     );
@@ -651,11 +686,16 @@ export class CommunityPackController implements CommunityPackRuntime {
     for (const origin of previous) {
       if (!next.has(origin)) this.#revoke(origin);
     }
+    for (const { record } of removed) {
+      this.#audit(record, "REVOKED", "REVOKED");
+    }
   }
 
-  #invalidateAndQueue(): void {
+  #invalidateAndQueue(refresh = false): void {
     this.#invalidate();
-    this.#queue(() => this.#reconcile());
+    this.#queue(() =>
+      refresh ? this.#reconcileAndRefresh() : this.#reconcile(),
+    );
   }
 
   #invalidate(): void {
@@ -672,6 +712,31 @@ export class CommunityPackController implements CommunityPackRuntime {
       this.#hooks.revokeOrigin?.(origin);
     } catch {
       // Revocation state cannot depend on observers.
+    }
+  }
+
+  #audit(
+    artifact: Pick<
+      CommunityInstalledRecord,
+      "publisher" | "id" | "version" | "digest"
+    >,
+    type: CommunityPackAuditEvent["type"],
+    status: CommunityPackAuditEvent["status"],
+  ): void {
+    try {
+      this.#hooks.audit?.(
+        Object.freeze({
+          eventVersion: 1,
+          type,
+          publisher: artifact.publisher,
+          id: artifact.id,
+          version: artifact.version,
+          digest: artifact.digest,
+          status,
+        }),
+      );
+    } catch {
+      // Audit observers cannot grant, retain, or revoke authority.
     }
   }
 

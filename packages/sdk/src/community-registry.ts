@@ -35,6 +35,7 @@ import type {
 import {
   COMMUNITY_REGISTRY_INDEX_VERSION,
   COMMUNITY_REGISTRY_SIGNATURE_VERSION,
+  MAX_COMMUNITY_REGISTRY_VERSIONS_PER_PACK,
 } from "./community-registry-types.js";
 import { cloneAndFreeze, isRecord } from "./validation/primitives.js";
 
@@ -239,22 +240,30 @@ function validateContent(
     return false;
   }
   if (validateBundleBounds(value) !== undefined) return false;
-  const identities = new Set<string>();
+  const artifacts = new Set<string>();
+  const versionCounts = new Map<string, number>();
   let previous = "";
   for (const candidate of value.packs) {
     if (!validatePackEntry(candidate, value)) return false;
     const entry = candidate as CommunityRegistryPackEntry;
     const identity = `${entry.publisher}/${entry.id}`;
+    const artifact = `${identity}/${entry.version}`;
     const sortKey = JSON.stringify([
       entry.publisher,
       entry.id,
       entry.version,
       entry.bundleDigest,
     ]);
-    if (identities.has(identity) || (previous !== "" && previous >= sortKey)) {
+    const versionCount = (versionCounts.get(identity) ?? 0) + 1;
+    if (
+      artifacts.has(artifact) ||
+      versionCount > MAX_COMMUNITY_REGISTRY_VERSIONS_PER_PACK ||
+      (previous !== "" && previous >= sortKey)
+    ) {
       return false;
     }
-    identities.add(identity);
+    artifacts.add(artifact);
+    versionCounts.set(identity, versionCount);
     previous = sortKey;
   }
   return true;

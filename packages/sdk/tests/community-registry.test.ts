@@ -133,7 +133,56 @@ describe("community registry index v1", () => {
     ).resolves.toMatchObject({ ok: false, code: "INVALID_INDEX" });
   });
 
-  it("rejects duplicate keys, truncation, duplicate identities, unsafe origins, and mutable paths", async () => {
+  it("accepts bounded version history but rejects version identity reuse", async () => {
+    const current = await registryEntry();
+    const next = await registryEntry("0.2.0", `sha256:${"b".repeat(64)}`);
+    await expect(
+      signCommunityRegistryIndex(
+        {
+          indexVersion: 1,
+          registryId: REGISTRY_ID,
+          publicationSequence: 7,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+          packs: [current, next],
+        },
+        registryKeys(),
+      ),
+    ).resolves.toMatchObject({
+      packs: [{ version: "0.1.0" }, { version: "0.2.0" }],
+    });
+
+    const reused = await registryEntry("0.1.0", `sha256:${"b".repeat(64)}`);
+    expect(
+      validateCommunityRegistryIndex({
+        ...(await signedIndex()),
+        packs: [current, reused],
+      }),
+    ).toBe(false);
+
+    await expect(
+      signCommunityRegistryIndex(
+        {
+          indexVersion: 1,
+          registryId: REGISTRY_ID,
+          publicationSequence: 7,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+          packs: await Promise.all(
+            ["0.1.0", "0.2.0", "0.3.0", "0.4.0"].map((version, index) =>
+              registryEntry(
+                version,
+                `sha256:${String.fromCharCode(97 + index).repeat(64)}`,
+              ),
+            ),
+          ),
+        },
+        registryKeys(),
+      ),
+    ).rejects.toThrow(TypeError);
+  });
+
+  it("rejects duplicate keys, truncation, duplicate artifacts, unsafe origins, and mutable paths", async () => {
     const index = await signedIndex();
     expect(
       validateCommunityRegistryIndex({
@@ -202,12 +251,15 @@ async function signedIndex() {
   return signCommunityRegistryIndex(content, registryKeys());
 }
 
-async function registryEntry(): Promise<CommunityRegistryPackEntry> {
+async function registryEntry(
+  version = "0.1.0",
+  bundleDigest = DIGEST,
+): Promise<CommunityRegistryPackEntry> {
   const identity = {
     publisher: "example",
     id: "weather",
-    version: "0.1.0",
-    bundleDigest: DIGEST,
+    version,
+    bundleDigest,
   };
   return {
     ...identity,

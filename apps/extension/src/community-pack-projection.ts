@@ -54,10 +54,20 @@ export function communityContentSites(
 export function communityPackReview(
   candidate: VerifiedCandidate,
   index: CommunityRegistryIndex,
+  current?: CommunityInstalledRecord,
 ): CommunityPackReview {
   const manifest = candidate.bundle.manifest;
   return Object.freeze({
     candidateToken: candidate.record.candidateToken,
+    kind: candidate.record.kind,
+    ...(current === undefined
+      ? {}
+      : {
+          current: Object.freeze({
+            version: current.version,
+            digest: current.digest,
+          }),
+        }),
     publisher: manifest.publisher,
     id: manifest.id,
     name: manifest.name,
