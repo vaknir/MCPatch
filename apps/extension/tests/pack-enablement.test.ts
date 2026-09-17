@@ -4,10 +4,15 @@ import {
   ENABLEMENT_STORAGE_KEY,
   type ChromeRegisteredContentScript,
   type EnabledPackRecord,
+  type PackSiteCatalog,
   type ReviewedPackSite,
 } from "../src/enablement-model.js";
 import { parseEnablementState } from "../src/enablement-storage.js";
 import { PackEnablementController } from "../src/pack-enablement.js";
+import {
+  catalogRegistrationId,
+  PackContentCatalog,
+} from "../src/pack-content-catalog.js";
 import {
   createReviewedPackCatalog,
   recordForSite,
@@ -73,7 +78,7 @@ describe("pack enablement controller", () => {
       { ...runtimeOptions(), allowedPermissions: ["READ", "EXTERNAL_NETWORK"] },
       [SITE_ORIGIN, NETWORK_ORIGIN],
     );
-    const controller = new PackEnablementController(api, catalog);
+    const controller = controllerFor(api, catalog);
     controller.start();
     await settle(controller);
 
@@ -97,13 +102,31 @@ describe("pack enablement controller", () => {
     const api = new FakeEnablementApi();
     const site = onlySite();
     api.permissions.granted.add(site.permissionPattern);
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = controllerFor(api, testCatalog());
 
     controller.start();
     await settle(controller);
 
     expect(api.scripting.registrations.size).toBe(0);
     expect(api.storage.data).not.toHaveProperty(ENABLEMENT_STORAGE_KEY);
+    expect(controller.authority.authorize(identity())).toBeUndefined();
+  });
+
+  it("does not restore authority from a broad covering permission", async () => {
+    const api = new FakeEnablementApi();
+    const site = onlySite();
+    api.storage.data[ENABLEMENT_STORAGE_KEY] = {
+      stateVersion: 1,
+      enabled: [recordForSite(site)],
+    };
+    api.permissions.inventoryOrigins = ["https://*/*"];
+    const controller = controllerFor(api, testCatalog());
+
+    controller.start();
+    await settle(controller);
+
+    expect(storedRecords(api)).toEqual([]);
+    expect(api.scripting.registrations.size).toBe(0);
     expect(controller.authority.authorize(identity())).toBeUndefined();
   });
 
@@ -135,7 +158,7 @@ describe("pack enablement controller", () => {
     for (const [id, script] of first.api.scripting.registrations) {
       restoredApi.scripting.registrations.set(id, structuredClone(script));
     }
-    const restored = new PackEnablementController(restoredApi, testCatalog());
+    const restored = controllerFor(restoredApi, testCatalog());
 
     expect(restored.authority.authorize(identity())).toBeUndefined();
     restored.start();
@@ -155,20 +178,20 @@ describe("pack enablement controller", () => {
       enabled: [recordForSite(site)],
     };
     api.permissions.granted.add(site.permissionPattern);
-    api.scripting.registrations.set(site.registrationId, {
+    api.scripting.registrations.set(catalogRegistrationId(site.origin), {
       ...expectedRegistration(site),
       js: ["unexpected.js"],
     });
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = controllerFor(api, testCatalog());
 
     controller.start();
     await settle(controller);
 
     expect(api.log).toContain("scripts.unregister");
     expect(api.log).toContain("scripts.register");
-    expect(api.scripting.registrations.get(site.registrationId)).toEqual(
-      expectedRegistration(site),
-    );
+    expect(
+      api.scripting.registrations.get(catalogRegistrationId(site.origin)),
+    ).toEqual(expectedRegistration(site));
     expect(controller.authority.authorize(identity())).toBeDefined();
   });
 
@@ -181,10 +204,10 @@ describe("pack enablement controller", () => {
     };
     api.permissions.granted.add(site.permissionPattern);
     api.scripting.registrations.set(
-      site.registrationId,
+      catalogRegistrationId(site.origin),
       expectedRegistration(site),
     );
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = controllerFor(api, testCatalog());
 
     controller.start();
     await settle(controller);
@@ -244,10 +267,10 @@ describe("pack enablement controller", () => {
     const site = onlySite();
     api.storage.throwAccess = true;
     api.scripting.registrations.set(
-      site.registrationId,
+      catalogRegistrationId(site.origin),
       expectedRegistration(site),
     );
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = controllerFor(api, testCatalog());
 
     controller.start();
     await settle(controller);
@@ -278,7 +301,7 @@ describe("pack enablement controller", () => {
     const catalog = testCatalog();
     const site = catalog.sites[0];
     if (site === undefined) throw new Error("missing site fixture");
-    const controller = new PackEnablementController(api, {
+    const controller = controllerFor(api, {
       sites: catalog.sites,
       match() {
         return [site, site];
@@ -303,7 +326,7 @@ async function setup() {
   const site = catalog.sites[0];
   if (site === undefined) throw new Error("missing site fixture");
   const revoke = vi.fn<(origin: string) => void>();
-  const controller = new PackEnablementController(api, catalog);
+  const controller = controllerFor(api, catalog);
   controller.setHooks({ revokeOrigin: revoke });
   controller.start();
   await settle(controller);
@@ -333,7 +356,7 @@ function expectedRegistration(
   site: ReviewedPackSite,
 ): ChromeRegisteredContentScript {
   return {
-    id: site.registrationId,
+    id: catalogRegistrationId(site.origin),
     matches: [...site.scriptMatches],
     js: ["content-script.js"],
     allFrames: false,
@@ -341,6 +364,18 @@ function expectedRegistration(
     runAt: "document_start",
     world: "ISOLATED",
   };
+}
+
+function controllerFor(
+  api: FakeEnablementApi,
+  catalog: PackSiteCatalog,
+): PackEnablementController {
+  const content = new PackContentCatalog(api.scripting, api.permissions);
+  return new PackEnablementController(
+    api,
+    catalog,
+    content.createSource("reviewed"),
+  );
 }
 
 function identity() {

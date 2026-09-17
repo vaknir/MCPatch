@@ -27,7 +27,6 @@ describe("reviewed pack site catalog", () => {
       origin: SITE_ORIGIN,
       permissionPattern: `${SITE_ORIGIN}/*`,
     });
-    expect(catalog.sites[0]?.registrationId).toMatch(/^mcpatch-v1-[a-f0-9]+$/);
     expect(catalog.match(`${SITE_ORIGIN}/app/search?q=1`)).toHaveLength(1);
     expect(catalog.match(`${SITE_ORIGIN}/outside`)).toEqual([]);
     expect(catalog.match("https://attacker.example/app")).toEqual([]);

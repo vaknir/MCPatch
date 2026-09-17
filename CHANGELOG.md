@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A dynamic exact-origin content catalog that combines reviewed and installed
+  declarative packs behind one deterministic packaged content-script registration
+  per origin, verifies grants from Chromium's complete permission inventory,
+  shares permission ownership across pack sources, migrates legacy registrations,
+  and revokes contexts before aggregate identity or path changes.
+
 - An extension-owned local pack developer mode that previews and confirms
   unsigned declarative bundles, requests exact HTTPS origins from a trusted user
   gesture, persists bounded validated records, and routes enabled tools through

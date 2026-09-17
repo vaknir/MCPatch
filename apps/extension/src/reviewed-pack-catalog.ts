@@ -10,7 +10,6 @@ import type {
   PackSiteCatalog,
   ReviewedPackSite,
 } from "./enablement-model.js";
-import { REGISTRATION_PREFIX } from "./enablement-model.js";
 import {
   validateCompiledPacks,
   validateRuntimeOptions,
@@ -19,7 +18,6 @@ import {
 } from "./compiled-pack-validation.js";
 
 const MAX_DECLARED_ORIGINS = 32;
-const MAX_REGISTRATION_ID_BYTES = 768;
 
 export function createReviewedPackCatalog(
   subjects: readonly CompiledPackSubject[],
@@ -69,7 +67,6 @@ export function createReviewedPackCatalog(
               .sort()
               .map((value) => `${value}/*`),
           ),
-          registrationId: registrationId(origin),
           scriptMatches: contentScriptMatches(match),
           tools: Object.freeze(
             new Set(pack.manifest.tools.map((tool) => tool.name)),
@@ -147,15 +144,4 @@ function validateDeclaredOrigins(
     }
   }
   return Object.freeze(new Set(values));
-}
-
-function registrationId(origin: string): string {
-  const encoded = [...new TextEncoder().encode(origin)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  const id = `${REGISTRATION_PREFIX}${encoded}`;
-  if (id.length > MAX_REGISTRATION_ID_BYTES) {
-    throw new TypeError("reviewed pack origin is too long to register safely");
-  }
-  return id;
 }

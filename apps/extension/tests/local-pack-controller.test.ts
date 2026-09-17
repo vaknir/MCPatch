@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DeclarativePackBundleContent } from "@mcpatch/sdk/runtime";
 
 import { LocalPackController } from "../src/local-pack-controller.js";
+import { PackContentCatalog } from "../src/pack-content-catalog.js";
 import {
   LOCAL_CANDIDATE_TTL_MS,
   LOCAL_PACK_STORAGE_KEY,
@@ -343,7 +344,9 @@ function setup(options: SetupOptions = {}) {
   let sequence = 0;
   const replaceBundles = vi.fn(async () => true);
   const revoke = vi.fn<(origin: string) => void>();
+  const content = new PackContentCatalog(api.scripting, api.permissions);
   const controller = new LocalPackController(api, {
+    content: content.createSource("declarative"),
     runtime: {
       runtimeVersion: "0.1.0",
       bridgeProtocolVersion: 2,

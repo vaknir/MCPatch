@@ -6,6 +6,8 @@ import {
 } from "@mcpatch/sdk/runtime";
 
 import type { CompiledPackRuntimeOptions } from "./compiled-pack-validation.js";
+import { contentScriptMatches } from "./content-script-matches.js";
+import { hasExactHostPermissions } from "./exact-host-permissions.js";
 import {
   decodeLocalPackBase64,
   isLocalPackMessage,
@@ -31,7 +33,10 @@ import {
   type LocalPackSummary,
   type ValidatedLocalPack,
 } from "./local-pack-model.js";
-import { reconcileLocalContentScripts } from "./local-pack-registration.js";
+import type {
+  PackContentSite,
+  PackContentSource,
+} from "./pack-content-catalog.js";
 import {
   createLocalPackState,
   EMPTY_LOCAL_PACK_STATE,
@@ -70,6 +75,7 @@ export interface LocalPackControllerOptions {
   readonly randomId?: () => string;
   readonly reviewedIdentities: ReadonlySet<string>;
   readonly runtime: CompiledPackRuntimeOptions;
+  readonly content: PackContentSource;
 }
 
 export class LocalPackController implements LocalPackControllerRuntime {
@@ -384,11 +390,11 @@ export class LocalPackController implements LocalPackControllerRuntime {
     const effective = stored.developerMode
       ? await this.#granted(valid.filter(({ record }) => record.enabled))
       : [];
-    await reconcileLocalContentScripts(
-      this.#api.scripting,
-      effective.map(({ pack }) => pack),
-    );
+    await this.#options.content.replace(localContentSites(effective));
     const final = await this.#granted(effective);
+    if (final.length !== effective.length) {
+      await this.#options.content.replace(localContentSites(final));
+    }
     const accepted = await this.#hooks.replaceBundles?.(
       final.map(({ pack }) => pack.bundle),
     );
@@ -443,11 +449,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
   }
 
   async #contains(origins: readonly string[]): Promise<boolean> {
-    try {
-      return await this.#api.permissions.contains({ origins });
-    } catch {
-      return false;
-    }
+    return hasExactHostPermissions(this.#api.permissions, origins);
   }
 
   #authorize(identityValue: PageSenderIdentity): PageAuthorization | undefined {
@@ -579,7 +581,7 @@ export class LocalPackController implements LocalPackControllerRuntime {
       // Page authority and contexts have already been revoked.
     }
     try {
-      await reconcileLocalContentScripts(this.#api.scripting, []);
+      await this.#options.content.replace([]);
     } catch {
       // No local authority remains even if script cleanup is delayed.
     }
@@ -595,26 +597,13 @@ export class LocalPackController implements LocalPackControllerRuntime {
   async #removeUnusedPermissions(
     additional: readonly string[] = [],
   ): Promise<void> {
-    const needed = new Set(
-      this.#state.packs
-        .filter((record) => record.enabled)
-        .flatMap((record) =>
-          record.bundle.manifest.matches.map((match) => `${match.origin}/*`),
-        ),
-    );
     const candidates = new Set([
       ...additional,
       ...this.#state.packs.flatMap((record) =>
         record.bundle.manifest.matches.map((match) => `${match.origin}/*`),
       ),
     ]);
-    const remove = [...candidates].filter((origin) => !needed.has(origin));
-    if (remove.length === 0) return;
-    try {
-      await this.#api.permissions.remove({ origins: remove });
-    } catch {
-      // Authority is already revoked; browser permission cleanup is best effort.
-    }
+    await this.#options.content.removeUnusedPermissions([...candidates]);
   }
 
   #expireCandidates(): void {
@@ -623,6 +612,36 @@ export class LocalPackController implements LocalPackControllerRuntime {
       if (candidate.expiresAt <= now) this.#candidates.delete(token);
     }
   }
+}
+
+function localContentSites(
+  records: readonly EffectiveRecord[],
+): readonly PackContentSite[] {
+  const sites: PackContentSite[] = [];
+  for (const { record, pack } of records) {
+    const matches = new Map<string, Set<string>>();
+    for (const match of pack.manifest.matches) {
+      const patterns = matches.get(match.origin) ?? new Set<string>();
+      for (const pattern of contentScriptMatches(match)) patterns.add(pattern);
+      matches.set(match.origin, patterns);
+    }
+    for (const [origin, patterns] of matches) {
+      sites.push({
+        fingerprint: JSON.stringify([
+          "local",
+          record.installId,
+          pack.manifest.publisher,
+          pack.manifest.id,
+          pack.manifest.version,
+          pack.manifest.digest,
+        ]),
+        matches: [...patterns].sort(),
+        origin,
+        permissionPatterns: permissionPatterns(pack.origins),
+      });
+    }
+  }
+  return Object.freeze(sites);
 }
 
 function randomHexId(): string {
