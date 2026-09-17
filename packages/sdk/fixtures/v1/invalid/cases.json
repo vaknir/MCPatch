@@ -1,9 +1,16 @@
 [
   {
     "name": "unsupported-manifest-version",
-    "operation": { "kind": "set", "path": "/manifestVersion", "value": 2 },
+    "operation": {
+      "kind": "set",
+      "path": "/manifestVersion",
+      "value": 2
+    },
     "schemaValid": false,
-    "issue": { "code": "UNSUPPORTED_VERSION", "field": "manifestVersion" }
+    "issue": {
+      "code": "UNSUPPORTED_VERSION",
+      "field": "manifestVersion"
+    }
   },
   {
     "name": "wildcard-origin",
@@ -13,7 +20,10 @@
       "value": "https://*.example.com"
     },
     "schemaValid": false,
-    "issue": { "code": "INVALID_ORIGIN", "field": "matches[0].origin" }
+    "issue": {
+      "code": "INVALID_ORIGIN",
+      "field": "matches[0].origin"
+    }
   },
   {
     "name": "unsafe-dot-segment-path",
@@ -23,22 +33,43 @@
       "value": "/items/../admin"
     },
     "schemaValid": false,
-    "issue": { "code": "INVALID_PATH", "field": "matches[0].paths[0].path" }
+    "issue": {
+      "code": "INVALID_PATH",
+      "field": "matches[0].paths[0].path"
+    }
   },
   {
     "name": "risk-permission-mismatch",
     "operations": [
-      { "kind": "set", "path": "/tools/0/risk", "value": "sensitive" },
-      { "kind": "set", "path": "/tools/0/permissions", "value": ["READ"] }
+      {
+        "kind": "set",
+        "path": "/tools/0/risk",
+        "value": "sensitive"
+      },
+      {
+        "kind": "set",
+        "path": "/tools/0/permissions",
+        "value": ["READ"]
+      }
     ],
     "schemaValid": true,
-    "issue": { "code": "INVALID_PERMISSION", "field": "tools[0].risk" }
+    "issue": {
+      "code": "INVALID_PERMISSION",
+      "field": "tools[0].risk"
+    }
   },
   {
     "name": "malformed-semver",
-    "operation": { "kind": "set", "path": "/version", "value": "01.0.0" },
+    "operation": {
+      "kind": "set",
+      "path": "/version",
+      "value": "01.0.0"
+    },
     "schemaValid": false,
-    "issue": { "code": "INVALID_VERSION", "field": "version" }
+    "issue": {
+      "code": "INVALID_VERSION",
+      "field": "version"
+    }
   },
   {
     "name": "malformed-digest",
@@ -48,7 +79,10 @@
       "value": "sha256:NOT-A-DIGEST"
     },
     "schemaValid": false,
-    "issue": { "code": "INVALID_DIGEST", "field": "digest" }
+    "issue": {
+      "code": "INVALID_DIGEST",
+      "field": "digest"
+    }
   },
   {
     "name": "unknown-executable-field",
@@ -58,7 +92,10 @@
       "value": "https://example.com/pack.js"
     },
     "schemaValid": false,
-    "issue": { "code": "UNKNOWN_FIELD", "field": "$.remoteScript" }
+    "issue": {
+      "code": "UNKNOWN_FIELD",
+      "field": "$.remoteScript"
+    }
   },
   {
     "name": "bundled-entrypoint-field",
@@ -68,26 +105,45 @@
       "value": "https://example.com/pack.js"
     },
     "schemaValid": false,
-    "issue": { "code": "UNKNOWN_FIELD", "field": "execution.entrypoint" }
+    "issue": {
+      "code": "UNKNOWN_FIELD",
+      "field": "execution.entrypoint"
+    }
   },
   {
     "name": "missing-network-policy",
-    "operation": { "kind": "remove", "path": "/networkPolicy" },
+    "operation": {
+      "kind": "remove",
+      "path": "/networkPolicy"
+    },
     "schemaValid": false,
-    "issue": { "code": "INVALID_VALUE", "field": "$.networkPolicy" }
+    "issue": {
+      "code": "INVALID_VALUE",
+      "field": "$.networkPolicy"
+    }
   },
   {
     "name": "duplicate-tool",
-    "operation": { "kind": "copy", "from": "/tools/0", "path": "/tools/-" },
+    "operation": {
+      "kind": "copy",
+      "from": "/tools/0",
+      "path": "/tools/-"
+    },
     "schemaValid": false,
-    "issue": { "code": "DUPLICATE_VALUE", "field": "tools[1].name" }
+    "issue": {
+      "code": "DUPLICATE_VALUE",
+      "field": "tools[1].name"
+    }
   },
   {
     "name": "inverted-runtime-range",
     "operation": {
       "kind": "set",
       "path": "/compatibility/runtime",
-      "value": { "minimum": "0.2.0", "maximumExclusive": "0.1.0" }
+      "value": {
+        "minimum": "0.2.0",
+        "maximumExclusive": "0.1.0"
+      }
     },
     "schemaValid": true,
     "issue": {
@@ -103,6 +159,165 @@
       "value": "mcpatch.demo.missing"
     },
     "schemaValid": true,
-    "issue": { "code": "INVALID_REFERENCE", "field": "fixtures[0].tool" }
+    "issue": {
+      "code": "INVALID_REFERENCE",
+      "field": "fixtures[0].tool"
+    }
+  },
+  {
+    "name": "open-output-schema",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema",
+      "value": {
+        "type": "object"
+      }
+    },
+    "schemaValid": false,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema"
+    }
+  },
+  {
+    "name": "empty-output-schema",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema",
+      "value": {}
+    },
+    "schemaValid": false,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema"
+    }
+  },
+  {
+    "name": "non-object-output-schema",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema",
+      "value": {
+        "type": "string",
+        "maxLength": 65536
+      }
+    },
+    "schemaValid": false,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema"
+    }
+  },
+  {
+    "name": "rejecting-output-schema",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema",
+      "value": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "not": {}
+      }
+    },
+    "schemaValid": true,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema.not"
+    }
+  },
+  {
+    "name": "untyped-output-property",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema/properties/status",
+      "value": {}
+    },
+    "schemaValid": true,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema.properties.status"
+    }
+  },
+  {
+    "name": "open-nested-output-object",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema/properties/status",
+      "value": {
+        "type": "object"
+      }
+    },
+    "schemaValid": true,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema.properties.status"
+    }
+  },
+  {
+    "name": "unbounded-output-array",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/outputSchema/properties/status",
+      "value": {
+        "type": "array",
+        "maxItems": 4
+      }
+    },
+    "schemaValid": true,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].outputSchema.properties.status"
+    }
+  },
+  {
+    "name": "open-nested-input-object",
+    "operation": {
+      "kind": "set",
+      "path": "/tools/0/inputSchema",
+      "value": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "schemaValid": true,
+    "issue": {
+      "code": "INVALID_SCHEMA",
+      "field": "tools[0].inputSchema.properties.filter"
+    }
+  },
+  {
+    "name": "whole-origin-prefix-without-declaration",
+    "operation": {
+      "kind": "set",
+      "path": "/matches/0/paths/0",
+      "value": {
+        "kind": "prefix",
+        "path": "/"
+      }
+    },
+    "schemaValid": false,
+    "issue": {
+      "code": "INVALID_VALUE",
+      "field": "matches[0].wholeOrigin"
+    }
+  },
+  {
+    "name": "whole-origin-declared-without-a-matching-rule",
+    "operation": {
+      "kind": "set",
+      "path": "/matches/0/wholeOrigin",
+      "value": true
+    },
+    "schemaValid": false,
+    "issue": {
+      "code": "INVALID_VALUE",
+      "field": "matches[0].wholeOrigin"
+    }
   }
 ]

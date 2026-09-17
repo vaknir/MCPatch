@@ -38,7 +38,7 @@ export interface TradingViewNavigation {
 
 export function createTradingViewDocumentSource(
   document: Document,
-  navigation: TradingViewNavigation = createDocumentNavigation(document),
+  navigation: TradingViewNavigation,
   fetchRequest: TradingViewSearchFetch = createDocumentFetch(document),
 ): TradingViewSnapshotSource {
   return new TradingViewDocumentSource(document, navigation, fetchRequest);
@@ -357,27 +357,26 @@ function readSymbolParameter(href: string): string | undefined {
   }
 }
 
-function createDocumentNavigation(document: Document): TradingViewNavigation {
-  const view = document.defaultView;
-  if (view === null) {
-    return {
-      schedule() {
-        throw new TradingViewPackError(
-          "TOOL_UNAVAILABLE",
-          "navigation_unavailable",
-        );
-      },
-    };
-  }
+/**
+ * Navigation the extension granted this pack. The isolated realm's own
+ * navigation primitives are gone, so this is the only way the approved symbol
+ * change can move the page, and it works only while that action is running.
+ * The chart-path check stays, so the pack refuses a target of its own that the
+ * reviewed action was never meant to reach.
+ */
+export function createGrantedNavigation(
+  origin: string,
+  navigate: (url: string) => void,
+): TradingViewNavigation {
   return {
     schedule(url) {
-      if (!url.startsWith(`${view.location.origin}${TRADINGVIEW_CHART_PATH}`)) {
+      if (!url.startsWith(`${origin}${TRADINGVIEW_CHART_PATH}`)) {
         throw new TradingViewPackError(
           "TOOL_UNAVAILABLE",
           "navigation_unavailable",
         );
       }
-      view.setTimeout(() => view.location.assign(url), 0);
+      navigate(url);
     },
   };
 }

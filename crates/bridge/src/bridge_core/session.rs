@@ -1,3 +1,8 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
+
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::sync::CancellationToken;
 
@@ -13,6 +18,9 @@ pub(super) const MAX_SESSIONS_PER_ROLE: usize = 8;
 pub(super) struct CoreSessionServices {
     mcp_server: BridgeMcpServer,
     browser_sessions: BrowserSessionManager,
+    /// Monotonic MCP session sequence shared by every clone of the services,
+    /// so each accepted client gets a distinct label in approval prompts.
+    mcp_sequence: Arc<AtomicU64>,
 }
 
 impl CoreSessionServices {
@@ -23,7 +31,16 @@ impl CoreSessionServices {
         Self {
             mcp_server,
             browser_sessions,
+            mcp_sequence: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Hand out the handler for the next accepted MCP session. Sequences start
+    /// at one so the shared template's `session-0000` label never reaches a
+    /// real client.
+    fn next_mcp_server(&self) -> BridgeMcpServer {
+        let sequence = self.mcp_sequence.fetch_add(1, Ordering::Relaxed) + 1;
+        self.mcp_server.for_session(sequence)
     }
 }
 
@@ -89,8 +106,9 @@ where
         }
         EndpointRole::Mcp => {
             let session_shutdown = shutdown.child_token();
+            let mcp_server = services.next_mcp_server();
             if let Err(error) =
-                run_core_mcp_session(services.mcp_server, reader, writer, session_shutdown).await
+                run_core_mcp_session(mcp_server, reader, writer, session_shutdown).await
             {
                 tracing::warn!(
                     target: "mcpatch",
@@ -101,4 +119,28 @@ where
         }
     }
     role
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CoreSessionServices;
+    use crate::{
+        browser::BrowserSessionManager, mcp::BridgeMcpServer, routing::shared_capability_registry,
+    };
+
+    #[test]
+    fn every_accepted_mcp_session_gets_a_distinct_label_across_clones() {
+        let registry = shared_capability_registry();
+        let services = CoreSessionServices::new(
+            BridgeMcpServer::new(registry.clone()),
+            BrowserSessionManager::new(registry, "namespace"),
+        );
+        let clone = services.clone();
+
+        let first = services.next_mcp_server();
+        let second = clone.next_mcp_server();
+
+        assert_eq!(first.session_label(), "session-0001");
+        assert_eq!(second.session_label(), "session-0002");
+    }
 }

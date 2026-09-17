@@ -5,7 +5,7 @@ use mcpatch_bridge::{
     local_ipc::{read_json_frame, write_json_frame},
     protocol::{
         Capability, CapabilitySnapshot, CapabilitySource, Hello, Implementation, Message,
-        PROTOCOL_VERSION, Permission, Risk, Role, parse_message,
+        PROTOCOL_VERSION, PackReference, Permission, Risk, Role, parse_message,
     },
     routing::SharedCapabilityRegistry,
 };
@@ -109,8 +109,13 @@ pub fn snapshot() -> CapabilitySnapshot {
             title: Some("Read demo state".to_owned()),
             description: "Return deterministic demo state.".to_owned(),
             origin: "https://example.com".to_owned(),
-            source: CapabilitySource::NativeWebMcp,
-            pack: None,
+            source: CapabilitySource::Pack,
+            pack: Some(PackReference {
+                publisher: "mcpatch".to_owned(),
+                id: "test-pack".to_owned(),
+                version: "0.1.0".to_owned(),
+                digest: format!("sha256:{}", "a".repeat(64)),
+            }),
             risk: Risk::Read,
             permissions: vec![Permission::Read],
             input_schema: object(json!({

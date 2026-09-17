@@ -103,7 +103,7 @@ documented in [Pack Manifest version 1](docs/architecture/pack-manifest-v1.md).
 
 ### Registry
 
-The future registry distributes immutable, signed declarative pack releases and
+The registry v1 implementation distributes immutable, signed declarative pack releases and
 compatibility evidence from one fixed HTTPS control-plane origin. The extension
 fetches bounded signed metadata only through its own registry client; packs,
 pages, agents, and MCP calls cannot select or invoke that client. Registry metadata
@@ -118,6 +118,10 @@ That declaration and the packaged declarative interpreter are explicit Chrome We
 Store release gates; see [ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md).
 Runtime operation can continue offline only for a previously verified, fresh, and
 unrevoked cached artifact, with freshness visible to the user.
+The exact index, transport, publisher, cache, and install contracts are in
+[Community registry v1](docs/architecture/community-registry-v1.md).
+Its immutable update, bounded rollback, and emergency revocation state machine is
+specified in [community pack updates](docs/architecture/community-pack-updates.md).
 
 ## Capability resolution
 
@@ -128,20 +132,31 @@ For the active context, the extension resolves capabilities in this order:
    packs—compiled and declarative—whose origin matches exactly.
 3. No capability.
 
+A native WebMCP tool's risk and permissions are declared by the page, so the
+bridge never allows one without a human decision: every native call takes an
+argument-bound one-time approval, and MCPatch emits no read-only, destructive
+or idempotent hint for it, because it has reviewed nothing. See
+[ADR 0016](docs/adr/0016-native-webmcp-approval.md).
+
 A later automation fallback would be a separate, high-risk subsystem with explicit
 permission and approval semantics. It is not part of protocol version 2.
 
-Native and pack tools with the same logical name do not merge. Native capabilities
-win, and the collision is recorded without exposing page-controlled metadata as a
-trusted description. Canonical URL matching, collision outcomes, and context binding
+Native and pack tools cannot share a name at all. Every page-declared tool is
+published under the reserved `native` namespace, qualified by the origin that
+declared it, so a page can neither shadow a reviewed pack's tool nor hide it by
+claiming its name; the two are listed side by side under distinct names. The
+bridge rejects a native capability outside that namespace, and a pack
+capability inside it, so the separation does not depend on the extension. The
+bridge also publishes its own attributed description for a native tool and
+drops the page's title, rather than forwarding page-authored metadata to the
+agent as trusted text. Canonical URL matching, collision outcomes, and context binding
 are detailed in
 [Pack matching and capability resolution](docs/architecture/pack-resolution.md).
 
 For community packs, discovery metadata is not capability metadata until the
 selected artifact, signature, digest, compatibility, revocation, enabled identity,
 exact origin/path, and page handshake all pass local validation. For each exact
-tool name, an eligible native WebMCP candidate wins. If no native candidate exists,
-compiled and declarative pack candidates participate in one set: exactly one
+tool name, compiled and declarative pack candidates participate in one set: exactly one
 candidate publishes, while two or more candidates are hidden as ambiguous. There
 is no compiled-over-declarative priority.
 
@@ -163,21 +178,52 @@ result-binding rules are detailed in
 7. If an approval is required, execution pauses until a deterministic grant matches
    the canonical argument hash, tool, origin, expiry, and unused nonce.
 8. The extension invokes the bound native capability or installed pack operation.
-9. The result is validated, size-limited, stripped of forbidden data, and returned
-   to the MCP client.
+9. The result is validated against the tool's closed output schema, size-limited,
+   and returned to the MCP client. The closed schema is the allowlist; no
+   separate scrubbing step exists, so content the schema does not name never
+   leaves the browser.
 
 Navigation, tab closure, pack disablement, disconnect, timeout, or cancellation
 invalidates the affected registrations and pending calls.
 
 ## Trust boundaries
 
-| Boundary            | Untrusted input                              | Required controls                                                                        |
-| ------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| MCP client → bridge | method, tool name, arguments, cancellation   | framing limits, protocol validation, schema validation, permission policy                |
-| Extension → bridge  | identity claims, contexts, schemas, results  | native-host allowlist, negotiation, message validation, origin binding, size limits      |
-| Website → extension | DOM, native WebMCP metadata, events, content | isolated worlds, origin checks, output validation, no policy from page text              |
-| Pack → extension    | code, manifest, schemas, network intent      | installed immutable bundle, signature/trust policy, manifest validation, least privilege |
-| Registry → runtime  | metadata, updates, compatibility claims      | signatures, transparency, explicit install/enable, no runtime code loading               |
+| Boundary            | Untrusted input                                                                      | Required controls                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| MCP client → bridge | method, tool name, arguments, cancellation                                           | framing limits, protocol validation, schema validation, permission policy                                         |
+| Extension → bridge  | identity claims, contexts, schemas, results                                          | native-host allowlist, negotiation, message validation, origin binding, size limits                               |
+| Website → extension | DOM, native WebMCP tool metadata (name, title, description, schema), events, content | isolated worlds, origin checks, output validation, no policy from page text                                       |
+| Pack → extension    | code, manifest, schemas, network intent                                              | installed immutable bundle, signature/trust policy, manifest validation, least privilege, isolated-realm lockdown |
+| Registry → runtime  | metadata, updates, compatibility claims                                              | signatures, transparency, explicit install/enable, no runtime code loading                                        |
+
+### Pack-boundary enforcement status
+
+Several boundaries below are honoured by **review** rather than by a runtime
+mechanism for the compiled (bundled) pack tier — every reviewed pack until the
+declarative interpreter exists. The table states, per claim, what enforces it
+today, so a reviewer never trusts a control that is not there for the tier they
+are reviewing. Each enforcement PR flips its row and links its issue; moving a row
+from review to mechanism is a trust-boundary change and needs an ADR
+(CONTRIBUTING.md, "Before implementation" step 2).
+
+| Claim (compiled pack tier)                                 | Enforced by today                                                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187) |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                 |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                    |
+| No navigation from `READ` tools                            | realm lockdown plus an action-gated navigator (#188)                                     |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                     |
+| Origin binding                                             | mechanism                                                                                |
+| Path binding                                               | content-script registration from the manifest path rules (#180)                          |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
+
+The **declarative community tier** now enforces its stronger invariants by
+mechanism: no dynamic selectors, code, navigation, mutation, cookies, storage, or
+network primitive. Signed registry discovery and explicit exact-origin installation
+are live, but production release remains gated by update/revocation operations,
+submission review, real-site pilot validation, and Chrome Web Store policy review
+(#151–#154 and #165).
 
 ## Protocol boundaries
 

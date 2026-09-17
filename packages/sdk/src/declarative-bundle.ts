@@ -65,6 +65,27 @@ export function parseDeclarativePackBundle(
   return cloneAndFreeze(value) as DeclarativePackBundle;
 }
 
+/**
+ * Parses the unsigned content envelope used only by explicit local developer
+ * workflows. Signed installation paths must continue to use
+ * `parseDeclarativePackBundle` or `verifyDeclarativePackBundle`.
+ */
+export function parseDeclarativePackBundleContent(
+  value: unknown,
+): DeclarativePackBundleContent {
+  const issue = validateBundleContent(value);
+  if (issue !== undefined)
+    throw new DeclarativePackBundleValidationError(issue);
+  assertCanonicalByteLimit(value);
+  return cloneAndFreeze(value) as DeclarativePackBundleContent;
+}
+
+export function parseDeclarativePackBundleContentBytes(
+  input: string | Uint8Array,
+): DeclarativePackBundleContent {
+  return parseDeclarativePackBundleContent(decodeDeclarativePackBundle(input));
+}
+
 export function parseDeclarativePackBundleBytes(
   input: string | Uint8Array,
 ): DeclarativePackBundle {

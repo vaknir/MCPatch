@@ -48,6 +48,7 @@ describe("Jira reviewed pack manifest", () => {
       {
         origin: JIRA_ORIGIN_PLACEHOLDER,
         paths: [{ kind: "prefix", path: "/" }],
+        wholeOrigin: true,
       },
     ]);
     expect(JIRA_ORIGIN_PLACEHOLDER.endsWith(".invalid")).toBe(true);

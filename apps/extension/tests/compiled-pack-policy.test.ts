@@ -26,14 +26,20 @@ import {
 } from "./support/compiled-pack.js";
 
 describe("compiled pack runtime policy", () => {
-  it("preserves native WebMCP precedence and executes only the winner", async () => {
+  it("publishes a native tool beside a same-named pack tool without either hiding the other", async () => {
     const packExecute = vi.fn(() => ({ source: "pack" }));
     const nativeExecute = vi.fn(() => ({ source: "native" }));
     const definition = testPack(packExecute);
     const { runtime, sent } = packRuntime([definition]);
     const tool = definition.manifest.tools[0];
     if (tool === undefined) throw new Error("missing test tool");
-    const native: NativeRuntimeTool = { tool, execute: nativeExecute };
+    // A page-declared tool reaches the runtime already namespaced, so it can
+    // no longer take the name a reviewed pack publishes under.
+    const nativeName = `native.demo_mcpatch_invalid.${DEMO_TOOL_NAME}`;
+    const native: NativeRuntimeTool = {
+      tool: { ...tool, name: nativeName },
+      execute: nativeExecute,
+    };
 
     runtime.activateContext({
       contextId: DEMO_CONTEXT_ID,
@@ -45,11 +51,14 @@ describe("compiled pack runtime policy", () => {
 
     expect(sent[0]).toMatchObject({
       type: "capability_snapshot",
-      capabilities: [{ name: DEMO_TOOL_NAME, source: "native_webmcp" }],
+      capabilities: [
+        { name: DEMO_TOOL_NAME, source: "pack" },
+        { name: nativeName, source: "native_webmcp" },
+      ],
     });
-    expect(sent[1]).toMatchObject({ result: { source: "native" } });
-    expect(nativeExecute).toHaveBeenCalledOnce();
-    expect(packExecute).not.toHaveBeenCalled();
+    expect(sent[1]).toMatchObject({ result: { source: "pack" } });
+    expect(packExecute).toHaveBeenCalledOnce();
+    expect(nativeExecute).not.toHaveBeenCalled();
   });
 
   it("hides deterministic collisions instead of selecting by arrival order", () => {

@@ -30,7 +30,7 @@ export interface PackCompatibility {
 
 export type PackExecution =
   | { readonly kind: "bundled" }
-  | { readonly kind: "declarative"; readonly operationsVersion: 1 };
+  | { readonly kind: "declarative"; readonly operationsVersion: 1 | 2 };
 
 export interface PackPathRule {
   readonly kind: "exact" | "prefix";
@@ -40,6 +40,12 @@ export interface PackPathRule {
 export interface PackMatch {
   readonly origin: string;
   readonly paths: readonly PackPathRule[];
+  /**
+   * Declares that this match deliberately covers the entire origin. A
+   * `prefix` rule of `/` grants the pack every page on the host, so it must be
+   * stated here rather than inferred from a path a reviewer could skim past.
+   */
+  readonly wholeOrigin?: true;
 }
 
 export interface PackNetworkRequestPolicy {

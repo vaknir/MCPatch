@@ -25,6 +25,7 @@ type PlatformWriter = tokio::io::WriteHalf<tokio::net::windows::named_pipe::Name
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LocalCoreConnectionErrorCode {
     MalformedFrame,
+    RuntimeDirectoryUnavailable,
     Transport,
     Unauthorized,
     Unavailable,
@@ -35,10 +36,20 @@ impl LocalCoreConnectionErrorCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::MalformedFrame => "local_core_malformed_frame",
+            Self::RuntimeDirectoryUnavailable => "local_core_runtime_directory_unavailable",
             Self::Transport => "local_core_transport_failed",
             Self::Unauthorized => "local_core_unauthorized",
             Self::Unavailable => "local_core_unavailable",
             Self::UnsafeRuntime => "local_core_runtime_unsafe",
+        }
+    }
+
+    /// Fixed, path-free guidance for failures an operator can correct.
+    pub const fn operator_hint(self) -> Option<&'static str> {
+        match self {
+            Self::RuntimeDirectoryUnavailable => Some(super::RUNTIME_DIRECTORY_UNAVAILABLE_HINT),
+            Self::UnsafeRuntime => Some(super::RUNTIME_DIRECTORY_UNSAFE_HINT),
+            Self::MalformedFrame | Self::Transport | Self::Unauthorized | Self::Unavailable => None,
         }
     }
 }
@@ -73,8 +84,9 @@ impl LocalCoreConnectionError {
             },
             #[cfg(unix)]
             Self::Unix(error) => match error.code() {
-                UnixIpcErrorCode::EndpointUnavailable | UnixIpcErrorCode::RuntimeUnavailable => {
-                    LocalCoreConnectionErrorCode::Unavailable
+                UnixIpcErrorCode::EndpointUnavailable => LocalCoreConnectionErrorCode::Unavailable,
+                UnixIpcErrorCode::RuntimeUnavailable => {
+                    LocalCoreConnectionErrorCode::RuntimeDirectoryUnavailable
                 }
                 UnixIpcErrorCode::PeerCredentialsUnavailable
                 | UnixIpcErrorCode::PeerUnauthorized => LocalCoreConnectionErrorCode::Unauthorized,
@@ -271,5 +283,72 @@ impl From<AuthenticatedWindowsClientStream> for LocalCoreConnection {
             reader: LocalCoreReceiver { inner: reader },
             writer: LocalCoreSender { inner: writer },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LocalCoreConnectionErrorCode as Code;
+
+    #[test]
+    fn connection_error_codes_are_stable() {
+        for (code, expected) in [
+            (Code::MalformedFrame, "local_core_malformed_frame"),
+            (
+                Code::RuntimeDirectoryUnavailable,
+                "local_core_runtime_directory_unavailable",
+            ),
+            (Code::Transport, "local_core_transport_failed"),
+            (Code::Unauthorized, "local_core_unauthorized"),
+            (Code::Unavailable, "local_core_unavailable"),
+            (Code::UnsafeRuntime, "local_core_runtime_unsafe"),
+        ] {
+            assert_eq!(code.as_str(), expected);
+        }
+    }
+
+    #[test]
+    fn operator_hints_name_environment_variables_but_never_paths() {
+        for code in [Code::RuntimeDirectoryUnavailable, Code::UnsafeRuntime] {
+            let hint = code.operator_hint().expect("runtime failures carry a hint");
+            assert!(!hint.contains('/'));
+            assert!(!hint.contains('\\'));
+        }
+        assert!(
+            Code::RuntimeDirectoryUnavailable
+                .operator_hint()
+                .is_some_and(
+                    |hint| hint.contains("XDG_RUNTIME_DIR") && hint.contains("MCPATCH_RUNTIME_DIR")
+                )
+        );
+        for code in [
+            Code::MalformedFrame,
+            Code::Transport,
+            Code::Unauthorized,
+            Code::Unavailable,
+        ] {
+            assert_eq!(code.operator_hint(), None);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn missing_runtime_directory_maps_to_its_own_connection_code() {
+        use super::{LocalCoreConnectionError, UnixIpcError, UnixIpcErrorCode};
+
+        let missing = LocalCoreConnectionError::from(UnixIpcError::without_source(
+            UnixIpcErrorCode::RuntimeUnavailable,
+        ));
+        assert_eq!(missing.code(), Code::RuntimeDirectoryUnavailable);
+
+        let endpoint = LocalCoreConnectionError::from(UnixIpcError::without_source(
+            UnixIpcErrorCode::EndpointUnavailable,
+        ));
+        assert_eq!(endpoint.code(), Code::Unavailable);
+
+        let unsafe_directory = LocalCoreConnectionError::from(UnixIpcError::without_source(
+            UnixIpcErrorCode::UnsafeRuntimeDirectory,
+        ));
+        assert_eq!(unsafe_directory.code(), Code::UnsafeRuntime);
     }
 }

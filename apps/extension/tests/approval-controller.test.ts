@@ -21,7 +21,7 @@ const APPROVAL_ID = "approval.0123456789abcdef0123456789abcdef";
 const BASE_URL = `chrome-extension://${EXTENSION_ID}/approval.html`;
 
 describe("trusted approval controller", () => {
-  it("presents only bridge-bound metadata and resolves an approval once", async () => {
+  it("presents the bridge-bound action, its arguments, and the requester, then resolves once", async () => {
     const state = setup();
     const resolved = vi.fn<(decision: ApprovalDecision) => void>();
 
@@ -36,8 +36,10 @@ describe("trusted approval controller", () => {
         approvalId: APPROVAL_ID,
         tool: "demo.action",
         origin: "https://example.com",
+        args: { query: "flights to Lisbon" },
         argsHash: "a".repeat(64),
         expiresAt: "2026-09-15T00:01:00Z",
+        requester: { client: "Claude Code", session: "session-0001" },
       },
     ]);
     expect(JSON.stringify(port.posted)).not.toContain("request-approval");
@@ -57,6 +59,90 @@ describe("trusted approval controller", () => {
     expect(resolved).toHaveBeenCalledOnce();
     expect(resolved).toHaveBeenCalledWith("approved");
     expect(port.disconnected).toBe(true);
+    expect(state.tabs.removed).toEqual([17]);
+  });
+
+  it("stops stealing focus for a minute after a denial", async () => {
+    const state = setup();
+    const first = vi.fn<(decision: ApprovalDecision) => void>();
+    expect(state.controller.request(approvalRequired(), first)).toBe(true);
+    await flushPromises();
+    const port = state.connectApproval();
+    port.emitMessage({ type: "approval_ready", approvalId: APPROVAL_ID });
+    port.emitMessage({
+      type: "approval_decision",
+      approvalId: APPROVAL_ID,
+      decision: "denied",
+    });
+    expect(first).toHaveBeenCalledWith("denied");
+
+    const secondId = "approval.fedcba9876543210fedcba9876543210";
+    const second = vi.fn<(decision: ApprovalDecision) => void>();
+    expect(
+      state.controller.request(
+        approvalRequired({ approvalId: secondId, requestId: "request-2" }),
+        second,
+      ),
+    ).toBe(true);
+    state.controller.cancel("request-2");
+
+    state.scheduler.advanceBy(60_001);
+    const thirdId = "approval.0123456789abcdef0123456789abcdef";
+    const third = vi.fn<(decision: ApprovalDecision) => void>();
+    expect(
+      state.controller.request(
+        approvalRequired({
+          approvalId: thirdId,
+          requestId: "request-3",
+          expiresAt: new Date(
+            state.scheduler.now().getTime() + 60_000,
+          ).toISOString(),
+        }),
+        third,
+      ),
+    ).toBe(true);
+
+    // First prompt is pushed; the one right after a denial is not; a minute
+    // later prompts are pushed again.
+    expect(state.tabs.createdActive).toEqual([true, false, true]);
+  });
+
+  it("tells a presented prompt when the caller gives up and closes it after a grace period", async () => {
+    const state = setup();
+    const resolved = vi.fn<(decision: ApprovalDecision) => void>();
+    state.controller.request(approvalRequired(), resolved);
+    await flushPromises();
+    const port = state.connectApproval();
+    port.emitMessage({ type: "approval_ready", approvalId: APPROVAL_ID });
+    expect(port.posted).toHaveLength(1);
+
+    expect(state.controller.cancel("request-approval")).toBe(true);
+    expect(port.posted[1]).toEqual({
+      type: "approval_withdrawn",
+      approvalId: APPROVAL_ID,
+    });
+    expect(port.disconnected).toBe(true);
+    expect(state.tabs.removed).toEqual([]);
+
+    // A late decision has no record to land on.
+    port.emitMessage({
+      type: "approval_decision",
+      approvalId: APPROVAL_ID,
+      decision: "approved",
+    });
+    expect(resolved).not.toHaveBeenCalled();
+
+    state.scheduler.advanceBy(7_999);
+    expect(state.tabs.removed).toEqual([]);
+    state.scheduler.advanceBy(1);
+    expect(state.tabs.removed).toEqual([17]);
+  });
+
+  it("closes an unpresented prompt immediately when the caller gives up", async () => {
+    const state = setup();
+    state.controller.request(approvalRequired(), vi.fn());
+    await flushPromises();
+    expect(state.controller.cancel("request-approval")).toBe(true);
     expect(state.tabs.removed).toEqual([17]);
   });
 
@@ -269,6 +355,7 @@ class FakeApprovalRuntime implements ChromeApprovalRuntimeApi {
 class FakeApprovalTabs implements ChromeApprovalTabsApi {
   readonly onRemoved = new FakeChromeEvent<[number]>();
   readonly created: string[] = [];
+  readonly createdActive: boolean[] = [];
   readonly removed: number[] = [];
   readonly #options: {
     readonly create?: () => Promise<ApprovalTab>;
@@ -282,8 +369,9 @@ class FakeApprovalTabs implements ChromeApprovalTabsApi {
     this.#options = options;
   }
 
-  create(properties: { readonly active: true; readonly url: string }) {
+  create(properties: { readonly active: boolean; readonly url: string }) {
     this.created.push(properties.url);
+    this.createdActive.push(properties.active);
     if (this.#options.createFails === true) {
       return Promise.reject(new Error("tab create failed"));
     }
@@ -351,8 +439,10 @@ function approvalRequired(
     contextRevision: 1,
     origin: "https://example.com",
     tool: "demo.action",
+    args: { query: "flights to Lisbon" },
     argsHash: "a".repeat(64),
     expiresAt: "2026-09-15T00:01:00Z",
+    requester: { client: "Claude Code", session: "session-0001" },
     ...overrides,
   };
 }

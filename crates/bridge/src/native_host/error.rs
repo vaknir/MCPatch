@@ -21,4 +21,12 @@ impl NativeHostError {
             Self::Message(error) => error.code().as_str(),
         }
     }
+
+    /// Fixed, path-free guidance for failures an operator can correct.
+    pub const fn operator_hint(&self) -> Option<&'static str> {
+        match self {
+            Self::LocalChannel(error) => error.code().operator_hint(),
+            Self::CallerOrigin(_) | Self::Message(_) => None,
+        }
+    }
 }

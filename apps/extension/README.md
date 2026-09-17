@@ -5,6 +5,10 @@ worker synchronously installs lifecycle listeners, owns one long-lived Native
 Messaging port to `dev.mcpatch.bridge`, negotiates protocol version 2, and sends a
 heartbeat every 15 seconds while connected.
 
+Its fixed, credential-free `https://registry.mcpatch.dev` control-plane client
+accepts only a bounded signed index and immutable publisher-signed declarative
+bundles. Registry metadata cannot choose another URL or add executable code.
+
 ## Build
 
 ```sh
@@ -20,6 +24,12 @@ reviewed origins. Load
 `apps/extension/dist` with **Load unpacked** on `chrome://extensions` for local
 development. The native-host manifest must allow the resulting extension ID. The
 toolbar enablement flow is active for the bundled Google Flights reference pack.
+
+The extension options page provides an explicit local developer mode for
+data-only `.mcpack` artifacts. It previews the exact digest and authority, requests
+only confirmed HTTPS origins, stores bounded trusted-context records, and labels
+every local pack `UNSIGNED_LOCAL_DEVELOPMENT`. See
+[local developer mode](../../docs/local-pack-developer-mode.md).
 
 The committed public `key` fixes unpacked builds to extension ID
 `imbnpameklobbabbkfkalcfcggpjacdi`; it is public identity material, not a signing
@@ -82,17 +92,35 @@ own native host.
 
 ## Current permissions
 
-The baseline permissions are `nativeMessaging`, `storage`, `scripting`, and
-`activeTab`. `activeTab` is used only by the toolbar click that identifies the
-selected page. The manifest has no permanent `host_permissions`, static content
-scripts, or externally connectable surface. Google is the only optional host
-authority and can be requested only from a toolbar click on one of the two matching
-Google Flights paths.
+The baseline API permissions are exactly `nativeMessaging`, `storage`, and
+`scripting`. The sole required host permission is
+`https://registry.mcpatch.dev/*`, used only by the extension-owned credential-free
+signed registry client. It is not pack network authority. The toolbar click that
+identifies the selected page receives the
+tab from the `action.onClicked` event itself, so `activeTab` is not declared:
+combined with `scripting`, it would let a click run code on any page, which is a
+capability nothing in the extension uses. The manifest has no permanent website
+`host_permissions`, static content scripts, web-accessible resources, or
+externally connectable surface. The optional `https://*/*` declaration grants
+nothing by itself: reviewed sites request their exact closed origin set from a
+matching toolbar click, while local packs request only the exact origins displayed
+in the trusted developer-page confirmation.
+`apps/extension/tests/manifest.test.ts` pins the exact permission set so any
+widening is a deliberate, reviewed change.
 
-ADR 0008 fixes the Phase 6 direction: `storage`, `scripting`, and `activeTab` may be
-added as baseline permissions, while each site remains an optional HTTPS host grant.
-Reviewed scripts will be registered dynamically in the isolated world, and their
-top-level document ports—not `tabs` or `webNavigation`—will own context lifecycle.
+When no bundled pack matches an explicit toolbar action, the worker may consult its
+fresh signed index locally for that selected URL. It verifies and stages the exact
+bundle before opening `community-review.html`; only that extension page can request
+the displayed exact origin. Startup and offline restore re-verify the index,
+attestation, publisher signature, digest, compatibility, permission inventory, and
+packaged content registration. See
+[Community registry v1](../../docs/architecture/community-registry-v1.md) and
+[community pack updates](../../docs/architecture/community-pack-updates.md).
+
+ADR 0008 fixes the Phase 6 direction: `storage` and `scripting` are baseline
+permissions, while each site remains an optional HTTPS host grant. Reviewed
+scripts are registered dynamically in the isolated world, and their top-level
+document ports—not `tabs` or `webNavigation`—own context lifecycle.
 
 The closed, bounded JSON contract for those ports is implemented as page-channel
 protocol version 2 and documented in

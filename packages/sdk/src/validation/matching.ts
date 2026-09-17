@@ -8,7 +8,12 @@ export function validateMatches(
   const origins = new Set<string>();
   for (const [index, candidate] of value.entries()) {
     const prefix = `matches[${index}]`;
-    const checked = closedObject(candidate, ["origin", "paths"], [], prefix);
+    const checked = closedObject(
+      candidate,
+      ["origin", "paths"],
+      ["wholeOrigin"],
+      prefix,
+    );
     if (checked.issue !== undefined) return checked.issue;
     const originIssue = validateOrigin(
       checked.value.origin,
@@ -45,6 +50,8 @@ export function validateMatches(
       if (paths.has(key)) return issue("DUPLICATE_VALUE", `${pathPrefix}.path`);
       paths.add(key);
     }
+    const wholeOriginIssue = validateWholeOrigin(checked.value, paths, prefix);
+    if (wholeOriginIssue !== undefined) return wholeOriginIssue;
   }
   return undefined;
 }
@@ -171,4 +178,24 @@ function hasControlCharacter(value: string): boolean {
     const code = character.charCodeAt(0);
     return code < 0x20 || code === 0x7f;
   });
+}
+
+/**
+ * A `prefix` rule of `/` covers every page on the host, which is a far larger
+ * injection surface than a path list. It is legal only when the match says so
+ * outright, and the flag is legal only when such a rule is present, so the
+ * declaration and the grant cannot drift apart.
+ */
+function validateWholeOrigin(
+  match: Record<string, unknown>,
+  paths: ReadonlySet<string>,
+  prefix: string,
+): PackManifestValidationIssue | undefined {
+  const declared = Object.hasOwn(match, "wholeOrigin");
+  if (declared && match.wholeOrigin !== true) {
+    return issue("INVALID_VALUE", `${prefix}.wholeOrigin`);
+  }
+  return paths.has("prefix:/") === declared
+    ? undefined
+    : issue("INVALID_VALUE", `${prefix}.wholeOrigin`);
 }

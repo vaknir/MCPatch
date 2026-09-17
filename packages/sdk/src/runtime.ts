@@ -48,3 +48,41 @@ export type {
   PackImageContent,
   PackToolReturn,
 } from "./tool-result.js";
+export {
+  computeDeclarativePackBundleDigest,
+  MAX_DECLARATIVE_BUNDLE_BYTES,
+  parseDeclarativePackBundleContent,
+  parseDeclarativePackBundleContentBytes,
+  parseDeclarativePackBundle,
+  validateDeclarativePackBundle,
+  verifyDeclarativePackBundle,
+  verifyRegistryAttestation,
+} from "./declarative-bundle.js";
+export type * from "./declarative-bundle-types.js";
+export {
+  communityBundlePath,
+  MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
+  MAX_COMMUNITY_REGISTRY_PACKS,
+  parseCommunityRegistryIndex,
+  validateCommunityRegistryIndex,
+  verifyCommunityRegistryIndex,
+} from "./community-registry.js";
+export {
+  COMMUNITY_REGISTRY_INDEX_VERSION,
+  COMMUNITY_REGISTRY_SIGNATURE_VERSION,
+} from "./community-registry-types.js";
+export type * from "./community-registry-types.js";
+export {
+  MAX_ATTRIBUTE_CHARS,
+  MAX_NODE_VISITS,
+  MAX_OPERATION_DEADLINE_MS,
+  MAX_OUTPUT_BYTES,
+  MAX_OUTPUT_NODES,
+  MAX_TEXT_CHARS,
+} from "./declarative-operations-limits.js";
+export type * from "./declarative-operations-types.js";
+export {
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
+} from "./declarative-navigation.js";
+export type * from "./declarative-navigation.js";

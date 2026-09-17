@@ -1,4 +1,9 @@
-import type { ApprovalDecision, ApprovalRequired } from "@mcpatch/protocol";
+import type {
+  ApprovalDecision,
+  ApprovalRequester,
+  ApprovalRequired,
+  JsonObject,
+} from "@mcpatch/protocol";
 
 import type { ChromeEvent } from "./lifecycle.js";
 
@@ -34,7 +39,7 @@ export interface ApprovalTab {
 export interface ChromeApprovalTabsApi {
   readonly onRemoved: ChromeEvent<[number]>;
   create(properties: {
-    readonly active: true;
+    readonly active: boolean;
     readonly url: string;
   }): Promise<ApprovalTab>;
   remove(tabId: number): Promise<void>;
@@ -66,11 +71,30 @@ export interface ApprovalDecisionMessage {
   readonly decision: ApprovalDecision;
 }
 
+/**
+ * Sent to a presented prompt when the requesting MCP client stopped waiting.
+ * The pending record is already discarded, so no decision can follow; the
+ * page only explains why the prompt is closing.
+ */
+export interface ApprovalWithdrawn {
+  readonly type: "approval_withdrawn";
+  readonly approvalId: string;
+}
+
+/**
+ * Everything the trusted page renders. `args` are the bridge-validated,
+ * bridge-retained arguments the hash commits to, so the user approves what
+ * will run rather than an opaque digest; `requester` names the MCP client and
+ * bridge session that asked, so a user running several agents can tell which
+ * one is asking.
+ */
 export interface ApprovalPresentation {
   readonly type: "approval_present";
   readonly approvalId: string;
   readonly tool: string;
   readonly origin: string;
+  readonly args: JsonObject;
   readonly argsHash: string;
   readonly expiresAt: string;
+  readonly requester: ApprovalRequester;
 }

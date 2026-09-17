@@ -5,7 +5,7 @@ import type {
 } from "@mcpatch/sdk/runtime";
 
 import type { PageRuntimeTool } from "./compiled-pack-model.js";
-import type { ValidatedCompiledPack } from "./compiled-pack-validation.js";
+import type { ValidatedRuntimePack } from "./compiled-pack-validation.js";
 
 const MAX_PAGE_TOOLS = 128;
 const TOOL_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
@@ -13,20 +13,22 @@ const TOOL_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
 export interface RuntimePackProjection {
   readonly candidates: readonly {
     readonly manifest: PackManifest;
-    readonly value: ValidatedCompiledPack;
+    readonly value: ValidatedRuntimePack;
   }[];
   readonly pageHandlers?: ReadonlyMap<string, PackToolHandler>;
 }
 
 /** Limits page-context pack manifests to tools reported over the page channel. */
 export function projectRuntimePacks(
-  packs: readonly ValidatedCompiledPack[],
+  packs: readonly ValidatedRuntimePack[],
   page: readonly PageRuntimeTool[] | undefined,
 ): RuntimePackProjection | undefined {
   if (page === undefined) {
     return Object.freeze({
       candidates: Object.freeze(
-        packs.map((value) => ({ manifest: value.manifest, value })),
+        packs
+          .filter((value) => value.kind === "compiled")
+          .map((value) => ({ manifest: value.manifest, value })),
       ),
     });
   }
@@ -34,7 +36,7 @@ export function projectRuntimePacks(
   if (pageHandlers === undefined) return undefined;
   const candidates: Array<{
     readonly manifest: PackManifest;
-    readonly value: ValidatedCompiledPack;
+    readonly value: ValidatedRuntimePack;
   }> = [];
   for (const value of packs) {
     const tools = value.manifest.tools.filter((tool) =>
@@ -66,7 +68,7 @@ export function projectRuntimePacks(
 /** Ensures every reported page route belongs to a pack matching this page. */
 export function pageProjectionMatchesResolution(
   projection: RuntimePackProjection,
-  capabilities: readonly ResolvedCapability<unknown, ValidatedCompiledPack>[],
+  capabilities: readonly ResolvedCapability<unknown, ValidatedRuntimePack>[],
   collisions: readonly {
     readonly name: string;
     readonly packs: readonly unknown[];

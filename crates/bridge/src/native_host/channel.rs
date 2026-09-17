@@ -15,6 +15,7 @@ pub enum LocalBrowserChannelErrorCode {
     Backpressure,
     Closed,
     Malformed,
+    RuntimeDirectoryUnavailable,
     SpawnFailed,
     StartupEntropyUnavailable,
     StartupTimeout,
@@ -30,6 +31,7 @@ impl LocalBrowserChannelErrorCode {
             Self::Backpressure => "local_ipc_backpressure",
             Self::Closed => "local_ipc_closed",
             Self::Malformed => "local_core_malformed_frame",
+            Self::RuntimeDirectoryUnavailable => "local_core_runtime_directory_unavailable",
             Self::SpawnFailed => "core_spawn_failed",
             Self::StartupEntropyUnavailable => "core_startup_entropy_unavailable",
             Self::StartupTimeout => "core_startup_timeout",
@@ -37,6 +39,25 @@ impl LocalBrowserChannelErrorCode {
             Self::Unavailable => "local_core_unavailable",
             Self::Unauthorized => "local_core_unauthorized",
             Self::UnsafeRuntime => "local_core_runtime_unsafe",
+        }
+    }
+
+    /// Fixed, path-free guidance for failures an operator can correct.
+    pub const fn operator_hint(self) -> Option<&'static str> {
+        match self {
+            Self::RuntimeDirectoryUnavailable => {
+                LocalCoreConnectionErrorCode::RuntimeDirectoryUnavailable.operator_hint()
+            }
+            Self::UnsafeRuntime => LocalCoreConnectionErrorCode::UnsafeRuntime.operator_hint(),
+            Self::Backpressure
+            | Self::Closed
+            | Self::Malformed
+            | Self::SpawnFailed
+            | Self::StartupEntropyUnavailable
+            | Self::StartupTimeout
+            | Self::Transport
+            | Self::Unavailable
+            | Self::Unauthorized => None,
         }
     }
 }
@@ -71,6 +92,9 @@ impl From<LocalCoreConnectionError> for LocalBrowserChannelError {
 const fn map_connection_code(code: LocalCoreConnectionErrorCode) -> LocalBrowserChannelErrorCode {
     match code {
         LocalCoreConnectionErrorCode::MalformedFrame => LocalBrowserChannelErrorCode::Malformed,
+        LocalCoreConnectionErrorCode::RuntimeDirectoryUnavailable => {
+            LocalBrowserChannelErrorCode::RuntimeDirectoryUnavailable
+        }
         LocalCoreConnectionErrorCode::Transport => LocalBrowserChannelErrorCode::Transport,
         LocalCoreConnectionErrorCode::Unauthorized => LocalBrowserChannelErrorCode::Unauthorized,
         LocalCoreConnectionErrorCode::Unavailable => LocalBrowserChannelErrorCode::Unavailable,
@@ -125,10 +149,33 @@ mod tests {
             (Code::StartupTimeout, "core_startup_timeout"),
             (Code::Transport, "local_core_transport_failed"),
             (Code::Unavailable, "local_core_unavailable"),
+            (
+                Code::RuntimeDirectoryUnavailable,
+                "local_core_runtime_directory_unavailable",
+            ),
             (Code::Unauthorized, "local_core_unauthorized"),
             (Code::UnsafeRuntime, "local_core_runtime_unsafe"),
         ] {
             assert_eq!(code.as_str(), expected);
+        }
+    }
+
+    #[test]
+    fn only_runtime_directory_failures_carry_operator_hints() {
+        assert!(Code::RuntimeDirectoryUnavailable.operator_hint().is_some());
+        assert!(Code::UnsafeRuntime.operator_hint().is_some());
+        for code in [
+            Code::Backpressure,
+            Code::Closed,
+            Code::Malformed,
+            Code::SpawnFailed,
+            Code::StartupEntropyUnavailable,
+            Code::StartupTimeout,
+            Code::Transport,
+            Code::Unavailable,
+            Code::Unauthorized,
+        ] {
+            assert_eq!(code.operator_hint(), None);
         }
     }
 }

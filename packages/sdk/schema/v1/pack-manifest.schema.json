@@ -20,7 +20,9 @@
     "fixtures"
   ],
   "properties": {
-    "manifestVersion": { "const": 1 },
+    "manifestVersion": {
+      "const": 1
+    },
     "publisher": {
       "type": "string",
       "minLength": 3,
@@ -33,14 +35,26 @@
       "maxLength": 64,
       "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?$"
     },
-    "name": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
-    "version": { "$ref": "#/$defs/semver" },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "version": {
+      "$ref": "#/$defs/semver"
+    },
     "digest": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$"
     },
-    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "compatibility": {
+      "$ref": "#/$defs/compatibility"
+    },
     "execution": {
       "oneOf": [
         {
@@ -48,15 +62,23 @@
           "additionalProperties": false,
           "required": ["kind", "operationsVersion"],
           "properties": {
-            "kind": { "const": "declarative" },
-            "operationsVersion": { "const": 1 }
+            "kind": {
+              "const": "declarative"
+            },
+            "operationsVersion": {
+              "enum": [1, 2]
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind"],
-          "properties": { "kind": { "const": "bundled" } }
+          "properties": {
+            "kind": {
+              "const": "bundled"
+            }
+          }
         }
       ]
     },
@@ -65,7 +87,9 @@
       "minItems": 1,
       "maxItems": 32,
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/match" }
+      "items": {
+        "$ref": "#/$defs/match"
+      }
     },
     "networkPolicy": {
       "type": "object",
@@ -74,7 +98,9 @@
       "properties": {
         "extensionRequests": {
           "oneOf": [
-            { "const": "none" },
+            {
+              "const": "none"
+            },
             {
               "type": "object",
               "additionalProperties": false,
@@ -93,7 +119,9 @@
                 },
                 "methods": {
                   "type": "array",
-                  "items": { "enum": ["GET", "POST"] },
+                  "items": {
+                    "enum": ["GET", "POST"]
+                  },
                   "uniqueItems": true,
                   "minItems": 1,
                   "maxItems": 2
@@ -109,14 +137,18 @@
       "minItems": 1,
       "maxItems": 128,
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/tool" }
+      "items": {
+        "$ref": "#/$defs/tool"
+      }
     },
     "fixtures": {
       "type": "array",
       "minItems": 1,
       "maxItems": 256,
       "uniqueItems": true,
-      "items": { "$ref": "#/$defs/fixture" }
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
     }
   },
   "$defs": {
@@ -140,8 +172,12 @@
           "additionalProperties": false,
           "required": ["minimum", "maximumExclusive"],
           "properties": {
-            "minimum": { "$ref": "#/$defs/stableSemver" },
-            "maximumExclusive": { "$ref": "#/$defs/stableSemver" }
+            "minimum": {
+              "$ref": "#/$defs/stableSemver"
+            },
+            "maximumExclusive": {
+              "$ref": "#/$defs/stableSemver"
+            }
           }
         },
         "bridgeProtocol": {
@@ -149,8 +185,16 @@
           "additionalProperties": false,
           "required": ["minimum", "maximum"],
           "properties": {
-            "minimum": { "type": "integer", "minimum": 1, "maximum": 65535 },
-            "maximum": { "type": "integer", "minimum": 1, "maximum": 65535 }
+            "minimum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "maximum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
           }
         }
       }
@@ -170,16 +214,65 @@
           "minItems": 1,
           "maxItems": 32,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/pathRule" }
+          "items": {
+            "$ref": "#/$defs/pathRule"
+          }
+        },
+        "wholeOrigin": {
+          "const": true
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "paths": {
+                "type": "array",
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "prefix"
+                    },
+                    "path": {
+                      "const": "/"
+                    }
+                  },
+                  "required": ["kind", "path"]
+                }
+              }
+            },
+            "required": ["paths"]
+          },
+          "then": {
+            "properties": {
+              "wholeOrigin": {
+                "const": true
+              }
+            },
+            "required": ["wholeOrigin"]
+          },
+          "else": {
+            "not": {
+              "properties": {
+                "wholeOrigin": {
+                  "const": true
+                }
+              },
+              "required": ["wholeOrigin"]
+            }
+          }
+        }
+      ]
     },
     "pathRule": {
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "path"],
       "properties": {
-        "kind": { "enum": ["exact", "prefix"] },
+        "kind": {
+          "enum": ["exact", "prefix"]
+        },
         "path": {
           "type": "string",
           "minLength": 1,
@@ -206,9 +299,19 @@
           "maxLength": 128,
           "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
         },
-        "title": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
-        "risk": { "enum": ["read", "action", "sensitive"] },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "risk": {
+          "enum": ["read", "action", "sensitive"]
+        },
         "permissions": {
           "type": "array",
           "minItems": 1,
@@ -229,11 +332,26 @@
           "type": "object",
           "required": ["type", "additionalProperties"],
           "properties": {
-            "type": { "const": "object" },
-            "additionalProperties": { "const": false }
+            "type": {
+              "const": "object"
+            },
+            "additionalProperties": {
+              "const": false
+            }
           }
         },
-        "outputSchema": { "type": "object" }
+        "outputSchema": {
+          "type": "object",
+          "required": ["type", "additionalProperties"],
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "additionalProperties": {
+              "const": false
+            }
+          }
+        }
       }
     },
     "fixture": {
@@ -247,8 +365,12 @@
           "maxLength": 64,
           "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
         },
-        "tool": { "$ref": "#/$defs/tool/properties/name" },
-        "input": { "type": "object" },
+        "tool": {
+          "$ref": "#/$defs/tool/properties/name"
+        },
+        "input": {
+          "type": "object"
+        },
         "expect": {
           "oneOf": [
             {
@@ -256,7 +378,9 @@
               "additionalProperties": false,
               "required": ["kind", "result"],
               "properties": {
-                "kind": { "const": "result" },
+                "kind": {
+                  "const": "result"
+                },
                 "result": true
               }
             },
@@ -265,7 +389,9 @@
               "additionalProperties": false,
               "required": ["kind", "code"],
               "properties": {
-                "kind": { "const": "error" },
+                "kind": {
+                  "const": "error"
+                },
                 "code": {
                   "enum": [
                     "INVALID_REQUEST",

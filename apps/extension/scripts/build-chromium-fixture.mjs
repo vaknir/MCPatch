@@ -32,6 +32,8 @@ const googleFlightsPackEntry = fileURLToPath(
 );
 const marker = "MCPATCH_CHROMIUM_FIXTURE_ONLY";
 const fixtureOrigin = "https://fixture.mcpatch.test";
+const communityOrigin = "https://community.mcpatch.test";
+const registryOrigin = "https://registry-fixture.mcpatch.test";
 
 await assertProductionArtifact();
 await rm(distributionDirectory, { recursive: true, force: true });
@@ -42,8 +44,16 @@ const manifest = JSON.parse(
 );
 manifest.name = "MCPatch Chromium fixture";
 manifest.description = "Test-only MCPatch fixture runtime; never ship.";
+delete manifest.options_ui;
+// The disposable fixture pre-grants only its exact synthetic site so headless
+// Chromium has no browser-chrome permission bubble. Production keeps this
+// origin optional and exercises the user gesture in unit/controller tests.
+manifest.host_permissions = [
+  `${fixtureOrigin}/*`,
+  `${registryOrigin}/*`,
+  `${communityOrigin}/*`,
+];
 delete manifest.optional_host_permissions;
-manifest.host_permissions = [`${fixtureOrigin}/*`];
 await writeFile(
   new URL("manifest.json", distributionDirectory),
   `${JSON.stringify(manifest, null, 2)}\n`,
@@ -92,6 +102,18 @@ await copyFile(
   new URL("fixture-control.html", fixtureDirectory),
   new URL("fixture-control.html", distributionDirectory),
 );
+for (const artifact of [
+  "approval.html",
+  "approval-page.js",
+  "approval.css",
+  "community-review.html",
+  "community-review.js",
+]) {
+  await copyFile(
+    new URL(artifact, productionDirectory),
+    new URL(artifact, distributionDirectory),
+  );
+}
 const tailwindPackage = require.resolve("@tailwindcss/cli/package.json");
 await executeFile(
   process.execPath,
@@ -138,7 +160,8 @@ async function assertProductionArtifact() {
   );
   if (
     manifest.name !== "MCPatch" ||
-    Object.hasOwn(manifest, "host_permissions") ||
+    JSON.stringify(manifest.host_permissions) !==
+      JSON.stringify(["https://registry.mcpatch.dev/*"]) ||
     JSON.stringify(manifest).includes(fixtureOrigin)
   ) {
     throw new Error(

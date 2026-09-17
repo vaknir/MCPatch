@@ -57,6 +57,8 @@ export {
   canonicalizeDeclarativePackBundle,
   computeDeclarativePackBundleDigest,
   decodeDeclarativePackBundle,
+  parseDeclarativePackBundleContent,
+  parseDeclarativePackBundleContentBytes,
   parseDeclarativePackBundle,
   parseDeclarativePackBundleBytes,
   publisherKeyId,
@@ -76,11 +78,28 @@ export {
 export {
   BUNDLE_SIGNATURE_VERSION,
   DECLARATIVE_OPERATIONS_VERSION,
+  DECLARATIVE_OPERATIONS_VERSIONS,
   DECLARATIVE_PACK_BUNDLE_VERSION,
   REGISTRY_ATTESTATION_VERSION,
   DeclarativePackBundleValidationError,
 } from "./declarative-bundle-types.js";
 export type * from "./declarative-bundle-types.js";
+export {
+  communityBundlePath,
+  indexSigningBytes,
+  MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
+  MAX_COMMUNITY_REGISTRY_PACKS,
+  parseCommunityRegistryIndex,
+  signCommunityRegistryIndex,
+  signRegistryAttestation,
+  validateCommunityRegistryIndex,
+  verifyCommunityRegistryIndex,
+} from "./community-registry.js";
+export {
+  COMMUNITY_REGISTRY_INDEX_VERSION,
+  COMMUNITY_REGISTRY_SIGNATURE_VERSION,
+} from "./community-registry-types.js";
+export type * from "./community-registry-types.js";
 export { validateDeclarativeOperations } from "./declarative-operations-validation.js";
 export {
   DECLARATIVE_OPERATION_RUNTIME_LIMITS,
@@ -113,3 +132,8 @@ export {
   DECLARATIVE_OUTPUT_ATTRIBUTES,
 } from "./declarative-operations-types.js";
 export type * from "./declarative-operations-types.js";
+export {
+  createDeclarativeNavigationUrl,
+  declarativeNavigationResult,
+} from "./declarative-navigation.js";
+export type * from "./declarative-navigation.js";

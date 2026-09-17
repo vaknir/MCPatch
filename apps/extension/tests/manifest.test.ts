@@ -3,10 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  CONFIGURABLE_ORIGIN_DECLARATION,
-  DECLARED_OPTIONAL_ORIGINS,
-} from "../src/bundled-packs.js";
+import { DECLARED_OPTIONAL_ORIGINS } from "../src/bundled-packs.js";
 
 const manifest = JSON.parse(
   readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
@@ -35,40 +32,32 @@ describe("extension manifest", () => {
     });
   });
 
-  it("declares one broad optional pattern that is never requested as a grant", () => {
-    // The declaration exists so an arbitrary configured origin is expressible.
-    // `permission-proof.ts` refuses it as proof, and no code path requests it.
-    expect(CONFIGURABLE_ORIGIN_DECLARATION).toBe("https://*/*");
-    expect(manifest["optional_host_permissions"]).toContain(
-      CONFIGURABLE_ORIGIN_DECLARATION,
-    );
-    expect(manifest["optional_host_permissions"]).not.toContain("<all_urls>");
-    expect(manifest["optional_host_permissions"]).not.toContain("*://*/*");
-  });
-
-  it("grants no ambient website authority and declares only exact optional origins", () => {
+  it("grants no ambient website authority and requests discovered HTTPS origins only at runtime", () => {
     expect(Object.keys(manifest).sort()).toEqual([
       "action",
       "background",
       "description",
+      "host_permissions",
       "key",
       "manifest_version",
       "minimum_chrome_version",
       "name",
       "optional_host_permissions",
+      "options_ui",
       "permissions",
       "version",
     ]);
     expect(manifest["minimum_chrome_version"]).toBe("106");
+    // Exact set: `activeTab` plus `scripting` would let a toolbar click run
+    // code on any page, so it is deliberately absent.
     expect(manifest["permissions"]).toEqual([
-      "activeTab",
       "nativeMessaging",
       "scripting",
       "storage",
     ]);
-    expect(manifest["optional_host_permissions"]).toEqual([
-      ...DECLARED_OPTIONAL_ORIGINS.map((origin) => `${origin}/*`),
-      CONFIGURABLE_ORIGIN_DECLARATION,
+    expect(manifest["optional_host_permissions"]).toEqual(["https://*/*"]);
+    expect(manifest["host_permissions"]).toEqual([
+      "https://registry.mcpatch.dev/*",
     ]);
     expect(
       DECLARED_OPTIONAL_ORIGINS.every(
@@ -76,10 +65,39 @@ describe("extension manifest", () => {
       ),
     ).toBe(true);
     expect(manifest["action"]).toEqual({ default_title: "MCPatch" });
+    expect(manifest["options_ui"]).toEqual({
+      page: "developer.html",
+      open_in_tab: true,
+    });
     expect(manifest).not.toHaveProperty("optional_permissions");
-    expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
     expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
+  });
+
+  it("keeps the approval page unreachable from web content", () => {
+    // A page can only load, frame, or fetch an extension resource that the
+    // manifest lists as web accessible, and can only message the worker
+    // through externally_connectable. Neither exists, so the trusted approval
+    // page and its port are reachable from extension pages alone.
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
+    expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(JSON.stringify(manifest)).not.toContain("approval.html");
+  });
+
+  it("keeps the local developer surface unreachable from web content", () => {
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
+    expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(manifest["options_ui"]).toEqual({
+      page: "developer.html",
+      open_in_tab: true,
+    });
+  });
+
+  it("keeps the community review surface unreachable from web content", () => {
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
+    expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(JSON.stringify(manifest)).not.toContain("community-review.html");
   });
 
   it("derives one stable ID from a committed public identity", () => {

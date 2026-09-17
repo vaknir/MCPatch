@@ -1,3 +1,4 @@
+import { contentScriptMatches } from "./content-script-matches.js";
 import {
   canonicalizePageLocation,
   packMatchesLocation,
@@ -9,13 +10,11 @@ import {
   configuredKey,
   type ConfiguredPackOrigin,
 } from "./configured-origins.js";
-
 import type {
   EnabledPackRecord,
   PackSiteCatalog,
   ReviewedPackSite,
 } from "./enablement-model.js";
-import { REGISTRATION_PREFIX } from "./enablement-model.js";
 import {
   validateCompiledPacks,
   validateRuntimeOptions,
@@ -24,7 +23,6 @@ import {
 } from "./compiled-pack-validation.js";
 
 const MAX_DECLARED_ORIGINS = 32;
-const MAX_REGISTRATION_ID_BYTES = 768;
 
 export function createReviewedPackCatalog(
   subjects: readonly CompiledPackSubject[],
@@ -53,25 +51,27 @@ export function createReviewedPackCatalog(
       }
     }
     for (const match of pack.manifest.matches) {
-      // A synthetic origin marks a pack whose real deployment is self-hosted, so
-      // its site comes from the user's stored configuration instead of a
+      // A synthetic origin marks a pack whose real deployment is self-hosted,
+      // so its sites come from the user's stored configuration rather than a
       // compile-time list. Nothing is emitted until that configuration exists.
-      const bindings = match.origin.endsWith(".invalid")
+      const configurable = match.origin.endsWith(".invalid");
+      const bindings = configurable
         ? configuredOriginsFor(configured, pack.manifest)
         : [match.origin];
       for (const origin of bindings) {
-        if (!match.origin.endsWith(".invalid") && !origins.has(origin)) {
+        if (!configurable && !origins.has(origin)) {
           throw new TypeError(
             "reviewed pack origin is not declared optional authority",
           );
         }
+        const bound = boundMatch(match, origin);
         const key = `${pack.manifest.publisher}/${pack.manifest.id}@${origin}`;
         if (keys.has(key)) throw new TypeError("duplicate reviewed pack site");
         keys.add(key);
         sites.push(
           Object.freeze({
             key,
-            manifest: boundManifest(pack.manifest, match, origin),
+            manifest: boundManifest(pack.manifest, bound, configurable),
             origin,
             permissionPattern: `${origin}/*`,
             permissionPatterns: Object.freeze(
@@ -82,7 +82,7 @@ export function createReviewedPackCatalog(
                 .sort()
                 .map((value) => `${value}/*`),
             ),
-            registrationId: registrationId(origin),
+            scriptMatches: contentScriptMatches(bound),
             tools: Object.freeze(
               new Set(pack.manifest.tools.map((tool) => tool.name)),
             ),
@@ -138,6 +138,12 @@ function configuredOriginsFor(
   );
 }
 
+function boundMatch(match: PackMatch, origin: string): PackMatch {
+  return match.origin === origin
+    ? match
+    : Object.freeze({ origin, paths: match.paths });
+}
+
 /**
  * The declared manifest keeps its reviewed identity and digest; only the origin
  * it is matched and registered against is bound at runtime. The enablement
@@ -147,13 +153,10 @@ function configuredOriginsFor(
 function boundManifest(
   manifest: PackManifest,
   match: PackMatch,
-  origin: string,
+  configurable: boolean,
 ): PackManifest {
-  if (match.origin === origin && manifest.matches.length === 1) return manifest;
-  return Object.freeze({
-    ...manifest,
-    matches: Object.freeze([Object.freeze({ origin, paths: match.paths })]),
-  });
+  if (!configurable) return manifest;
+  return Object.freeze({ ...manifest, matches: Object.freeze([match]) });
 }
 
 function networkRequestOrigins(manifest: PackManifest): readonly string[] {
@@ -199,15 +202,4 @@ function validateDeclaredOrigins(
     }
   }
   return Object.freeze(new Set(values));
-}
-
-function registrationId(origin: string): string {
-  const encoded = [...new TextEncoder().encode(origin)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  const id = `${REGISTRATION_PREFIX}${encoded}`;
-  if (id.length > MAX_REGISTRATION_ID_BYTES) {
-    throw new TypeError("reviewed pack origin is too long to register safely");
-  }
-  return id;
 }

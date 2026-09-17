@@ -7,7 +7,6 @@ import type { PageAuthority } from "./page-context-model.js";
 export const ENABLEMENT_STORAGE_KEY = "mcpatch.enablement.v1";
 export const ENABLEMENT_STATE_VERSION = 1 as const;
 export const CONTENT_SCRIPT_FILE = "content-script.js";
-export const REGISTRATION_PREFIX = "mcpatch-v1-";
 
 export interface ReviewedPackSite {
   readonly key: string;
@@ -15,7 +14,12 @@ export interface ReviewedPackSite {
   readonly origin: string;
   readonly permissionPattern: string;
   readonly permissionPatterns: readonly string[];
-  readonly registrationId: string;
+  /**
+   * Where the content script is registered: the manifest's own path rules,
+   * not the whole origin. Host permissions stay origin-granular because
+   * Chrome grants them that way; this bounds where code runs.
+   */
+  readonly scriptMatches: readonly string[];
   readonly tools: ReadonlySet<string>;
 }
 
@@ -67,8 +71,6 @@ export interface ChromeActionApi {
 export interface ChromePermissionsApi {
   readonly onAdded: ChromeEvent<[ChromePermissionSet]>;
   readonly onRemoved: ChromeEvent<[ChromePermissionSet]>;
-  // `contains` is deliberately absent: a broader granted pattern satisfies an
-  // exact-looking query, so proof reads the complete inventory instead.
   getAll(): Promise<ChromePermissionSet>;
   remove(permissions: ChromePermissionSet): Promise<boolean>;
   request(permissions: ChromePermissionSet): Promise<boolean>;

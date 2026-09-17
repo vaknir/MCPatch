@@ -2,12 +2,13 @@ import type { PackManifest } from "./types.js";
 import type { DeclarativeOperationsProgram } from "./declarative-operations-types.js";
 
 export const DECLARATIVE_PACK_BUNDLE_VERSION = 1 as const;
-export const DECLARATIVE_OPERATIONS_VERSION = 1 as const;
+export const DECLARATIVE_OPERATIONS_VERSION = 2 as const;
+export const DECLARATIVE_OPERATIONS_VERSIONS = [1, 2] as const;
 export const BUNDLE_SIGNATURE_VERSION = 1 as const;
 export const REGISTRY_ATTESTATION_VERSION = 1 as const;
 
 export type DeclarativePackBundleOperations = Readonly<{
-  readonly operationsVersion: typeof DECLARATIVE_OPERATIONS_VERSION;
+  readonly operationsVersion: (typeof DECLARATIVE_OPERATIONS_VERSIONS)[number];
   readonly program: DeclarativeOperationsProgram;
 }>;
 

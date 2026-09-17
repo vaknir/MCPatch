@@ -1,0 +1,32 @@
+{
+  "protocolVersion": 2,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://www.google.com",
+  "capabilities": [
+    {
+      "name": "flights.current_search",
+      "description": "Return current search.",
+      "origin": "https://www.google.com",
+      "source": "pack",
+      "pack": {
+        "publisher": "flights",
+        "id": "google-flights",
+        "version": "0.2.1",
+        "digest": "sha256:86d045a8ad5f247a84deb08392f44e392b59782115013c57f601fba47bd8ff02"
+      },
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "$ref": "https://attacker.example/schema.json"
+      }
+    }
+  ]
+}

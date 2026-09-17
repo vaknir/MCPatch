@@ -22,6 +22,14 @@ impl CoreRendezvousErrorCode {
             Self::StartupTimeout => "core_startup_timeout",
         }
     }
+
+    /// Fixed, path-free guidance for failures an operator can correct.
+    pub const fn operator_hint(self) -> Option<&'static str> {
+        match self {
+            Self::Connection(code) => code.operator_hint(),
+            Self::EntropyUnavailable | Self::SpawnFailed | Self::StartupTimeout => None,
+        }
+    }
 }
 
 /// Payload-free rendezvous error whose sources are never written to audit logs.

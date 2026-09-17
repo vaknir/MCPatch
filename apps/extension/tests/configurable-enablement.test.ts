@@ -5,6 +5,7 @@ import {
   type ConfiguredPackOrigin,
 } from "../src/configured-origins.js";
 import { PackEnablementController } from "../src/pack-enablement.js";
+import { PackContentCatalog } from "../src/pack-content-catalog.js";
 import { FakeEnablementApi } from "./support/enablement.js";
 import {
   CONFIGURABLE_PLACEHOLDER,
@@ -25,8 +26,11 @@ function configuration(origins: readonly string[]): unknown {
 }
 
 async function start(api: FakeEnablementApi) {
-  const controller = new PackEnablementController(api, (configured) =>
-    configurableCatalog(configured.map((site) => site.origin)),
+  const content = new PackContentCatalog(api.scripting, api.permissions);
+  const controller = new PackEnablementController(
+    api,
+    (configured) => configurableCatalog(configured.map((site) => site.origin)),
+    content.createSource("reviewed"),
   );
   controller.start();
   await settle(controller);
@@ -62,20 +66,20 @@ describe("configurable pack origins end to end", () => {
     ]);
     expect(JSON.stringify(api.permissions.requests)).not.toContain("*/*");
     expect([...api.scripting.registrations.values()][0]?.matches).toEqual([
-      `${CONFIGURED}/*`,
+      `${CONFIGURED}/app/*`,
     ]);
     expect(controller.authority.authorize(identity())).toEqual({
       packTools: new Set(["mcpatch.site.status"]),
     });
   });
 
-  it("refuses an all-hosts grant as authority for the configured origin", async () => {
+  it("never treats an all-hosts grant alone as authority", async () => {
     const api = new FakeEnablementApi();
     api.storage.data[ORIGIN_CONFIG_STORAGE_KEY] = configuration([CONFIGURED]);
+    // Granted without any user gesture for this pack, as a manually broadened
+    // site-access setting would look.
     api.permissions.granted.add("https://*/*");
     const controller = await start(api);
-
-    api.action.onClicked.emit({ id: 7, url: PAGE });
     await settle(controller);
 
     expect(api.scripting.registrations.size).toBe(0);

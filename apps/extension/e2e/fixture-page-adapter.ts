@@ -7,8 +7,10 @@ import {
 } from "../src/page-content-model.js";
 import {
   FIXTURE_ORIGIN,
+  FIXTURE_PROBE_TOOL,
   FIXTURE_STATE_TOOL,
   FIXTURE_WAIT_TOOL,
+  OTHER_ORIGIN,
 } from "./fixture-constants.js";
 
 const capabilities: readonly PageCapability[] = Object.freeze([
@@ -19,6 +21,10 @@ const capabilities: readonly PageCapability[] = Object.freeze([
   Object.freeze({
     source: "pack" as const,
     name: FIXTURE_WAIT_TOOL,
+  }),
+  Object.freeze({
+    source: "pack" as const,
+    name: FIXTURE_PROBE_TOOL,
   }),
 ]);
 
@@ -36,6 +42,7 @@ export function createFixturePageAdapter(document: Document): PageAdapter {
       if (tool === FIXTURE_STATE_TOOL) return currentState(document);
       if (tool === FIXTURE_WAIT_TOOL)
         return waitForCancellation(document, signal);
+      if (tool === FIXTURE_PROBE_TOOL) return realmProbe(document);
       throw new PageAdapterExecutionError("TOOL_UNAVAILABLE");
     },
     subscribe(listener) {
@@ -87,4 +94,57 @@ function waitForCancellation(
     }
     signal.addEventListener("abort", cancelled, { once: true });
   });
+}
+
+/**
+ * Exercises the locked isolated realm from inside a pack handler and reports,
+ * per primitive, whether the lockdown refused it. Every field must be true on
+ * a page whose realm was locked before this code ran.
+ */
+async function realmProbe(document: Document): Promise<JsonObject> {
+  return {
+    fetchUndeclaredBlocked: await rejectedByLockdown(() =>
+      fetch(`${OTHER_ORIGIN}/collect`),
+    ),
+    fetchHttpBlocked: await rejectedByLockdown(() =>
+      fetch("http://fixture.mcpatch.test/x"),
+    ),
+    xhrBlocked: throwsSynchronously(
+      () =>
+        new (
+          globalThis as { XMLHttpRequest: new () => unknown }
+        ).XMLHttpRequest(),
+    ),
+    sendBeaconBlocked: throwsSynchronously(() =>
+      globalThis.navigator.sendBeacon(`${OTHER_ORIGIN}/collect`),
+    ),
+    cookieBlocked: throwsSynchronously(() => {
+      void document.cookie;
+    }),
+  };
+}
+
+/** True when the thunk rejects with the lockdown's own TypeError rather than a
+ * network error, so a blocked request is distinguished from an aborted one. */
+async function rejectedByLockdown(
+  thunk: () => Promise<unknown>,
+): Promise<boolean> {
+  try {
+    await thunk();
+    return false;
+  } catch (error) {
+    return (
+      error instanceof TypeError &&
+      /not declared|must use https/.test(error.message)
+    );
+  }
+}
+
+function throwsSynchronously(thunk: () => unknown): boolean {
+  try {
+    thunk();
+    return false;
+  } catch {
+    return true;
+  }
 }

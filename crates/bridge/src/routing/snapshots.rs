@@ -4,6 +4,8 @@ use super::{
     schema::compile_capabilities,
     state::{ConnectionState, ContextState},
 };
+use time::OffsetDateTime;
+
 use crate::{
     browser::BrowserConnectionId,
     protocol::{CapabilitySnapshot, ContextClosed, Message, ValidationCode},
@@ -18,6 +20,18 @@ impl CapabilityRegistry {
         &mut self,
         connection_id: &BrowserConnectionId,
         snapshot: CapabilitySnapshot,
+    ) -> Result<RegistryChange, RegistryError> {
+        self.replace_snapshot_at(connection_id, snapshot, OffsetDateTime::now_utc())
+    }
+
+    /// Accept a snapshot at an explicit instant so the per-connection budget is
+    /// deterministic. Replays and stale revisions are answered before the budget
+    /// is charged; only a snapshot that would compile schemas spends a token.
+    pub fn replace_snapshot_at(
+        &mut self,
+        connection_id: &BrowserConnectionId,
+        snapshot: CapabilitySnapshot,
+        now: OffsetDateTime,
     ) -> Result<RegistryChange, RegistryError> {
         Message::CapabilitySnapshot(snapshot.clone())
             .validate()
@@ -39,8 +53,11 @@ impl CapabilityRegistry {
             }
         }
         enforce_connection_limits(state, &snapshot)?;
+        if !self.snapshot_limiter.admit(connection_id, now) {
+            return Err(RegistryError::new(RegistryErrorCode::SnapshotRateLimited));
+        }
 
-        let capabilities = compile_capabilities(&snapshot.capabilities)?;
+        let capabilities = compile_capabilities(&mut self.schema_cache, &snapshot.capabilities)?;
         let cancellations = self.revoke_context_requests(connection_id, &snapshot.context_id);
         let state = self
             .connections

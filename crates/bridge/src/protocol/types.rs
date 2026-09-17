@@ -78,6 +78,11 @@ pub struct Capability {
     pub output_schema: Option<JsonObject>,
 }
 
+/// First name segment reserved for tools a page declares through native
+/// WebMCP. Reserving it keeps page-authored names out of the space reviewed
+/// packs publish in, so neither can impersonate the other.
+pub const NATIVE_TOOL_NAMESPACE: &str = "native";
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum CapabilitySource {
     #[serde(rename = "native_webmcp")]
@@ -222,8 +227,21 @@ pub struct ApprovalRequired {
     pub context_revision: u64,
     pub origin: String,
     pub tool: String,
+    /// The bridge-validated arguments the hash binds, so the human can read
+    /// what they are approving. Results never travel in approval messages.
+    pub args: JsonObject,
     pub args_hash: String,
     pub expires_at: String,
+    pub requester: ApprovalRequester,
+}
+
+/// Which MCP client is asking. Display-only text for the prompt; the bridge
+/// never uses it for policy, so a client cannot gain anything by lying.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ApprovalRequester {
+    pub client: String,
+    pub session: String,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -41,7 +41,11 @@ export function pack({
         additionalProperties: false,
         properties: {},
       },
-      outputSchema: { type: "object" },
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
     })),
     fixtures: tools.map((tool, index) => ({
       id: `fixture-${String(index)}`,

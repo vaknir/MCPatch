@@ -1,22 +1,27 @@
 use std::{borrow::Cow, fmt, sync::Arc};
 
+use futures_util::future::BoxFuture;
 use rmcp::{
-    ErrorData as McpError, RoleServer, ServerHandler,
+    ErrorData as McpError, Peer, RoleServer, ServerHandler,
     model::{
         CallToolRequestParams, CallToolResponse, Implementation, ListToolsResult,
-        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
-        ToolAnnotations,
+        PaginatedRequestParams, ProgressNotification, ProgressNotificationParam, ProgressToken,
+        ProtocolVersion, ServerCapabilities, ServerInfo, ServerNotification, Tool, ToolAnnotations,
     },
     service::RequestContext,
 };
 
 use crate::{
     PRODUCT_VERSION,
-    protocol::{Capability, Risk},
+    protocol::{Capability, CapabilitySource, Risk},
     routing::{SharedCapabilityRegistry, shared_capability_registry},
 };
 
-use super::calls::McpCallRuntime;
+use super::calls::{
+    APPROVAL_TIMEOUT_ENV, APPROVAL_WAIT_MESSAGE, ApprovalProgress, McpCallRuntime,
+    approval_timeout_from, requester_label,
+};
+use super::native_tools::native_description;
 
 const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
     &[ProtocolVersion::V_2025_11_25, ProtocolVersion::V_2026_07_28];
@@ -26,14 +31,70 @@ const SUPPORTED_MCP_VERSIONS: &[ProtocolVersion] =
 pub struct BridgeMcpServer {
     calls: McpCallRuntime,
     registry: SharedCapabilityRegistry,
+    /// Short bridge-assigned label for this MCP session, shown in approval
+    /// prompts so a user with several clients can tell which one is asking.
+    session: Arc<str>,
 }
 
 impl BridgeMcpServer {
-    pub fn new(registry: SharedCapabilityRegistry) -> Self {
+    /// Derive the handler for one accepted MCP session. Every session shares
+    /// the registry and call runtime; only the display label differs.
+    pub fn for_session(&self, sequence: u64) -> Self {
         Self {
-            calls: McpCallRuntime::new(registry.clone()),
-            registry,
+            calls: self.calls.clone(),
+            registry: self.registry.clone(),
+            session: Arc::from(format!("session-{sequence:04x}")),
         }
+    }
+
+    /// The label this handler attaches to approval prompts as the requester
+    /// session.
+    pub fn session_label(&self) -> &str {
+        &self.session
+    }
+
+    pub fn new(registry: SharedCapabilityRegistry) -> Self {
+        let approval_timeout = match approval_timeout_from(
+            std::env::var_os(APPROVAL_TIMEOUT_ENV).as_deref(),
+        ) {
+            Ok(timeout) => Some(timeout),
+            Err(error) => {
+                tracing::warn!(target: "mcpatch", event = "approval_timeout_ignored", code = error.code());
+                None
+            }
+        };
+        let calls = match approval_timeout {
+            Some(timeout) => McpCallRuntime::with_approval_timeout(registry.clone(), timeout),
+            None => McpCallRuntime::new(registry.clone()),
+        };
+        Self {
+            calls,
+            registry,
+            session: Arc::from("session-0000"),
+        }
+    }
+}
+
+/// Reports approval-wait progress to the requesting client over its own peer,
+/// using the token that client supplied, so notifications route to the right
+/// session and carry nothing but a sequence number and a fixed sentence.
+struct PeerApprovalProgress {
+    peer: Peer<RoleServer>,
+    token: ProgressToken,
+}
+
+impl ApprovalProgress for PeerApprovalProgress {
+    fn report(&self, sequence: u32) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            let params = ProgressNotificationParam::new(self.token.clone(), f64::from(sequence))
+                .with_message(APPROVAL_WAIT_MESSAGE.to_owned());
+            let _ = self
+                .peer
+                .send_notification(ServerNotification::ProgressNotification(
+                    ProgressNotification::new(params),
+                ))
+                .await;
+        })
     }
 }
 
@@ -93,29 +154,66 @@ impl ServerHandler for BridgeMcpServer {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
-        self.calls.execute(request, context.ct).await
+        let progress = context.meta.get_progress_token().map(|token| {
+            Arc::new(PeerApprovalProgress {
+                peer: context.peer.clone(),
+                token,
+            }) as Arc<dyn ApprovalProgress>
+        });
+        let client_name = context
+            .peer
+            .peer_info()
+            .map(|info| info.client_info.name.clone());
+        let requester = requester_label(client_name.as_deref(), &self.session);
+        self.calls
+            .execute(request, context.ct, progress, requester)
+            .await
     }
 }
 
 fn project_capability(capability: Capability) -> Tool {
-    let read_only = capability.risk == Risk::Read;
-    let annotations = if read_only {
-        ToolAnnotations::new()
-            .read_only(true)
-            .destructive(false)
-            .idempotent(true)
+    let native = capability.source == CapabilitySource::NativeWebMcp;
+    // A native tool's description and title are page-authored, so the bridge
+    // publishes its own attributed text rather than forwarding either. This
+    // holds here, at the boundary to the MCP client, so the invariant does not
+    // depend on the extension having sanitised anything.
+    let description = if native {
+        native_description(&capability.origin, &capability.description)
     } else {
-        ToolAnnotations::new().read_only(false)
+        capability.description
     };
     let mut tool = Tool::new(
         capability.name,
-        capability.description,
+        description,
         Arc::new(capability.input_schema),
-    )
-    .with_annotations(annotations);
-    tool.title = capability.title;
+    );
+    if let Some(annotations) = tool_annotations(&capability.source, capability.risk) {
+        tool = tool.with_annotations(annotations);
+    }
+    tool.title = if native { None } else { capability.title };
     tool.output_schema = capability.output_schema.map(Arc::new);
     tool
+}
+
+/// Behavioural hints MCPatch is willing to vouch for.
+///
+/// A reviewed pack's risk was fixed by review, so its hints are ours to state.
+/// A native WebMCP tool's risk is whatever the page said, so MCPatch emits no
+/// hints at all rather than telling a client that page-controlled code is
+/// read-only, non-destructive and safe to retry; a client that auto-approves
+/// on `readOnlyHint` would otherwise run it unattended.
+fn tool_annotations(source: &CapabilitySource, risk: Risk) -> Option<ToolAnnotations> {
+    match source {
+        CapabilitySource::NativeWebMcp => None,
+        CapabilitySource::Pack => Some(if risk == Risk::Read {
+            ToolAnnotations::new()
+                .read_only(true)
+                .destructive(false)
+                .idempotent(true)
+        } else {
+            ToolAnnotations::new().read_only(false)
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -125,8 +223,36 @@ mod tests {
         model::{ProtocolVersion, ToolAnnotations},
     };
 
-    use super::{BridgeMcpServer, project_capability};
-    use crate::protocol::{Message, parse_message};
+    use super::{BridgeMcpServer, project_capability, tool_annotations};
+    use crate::protocol::{CapabilitySource, Message, Risk, parse_message};
+
+    #[test]
+    fn vouches_for_reviewed_pack_hints_and_never_for_native_ones() {
+        let read = tool_annotations(&CapabilitySource::Pack, Risk::Read)
+            .expect("a reviewed read carries hints");
+        assert_eq!(read.read_only_hint, Some(true));
+        assert_eq!(read.destructive_hint, Some(false));
+        assert_eq!(read.idempotent_hint, Some(true));
+
+        let action = tool_annotations(&CapabilitySource::Pack, Risk::Action)
+            .expect("a reviewed action carries hints");
+        assert_eq!(action.read_only_hint, Some(false));
+
+        // The page decides a native tool's risk, so MCPatch states nothing.
+        assert!(tool_annotations(&CapabilitySource::NativeWebMcp, Risk::Read).is_none());
+        assert!(tool_annotations(&CapabilitySource::NativeWebMcp, Risk::Action).is_none());
+    }
+
+    #[test]
+    fn derives_a_short_hex_session_label_per_accepted_session() {
+        let template = BridgeMcpServer::default();
+        assert_eq!(template.session_label(), "session-0000");
+        assert_eq!(template.for_session(7).session_label(), "session-0007");
+        assert_eq!(
+            template.for_session(0x00ab_cdef).session_label(),
+            "session-abcdef"
+        );
+    }
 
     #[test]
     fn advertises_tools_without_placeholder_tools() {

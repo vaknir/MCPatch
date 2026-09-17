@@ -40,6 +40,7 @@ export interface ExtensionRuntimeOptions
   readonly pageCallTimeoutMs?: number;
   readonly pageHandshakeTimeoutMs?: number;
   readonly onPageContextOwner?: (owner: PageContextOwner) => void;
+  readonly onPackRuntime?: (runtime: CompiledPackRuntime) => void;
   readonly pageRandomId?: () => string;
   readonly pageScheduler?: SessionScheduler;
 }
@@ -88,12 +89,25 @@ export function startExtensionRuntime(
   });
   options.onPageContextOwner?.(pageContexts);
   const session: { supervisor?: NativeSessionSupervisor } = {};
+  const activateDemo = (): boolean => {
+    if (!bridgeReady) return true;
+    const activeRuntime = packState.runtime;
+    if (activeRuntime === undefined) return false;
+    const activation = activeRuntime.activateContext({
+      contextId: DEMO_CONTEXT_ID,
+      url: DEMO_URL,
+      native: [],
+    });
+    return activation.ok && activation.published;
+  };
   const packs = new CompiledPackRuntime(
     (message) => session.supervisor?.send(message) ?? false,
     options.compiledPacks ?? BUNDLED_PACKS,
     options.compiledPackRuntimeOptions ?? PACK_RUNTIME_OPTIONS,
+    activateDemo,
   );
   packState.runtime = packs;
+  options.onPackRuntime?.(packs);
   const supervisorOptions: NativeSessionOptions = {
     ...options,
     onMessage(message) {
@@ -142,12 +156,7 @@ export function startExtensionRuntime(
     },
     onReady() {
       bridgeReady = true;
-      const activation = packs.activateContext({
-        contextId: DEMO_CONTEXT_ID,
-        url: DEMO_URL,
-        native: [],
-      });
-      if (!activation.ok || !activation.published) {
+      if (!activateDemo()) {
         throw new Error("synthetic pack activation failed");
       }
       options.onReady?.();

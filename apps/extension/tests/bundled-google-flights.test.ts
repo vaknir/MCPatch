@@ -52,13 +52,13 @@ describe("bundled Google Flights production pack", () => {
     expect(catalog.match("https://google.com/travel/flights")).toEqual([]);
   });
 
-  it("keeps the production manifest at optional exact-origin authority", () => {
+  it("keeps production authority optional for runtime-discovered HTTPS origins", () => {
     const manifest = JSON.parse(
       readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
     ) as Record<string, unknown>;
-    expect(manifest["optional_host_permissions"]).toContain(
-      `${GOOGLE_FLIGHTS_ORIGIN}/*`,
-    );
-    expect(manifest).not.toHaveProperty("host_permissions");
+    expect(manifest["optional_host_permissions"]).toEqual(["https://*/*"]);
+    expect(manifest["host_permissions"]).toEqual([
+      "https://registry.mcpatch.dev/*",
+    ]);
   });
 });

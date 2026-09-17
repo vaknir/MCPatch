@@ -99,7 +99,11 @@ describe("bundled Jira Data Center pack", () => {
     ) as Record<string, unknown>;
 
     expect(manifest["optional_host_permissions"]).toContain("https://*/*");
-    expect(manifest).not.toHaveProperty("host_permissions");
+    // The only required host is the credential-free registry control plane; a
+    // configured Jira origin is never a required permission.
+    expect(manifest["host_permissions"]).toEqual([
+      "https://registry.mcpatch.dev/*",
+    ]);
   });
 
   it("asks for no extension network authority", () => {

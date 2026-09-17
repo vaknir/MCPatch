@@ -1,4 +1,12 @@
-import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,11 +19,22 @@ import {
 } from "@playwright/test";
 
 import {
+  COMMUNITY_ORIGIN,
+  COMMUNITY_NAVIGATE_TOOL,
+  COMMUNITY_REGISTRY_ORIGIN,
+  COMMUNITY_TOOL,
+  FIXTURE_LOCAL_TOOL,
   FIXTURE_ORIGIN,
+  FIXTURE_PROBE_TOOL,
   FIXTURE_STATE_TOOL,
   FIXTURE_WAIT_TOOL,
   OTHER_ORIGIN,
 } from "./fixture-constants.js";
+import {
+  communityRegistryFixture,
+  type CommunityRegistryFixture,
+  type CommunityRegistryFixtureStage,
+} from "./fixture-community-registry.js";
 import { McpStdioClient, structuredContent } from "./mcp-client.js";
 
 const extensionPath = fileURLToPath(
@@ -48,11 +67,17 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
   expect(browserName).toBe("chromium");
   const fixtureHtml = await readFile(fixtureHtmlPath, "utf8");
   const fixtureCss = await readFile(fixtureCssPath, "utf8");
+  const registry = await communityRegistryFixture();
+  const registryState = { current: registry.initial };
+  const registryRequests: string[] = [];
+  const navigationGate = deferredGate();
   const profile = testInfo.outputPath("chromium-profile");
+  let runtimeDirectory: string | undefined;
   let context: BrowserContext | undefined;
   let mcp: McpStdioClient | undefined;
 
   try {
+    runtimeDirectory = await mkdtemp(join(tmpdir(), "mcpatch-e2e-"));
     await prepareNativeHostProfile(profile);
     context = await chromium.launchPersistentContext(profile, {
       channel: "chromium",
@@ -62,8 +87,17 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
         "--host-resolver-rules=MAP * ~NOTFOUND",
         `--load-extension=${extensionPath}`,
       ],
+      env: { ...process.env, MCPATCH_RUNTIME_DIR: runtimeDirectory },
     });
-    await installNetworkBoundary(context, fixtureHtml, fixtureCss);
+    await installNetworkBoundary(
+      context,
+      fixtureHtml,
+      fixtureCss,
+      registry,
+      registryState,
+      registryRequests,
+      navigationGate.promise,
+    );
     const worker =
       context.serviceWorkers()[0] ??
       (await context.waitForEvent("serviceworker"));
@@ -105,18 +139,43 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     );
     await expect.poll(() => registeredContentScriptCount(worker)).toBe(1);
 
-    const client = await McpStdioClient.connect(bridgePath);
+    const client = await McpStdioClient.connect(bridgePath, [], {
+      MCPATCH_RUNTIME_DIR: runtimeDirectory,
+    });
     mcp = client;
     await expectTools(client, [demoTool]);
 
     const page = await context.newPage();
     await page.goto(`${FIXTURE_ORIGIN}/state`);
+    await expect
+      .poll(() => page.locator("html").getAttribute("data-fixture-runtime"))
+      .toBe("ready");
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     expect(await callState(client)).toEqual({ revision: 1, value: "initial" });
+    expect(
+      structuredContent(await client.callTool(FIXTURE_LOCAL_TOOL).response),
+    ).toMatchObject({
+      text: expect.stringContaining("Synthetic website state"),
+    });
+
+    // The realm lockdown installed before pack code ran must refuse every
+    // network primitive from inside a pack handler, while the credential-free
+    // DOM read above still works.
+    expect(
+      structuredContent(await client.callTool(FIXTURE_PROBE_TOOL).response),
+    ).toEqual({
+      fetchUndeclaredBlocked: true,
+      fetchHttpBlocked: true,
+      xhrBlocked: true,
+      sendBeaconBlocked: true,
+      cookieBlocked: true,
+    });
 
     await page.locator("#fixture-update").click();
     await expect
@@ -136,15 +195,19 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     );
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
 
     await page.reload();
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     expect(await callState(client)).toEqual({ revision: 1, value: "initial" });
 
@@ -157,8 +220,10 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await page.goto(`${FIXTURE_ORIGIN}/state`);
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     await page.goto(`${OTHER_ORIGIN}/replacement`);
     await expectTools(client, [demoTool]);
@@ -166,16 +231,187 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await page.goto(`${FIXTURE_ORIGIN}/state`);
     await expectTools(client, [
       demoTool,
+      FIXTURE_LOCAL_TOOL,
       FIXTURE_STATE_TOOL,
       FIXTURE_WAIT_TOOL,
+      FIXTURE_PROBE_TOOL,
     ]);
     await disableFixture(control);
     await expectTools(client, [demoTool]);
     await expect.poll(() => registeredContentScriptCount(worker)).toBe(0);
+
+    const communityPage = await context.newPage();
+    await communityPage.goto(`${COMMUNITY_ORIGIN}/portfolio`);
+    await communityPage.bringToFront();
+    const communityTabId = await activeTabId(worker);
+    await triggerCommunityDiscovery(
+      worker,
+      communityTabId,
+      `${COMMUNITY_ORIGIN}/portfolio`,
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({ candidate: true, installed: 0, sequence: 1 });
+    await expect
+      .poll(
+        () =>
+          (context?.pages() ?? []).some((candidate) =>
+            candidate
+              .url()
+              .startsWith(
+                `chrome-extension://${extensionId}/community-review.html`,
+              ),
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+    const review = context
+      .pages()
+      .find((candidate) =>
+        candidate
+          .url()
+          .startsWith(
+            `chrome-extension://${extensionId}/community-review.html`,
+          ),
+      );
+    if (review === undefined) throw new Error("community review page missing");
+    await review.waitForLoadState("domcontentloaded");
+    await expect(review.locator("#trust")).toHaveText("REVIEWED_COMMUNITY");
+    await expect(review.locator("#identity")).toHaveText(
+      "community/visible-page",
+    );
+    await expect(review.locator("#paths")).toContainText(COMMUNITY_ORIGIN);
+    await expect(review.locator("#tools")).toContainText(COMMUNITY_TOOL);
+    await review.locator("#install").click();
+    await expect(review.locator("#status")).toHaveText(
+      "The verified pack is installed and enabled.",
+    );
+    await expect.poll(() => registeredContentScriptCount(worker)).toBe(1);
+
+    await communityPage.reload();
+    await expect
+      .poll(() =>
+        communityPage.locator("html").getAttribute("data-fixture-runtime"),
+      )
+      .toBe("ready");
+    await expectTools(client, [demoTool, COMMUNITY_TOOL]);
+    expect(
+      structuredContent(await client.callTool(COMMUNITY_TOOL).response),
+    ).toMatchObject({
+      text: expect.stringContaining("Synthetic website state"),
+    });
+
+    await review.close();
+    registryState.current = registry.update;
+    await communityPage.bringToFront();
+    await triggerCommunityDiscovery(
+      worker,
+      await activeTabId(worker),
+      `${COMMUNITY_ORIGIN}/portfolio`,
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({
+        candidate: true,
+        candidateKind: "update",
+        candidateVersion: "1.1.0",
+        installed: 1,
+        installedVersion: "1.0.0",
+        sequence: 2,
+      });
+    const updateReview = await waitForCommunityReview(context, extensionId);
+    await expect(updateReview.locator("#change-kind")).toHaveText("UPDATE");
+    await expect(updateReview.locator("#current-version")).toContainText(
+      "1.0.0",
+    );
+    await updateReview.locator("#install").click();
+    await expect(updateReview.locator("#status")).toHaveText(
+      "The verified update is active.",
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({
+        candidate: false,
+        enabled: true,
+        hasPrevious: true,
+        installed: 1,
+        installedVersion: "1.1.0",
+        sequence: 2,
+      });
+    await communityPage.reload();
+    await expectTools(client, [
+      demoTool,
+      COMMUNITY_NAVIGATE_TOOL,
+      COMMUNITY_TOOL,
+    ]);
+    expect(
+      structuredContent(await client.callTool(COMMUNITY_TOOL).response),
+    ).toMatchObject({
+      text: expect.stringContaining("Synthetic website state"),
+    });
+
+    const navigation = client.callTool(
+      COMMUNITY_NAVIGATE_TOOL,
+      { item: "next" },
+      15_000,
+    );
+    const approval = await waitForApproval(context, extensionId);
+    await expect(approval.locator("#tool")).toHaveText(COMMUNITY_NAVIGATE_TOOL);
+    await expect(approval.locator("#origin")).toHaveText(COMMUNITY_ORIGIN);
+    await expect(approval.locator("#args")).toContainText('"item": "next"');
+    await approval.locator("#approve").click();
+    expect(structuredContent(await navigation.response)).toEqual({
+      state: "scheduled",
+      url: `${COMMUNITY_ORIGIN}/items/next`,
+    });
+    await expectTools(client, [demoTool]);
+    navigationGate.release();
+    await communityPage.waitForURL(`${COMMUNITY_ORIGIN}/items/next`);
+    await expect
+      .poll(() =>
+        communityPage.locator("html").getAttribute("data-fixture-runtime"),
+      )
+      .toBe("ready");
+    await expectTools(client, [
+      demoTool,
+      COMMUNITY_NAVIGATE_TOOL,
+      COMMUNITY_TOOL,
+    ]);
+
+    await updateReview.close();
+    registryState.current = registry.revoked;
+    await communityPage.bringToFront();
+    await triggerCommunityDiscovery(
+      worker,
+      await activeTabId(worker),
+      `${COMMUNITY_ORIGIN}/portfolio`,
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toMatchObject({
+        candidate: false,
+        enabled: false,
+        installed: 1,
+        installedVersion: "1.1.0",
+        sequence: 3,
+      });
+    await expectTools(client, [demoTool]);
+    await expect.poll(() => registeredContentScriptCount(worker)).toBe(0);
+    expect(registryRequests).toEqual([
+      "/v1/index.json",
+      registry.initialBundlePath,
+      "/v1/index.json",
+      registry.updateBundlePath,
+      "/v1/index.json",
+    ]);
   } finally {
+    navigationGate.release();
     await mcp?.close();
     await context?.close();
     await rm(profile, { recursive: true, force: true });
+    if (runtimeDirectory !== undefined) {
+      await rm(runtimeDirectory, { recursive: true, force: true });
+    }
   }
 });
 
@@ -203,6 +439,10 @@ async function installNetworkBoundary(
   context: BrowserContext,
   fixtureHtml: string,
   fixtureCss: string,
+  registry: CommunityRegistryFixture,
+  registryState: { current: CommunityRegistryFixtureStage },
+  registryRequests: string[],
+  navigationReady: Promise<void>,
 ): Promise<void> {
   await context.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -210,7 +450,35 @@ async function installNetworkBoundary(
       await route.continue();
       return;
     }
-    if (url.origin !== FIXTURE_ORIGIN && url.origin !== OTHER_ORIGIN) {
+    if (url.origin === COMMUNITY_REGISTRY_ORIGIN) {
+      const body =
+        url.pathname === "/v1/index.json"
+          ? registryState.current.indexBytes
+          : registry.bundles.get(url.pathname);
+      if (body === undefined) {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      registryRequests.push(url.pathname);
+      await route.fulfill({
+        body: Buffer.from(body),
+        contentType:
+          url.pathname === "/v1/index.json"
+            ? "application/vnd.mcpatch.registry-index+json"
+            : "application/vnd.mcpatch.pack+json",
+        headers: {
+          "content-length": String(body.byteLength),
+          "x-content-type-options": "nosniff",
+        },
+        status: 200,
+      });
+      return;
+    }
+    if (
+      url.origin !== FIXTURE_ORIGIN &&
+      url.origin !== OTHER_ORIGIN &&
+      url.origin !== COMMUNITY_ORIGIN
+    ) {
       await route.abort("blockedbyclient");
       return;
     }
@@ -222,6 +490,9 @@ async function installNetworkBoundary(
       });
       return;
     }
+    if (url.origin === COMMUNITY_ORIGIN && url.pathname === "/items/next") {
+      await navigationReady;
+    }
     await route.fulfill({
       body: fixtureHtml,
       contentType: "text/html; charset=utf-8",
@@ -232,6 +503,194 @@ async function installNetworkBoundary(
       status: 200,
     });
   });
+}
+
+async function waitForApproval(
+  context: BrowserContext,
+  id: string,
+): Promise<Page> {
+  await expect
+    .poll(
+      () =>
+        context
+          .pages()
+          .find((page) =>
+            page.url().startsWith(`chrome-extension://${id}/approval.html?`),
+          )
+          ?.url(),
+      { timeout: 10_000 },
+    )
+    .toBeTruthy();
+  const approval = context
+    .pages()
+    .find((page) =>
+      page.url().startsWith(`chrome-extension://${id}/approval.html?`),
+    );
+  if (approval === undefined) throw new Error("approval page missing");
+  await approval.waitForLoadState("domcontentloaded");
+  await expect(approval.locator("#approve")).toBeEnabled();
+  return approval;
+}
+
+function deferredGate(): {
+  readonly promise: Promise<void>;
+  readonly release: () => void;
+} {
+  let release: () => void = () => void 0;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return Object.freeze({ promise, release });
+}
+
+async function activeTabId(worker: {
+  evaluate<Result>(
+    pageFunction: () => Result | Promise<Result>,
+  ): Promise<Result>;
+}): Promise<number> {
+  return worker.evaluate(async () => {
+    const scope = globalThis as typeof globalThis & {
+      chrome: {
+        tabs: {
+          query(value: {
+            readonly active: true;
+            readonly currentWindow: true;
+          }): Promise<readonly { readonly id?: number }[]>;
+        };
+      };
+    };
+    const tabs = await scope.chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    const id = tabs[0]?.id;
+    if (typeof id !== "number") throw new Error("active fixture tab missing");
+    return id;
+  });
+}
+
+async function triggerCommunityDiscovery(
+  worker: {
+    evaluate<Argument, Result>(
+      pageFunction: (argument: Argument) => Result | Promise<Result>,
+      argument: Argument,
+    ): Promise<Result>;
+  },
+  tabId: number,
+  url: string,
+): Promise<void> {
+  await worker.evaluate(
+    (tab) => {
+      const discover = (
+        globalThis as typeof globalThis & {
+          __MCPATCH_FIXTURE_DISCOVER__?: (value: {
+            readonly id: number;
+            readonly url: string;
+          }) => void;
+        }
+      ).__MCPATCH_FIXTURE_DISCOVER__;
+      if (discover === undefined)
+        throw new Error("fixture discovery seam missing");
+      discover(tab);
+    },
+    { id: tabId, url },
+  );
+}
+
+async function communityCandidateStatus(worker: {
+  evaluate<Result>(
+    pageFunction: () => Result | Promise<Result>,
+  ): Promise<Result>;
+}): Promise<{
+  readonly candidate: boolean;
+  readonly candidateKind?: string;
+  readonly candidateVersion?: string;
+  readonly enabled?: boolean;
+  readonly hasPrevious?: boolean;
+  readonly installed: number;
+  readonly installedVersion?: string;
+  readonly sequence: number;
+}> {
+  return worker.evaluate(async () => {
+    const scope = globalThis as typeof globalThis & {
+      chrome: {
+        storage: {
+          local: {
+            get(key: string): Promise<Record<string, unknown>>;
+          };
+        };
+      };
+    };
+    const key = "mcpatch.community-packs.v2";
+    const stored = await scope.chrome.storage.local.get(key);
+    const state = stored[key] as
+      | {
+          readonly candidate?: {
+            readonly kind?: unknown;
+            readonly version?: unknown;
+          };
+          readonly highWaterSequence?: unknown;
+          readonly installed?: readonly {
+            readonly enabled?: unknown;
+            readonly previous?: unknown;
+            readonly version?: unknown;
+          }[];
+        }
+      | undefined;
+    const installed = state?.installed?.[0];
+    return {
+      candidate: state?.candidate !== undefined,
+      ...(typeof state?.candidate?.kind === "string"
+        ? { candidateKind: state.candidate.kind }
+        : {}),
+      ...(typeof state?.candidate?.version === "string"
+        ? { candidateVersion: state.candidate.version }
+        : {}),
+      ...(typeof installed?.enabled === "boolean"
+        ? { enabled: installed.enabled }
+        : {}),
+      ...(installed === undefined
+        ? {}
+        : { hasPrevious: installed.previous !== undefined }),
+      installed: Array.isArray(state?.installed) ? state.installed.length : -1,
+      ...(typeof installed?.version === "string"
+        ? { installedVersion: installed.version }
+        : {}),
+      sequence:
+        typeof state?.highWaterSequence === "number"
+          ? state.highWaterSequence
+          : -1,
+    };
+  });
+}
+
+async function waitForCommunityReview(
+  context: BrowserContext,
+  id: string,
+): Promise<Page> {
+  await expect
+    .poll(
+      () =>
+        context
+          .pages()
+          .filter((page) =>
+            page
+              .url()
+              .startsWith(`chrome-extension://${id}/community-review.html`),
+          ).length,
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(0);
+  const page = context
+    .pages()
+    .findLast((candidate) =>
+      candidate
+        .url()
+        .startsWith(`chrome-extension://${id}/community-review.html`),
+    );
+  if (page === undefined) throw new Error("community review page missing");
+  await page.waitForLoadState("domcontentloaded");
+  return page;
 }
 
 async function expectTools(

@@ -6,7 +6,7 @@
   "origin": "https://example.com",
   "capabilities": [
     {
-      "name": "example.read",
+      "name": "native.www_google_com.example.read",
       "description": "Read a synthetic value.",
       "origin": "https://example.com",
       "source": "native_webmcp",

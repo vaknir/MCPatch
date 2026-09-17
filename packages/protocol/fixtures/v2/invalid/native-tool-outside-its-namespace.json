@@ -1,0 +1,22 @@
+{
+  "protocolVersion": 2,
+  "type": "capability_snapshot",
+  "contextId": "tab-42",
+  "contextRevision": 3,
+  "origin": "https://www.google.com",
+  "capabilities": [
+    {
+      "name": "flights.search",
+      "description": "Return price guidance exposed by the current document.",
+      "origin": "https://www.google.com",
+      "source": "native_webmcp",
+      "risk": "read",
+      "permissions": ["READ"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      }
+    }
+  ]
+}

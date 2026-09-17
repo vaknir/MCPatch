@@ -36,6 +36,9 @@ const NATIVE_CAPABILITY: PageCapability = {
   },
 };
 
+/** The captured navigation entry point a locked realm hands the adapter. */
+const NAVIGATION = { assign: () => {} };
+
 describe("reviewed page adapter", () => {
   it("constructs only an exact matching adapter after worker authorization", async () => {
     const pack = fakeAdapter([PACK_CAPABILITY], { source: "pack" });
@@ -45,11 +48,15 @@ describe("reviewed page adapter", () => {
       `${SITE_ORIGIN}/app/search?ignored=yes`,
       [definition(factory)],
       runtimeOptions(),
+      NAVIGATION,
     );
 
     expect(factory).not.toHaveBeenCalled();
     adapter.authorizePackTools?.([SITE_TOOL]);
-    expect(factory).toHaveBeenCalledWith(DOCUMENT);
+    // The factory also receives the page services carrying gated navigation.
+    expect(factory).toHaveBeenCalledWith(DOCUMENT, {
+      navigate: expect.any(Function) as unknown,
+    });
     await expect(adapter.capabilities(signal())).resolves.toEqual([
       PACK_CAPABILITY,
     ]);
@@ -62,6 +69,7 @@ describe("reviewed page adapter", () => {
       `${SITE_ORIGIN}/outside`,
       [definition(factory)],
       runtimeOptions(),
+      NAVIGATION,
     );
     outside.authorizePackTools?.([SITE_TOOL]);
     await expect(outside.capabilities(signal())).resolves.toEqual([]);
@@ -76,6 +84,7 @@ describe("reviewed page adapter", () => {
       `${SITE_ORIGIN}/app/search`,
       [definition(() => pack.adapter)],
       runtimeOptions(),
+      NAVIGATION,
       native.adapter,
     );
     adapter.authorizePackTools?.([SITE_TOOL]);
@@ -109,6 +118,7 @@ describe("reviewed page adapter", () => {
       `${SITE_ORIGIN}/app/search`,
       [definition(() => pack.adapter)],
       runtimeOptions(),
+      NAVIGATION,
       native.adapter,
     );
     adapter.authorizePackTools?.([SITE_TOOL]);
@@ -138,6 +148,7 @@ describe("reviewed page adapter", () => {
       `${SITE_ORIGIN}/app/search`,
       [definition(() => undeclared.adapter)],
       runtimeOptions(),
+      NAVIGATION,
     );
     adapter.authorizePackTools?.([SITE_TOOL]);
     await expectAdapterError(
@@ -155,6 +166,7 @@ describe("reviewed page adapter", () => {
         `${SITE_ORIGIN}/app/search`,
         [{ ...definition(() => undeclared.adapter), tools: [OTHER_TOOL] }],
         runtimeOptions(),
+        NAVIGATION,
       ),
     ).toThrow(TypeError);
     expect(() =>
@@ -167,6 +179,7 @@ describe("reviewed page adapter", () => {
           }),
         ],
         runtimeOptions(),
+        NAVIGATION,
       ).authorizePackTools?.([SITE_TOOL]),
     ).toThrow(TypeError);
   });
@@ -185,6 +198,7 @@ describe("reviewed page adapter", () => {
       `${SITE_ORIGIN}/app/search`,
       [definition(() => browserAdapter)],
       runtimeOptions(),
+      NAVIGATION,
     );
     adapter.authorizePackTools?.([SITE_TOOL]);
 
@@ -202,6 +216,7 @@ describe("reviewed page adapter", () => {
         })),
       ],
       runtimeOptions(),
+      NAVIGATION,
     );
     routedAdapter.authorizePackTools?.([SITE_TOOL]);
     await routedAdapter.capabilities(signal());

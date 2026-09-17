@@ -34,6 +34,11 @@ All permission checks default to deny. Missing, unknown, contradictory, or
 unsupported permissions reject pack activation or tool dispatch. `READ` does not
 mean harmless: a tool that reads private or high-impact content must also declare
 `SENSITIVE`.
+_Amended 2026-09-16 ([ADR 0015](0015-sensitive-read-classification.md)):_ the
+rule for deciding what counts as private or high-impact is defined there. In
+short, content the user has already rendered in the current document is `READ`;
+undisplayed account data and high-impact content are `SENSITIVE`; credential-free
+network reads are `READ`.
 
 `READ + EXTERNAL_NETWORK` is allowed only for an installed pack capability with a
 pack identity and reviewed GET authority. `ACTION + EXTERNAL_NETWORK` is allowed
@@ -76,6 +81,13 @@ exact action in trusted UI and returns the opaque nonce and decision over the
 authenticated connection. The browser approval message contains the route, hash,
 expiry, and opaque nonce but never raw arguments or results. Approval does not arrive
 through website content, tool arguments, MCP descriptions, or model text.
+_Amended 2026-09-16 ([#175](https://github.com/vaknir/MCPatch/issues/175),
+[#193](https://github.com/vaknir/MCPatch/issues/193)):_ the approval message
+also carries the bridge-validated arguments the hash commits to and the requesting
+client and session, so the user approves a readable action attributed to one
+agent rather than a digest. Results still never enter the message, and the
+arguments are excluded from every log. See
+[protocol-v2-approval-presentation](../architecture/protocol-v2-approval-presentation.md).
 
 Before dispatch, the bridge atomically consumes the record and rechecks every bound
 field plus current context/origin state. The call is denied if:
@@ -91,7 +103,8 @@ messages reveal only an opaque request ID and stable error code.
 
 The trusted frontend is an extension-owned page opened and tracked by the service
 worker. Its internal protocol is deliberately smaller than the bridge protocol and
-contains no raw arguments or results. The worker binds a pending prompt to its exact
+contains no results, request identifiers, or context identifiers; it renders the
+validated arguments and requester as inert text. The worker binds a pending prompt to its exact
 extension ID, URL, top frame, and created tab before accepting a one-time decision.
 Malformed traffic, closure, cancellation, timeout, overflow, or presentation failure
 denies or discards the request. When this surface is unavailable, the runtime denies

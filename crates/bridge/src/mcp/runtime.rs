@@ -27,6 +27,15 @@ impl BridgeRuntimeError {
             Self::Stdio(error) => error.code().as_str(),
         }
     }
+
+    /// Fixed, path-free guidance for failures an operator can correct.
+    pub const fn operator_hint(&self) -> Option<&'static str> {
+        match self {
+            Self::Rendezvous(error) => error.code().operator_hint(),
+            Self::LocalConnection(error) => error.code().operator_hint(),
+            Self::Stdio(_) => None,
+        }
+    }
 }
 
 pub async fn run_stdio() -> Result<(), BridgeRuntimeError> {

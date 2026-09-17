@@ -3,9 +3,15 @@ use thiserror::Error;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RegistryErrorCode {
     AmbiguousTool,
+    /// The registration an approval was bound to was replaced or closed before
+    /// dispatch; the human's decision was valid but its target is gone.
+    ApprovalContextChanged,
     ApprovalExpired,
     ApprovalMismatch,
     ApprovalNotFound,
+    /// The per-site prompt budget is exhausted or the site is in a denial
+    /// cooldown; no browser prompt was opened.
+    ApprovalRateLimited,
     ApprovalRequired,
     CapabilityDenied,
     ConnectionAlreadyExists,
@@ -21,6 +27,9 @@ pub enum RegistryErrorCode {
     ResultInvalid,
     RevisionConflict,
     RouteMismatch,
+    /// The connection published snapshots faster than its budget; nothing was
+    /// compiled or registered.
+    SnapshotRateLimited,
     StaleRevision,
     ToolNotFound,
     Unauthorized,

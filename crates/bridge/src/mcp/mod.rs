@@ -1,5 +1,6 @@
 mod calls;
 mod core;
+mod native_tools;
 mod runtime;
 mod server;
 mod stdio;

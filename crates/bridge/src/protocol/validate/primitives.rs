@@ -78,16 +78,124 @@ pub(super) fn validate_tool_name(
     Ok(())
 }
 
+/// Keywords the extension's codegen-free interpreter understands. The bridge
+/// enforces the same allowlist so its own validator never compiles a keyword
+/// the extension would refuse, even if an extension build is buggy or hostile.
+const RUNTIME_SCHEMA_KEYWORDS: [&str; 15] = [
+    "additionalProperties",
+    "const",
+    "enum",
+    "items",
+    "maximum",
+    "maxItems",
+    "maxLength",
+    "maxProperties",
+    "minimum",
+    "minItems",
+    "minLength",
+    "minProperties",
+    "properties",
+    "required",
+    "type",
+];
+const JSON_TYPES: [&str; 7] = [
+    "array", "boolean", "integer", "null", "number", "object", "string",
+];
+
 pub(super) fn validate_input_schema(
     schema: &serde_json::Map<String, Value>,
     field: impl Into<String>,
 ) -> Result<(), ValidationError> {
     let field = field.into();
-    validate_object_limit(schema.len(), &field)?;
+    validate_runtime_schema(schema, &field)?;
     if schema.get("type") != Some(&Value::String("object".to_owned())) {
         return Err(invalid(ValidationCode::InvalidSchema, field));
     }
     Ok(())
+}
+
+pub(super) fn validate_output_schema(
+    schema: &serde_json::Map<String, Value>,
+    field: impl Into<String>,
+) -> Result<(), ValidationError> {
+    validate_runtime_schema(schema, &field.into())
+}
+
+fn validate_runtime_schema(
+    schema: &serde_json::Map<String, Value>,
+    field: &str,
+) -> Result<(), ValidationError> {
+    let mut nodes = 0;
+    visit_runtime_schema(schema, field, 0, &mut nodes)
+}
+
+fn visit_runtime_schema(
+    schema: &serde_json::Map<String, Value>,
+    field: &str,
+    depth: usize,
+    nodes: &mut usize,
+) -> Result<(), ValidationError> {
+    *nodes += 1;
+    if depth > super::MAX_SCHEMA_DEPTH || *nodes > super::MAX_SCHEMA_NODES {
+        return Err(invalid(ValidationCode::LimitExceeded, field));
+    }
+    validate_object_limit(schema.len(), field)?;
+    for key in schema.keys() {
+        if !RUNTIME_SCHEMA_KEYWORDS.contains(&key.as_str()) {
+            return Err(invalid(
+                ValidationCode::InvalidSchema,
+                format!("{field}.{key}"),
+            ));
+        }
+    }
+    if let Some(kind) = schema.get("type")
+        && !kind.as_str().is_some_and(|kind| JSON_TYPES.contains(&kind))
+    {
+        return Err(invalid(
+            ValidationCode::InvalidSchema,
+            format!("{field}.type"),
+        ));
+    }
+    // Depth counts JSON nesting, the same unit the routing compiler bounds, so
+    // a schema this validator accepts always compiles: a property subschema
+    // sits two levels down (`properties` → name), `items` and a schema-valued
+    // `additionalProperties` one.
+    if let Some(properties) = schema.get("properties") {
+        let properties_field = format!("{field}.properties");
+        let Value::Object(properties) = properties else {
+            return Err(invalid(ValidationCode::InvalidSchema, properties_field));
+        };
+        for (name, candidate) in properties {
+            let property_field = format!("{properties_field}.{name}");
+            visit_subschema(candidate, &property_field, depth + 2, nodes)?;
+        }
+    }
+    if let Some(items) = schema.get("items") {
+        visit_subschema(items, &format!("{field}.items"), depth + 1, nodes)?;
+    }
+    if let Some(additional) = schema.get("additionalProperties")
+        && !additional.is_boolean()
+    {
+        visit_subschema(
+            additional,
+            &format!("{field}.additionalProperties"),
+            depth + 1,
+            nodes,
+        )?;
+    }
+    Ok(())
+}
+
+fn visit_subschema(
+    candidate: &Value,
+    field: &str,
+    depth: usize,
+    nodes: &mut usize,
+) -> Result<(), ValidationError> {
+    let Value::Object(schema) = candidate else {
+        return Err(invalid(ValidationCode::InvalidSchema, field));
+    };
+    visit_runtime_schema(schema, field, depth, nodes)
 }
 
 pub(super) fn validate_object_limit(
@@ -160,8 +268,101 @@ fn is_ascii_lowercase_or_digit(byte: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_tool_name;
-    use crate::protocol::valid_identifier;
+    use serde_json::{Value, json};
+
+    use super::{validate_input_schema, validate_output_schema, validate_tool_name};
+    use crate::protocol::{ValidationCode, valid_identifier};
+
+    fn object(value: Value) -> serde_json::Map<String, Value> {
+        value.as_object().expect("schema must be an object").clone()
+    }
+
+    #[test]
+    fn runtime_schemas_accept_the_interpreter_subset() {
+        let schema = object(json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rows"],
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": { "type": "number", "minimum": 0 },
+                        "properties": { "label": { "type": "string", "maxLength": 64 } }
+                    }
+                },
+                "mode": { "enum": ["fast", "slow"] },
+                "status": { "const": "ready" }
+            }
+        }));
+        assert!(validate_input_schema(&schema, "input").is_ok());
+        assert!(validate_output_schema(&schema, "output").is_ok());
+        assert!(validate_output_schema(&object(json!({})), "output").is_ok());
+    }
+
+    #[test]
+    fn runtime_schemas_reject_unsupported_keywords_at_their_exact_path() {
+        for (schema, field) in [
+            (
+                json!({"type": "object", "properties": {"q": {"type": "string", "pattern": "^a"}}}),
+                "input.properties.q.pattern",
+            ),
+            (
+                json!({"type": "object", "$ref": "https://attacker.example/schema.json"}),
+                "input.$ref",
+            ),
+            (
+                json!({"type": "object", "properties": {"q": {"type": "string", "format": "regex"}}}),
+                "input.properties.q.format",
+            ),
+            (
+                json!({"type": "object", "items": {"type": "string", "pattern": ".*"}}),
+                "input.items.pattern",
+            ),
+            (
+                json!({"type": "object", "additionalProperties": {"anyOf": []}}),
+                "input.additionalProperties.anyOf",
+            ),
+            (
+                json!({"type": "object", "properties": {"q": {"type": ["string", "null"]}}}),
+                "input.properties.q.type",
+            ),
+            (
+                json!({"type": "object", "properties": {"q": "string"}}),
+                "input.properties.q",
+            ),
+            (
+                json!({"type": "object", "properties": []}),
+                "input.properties",
+            ),
+        ] {
+            let error = validate_input_schema(&object(schema), "input")
+                .expect_err("unsupported schema must be rejected");
+            assert_eq!(error.code, ValidationCode::InvalidSchema);
+            assert_eq!(error.field, field);
+        }
+    }
+
+    #[test]
+    fn input_schemas_must_describe_an_object_root() {
+        let error = validate_input_schema(&object(json!({"type": "string"})), "input")
+            .expect_err("string root must fail");
+        assert_eq!(error.code, ValidationCode::InvalidSchema);
+        assert_eq!(error.field, "input");
+    }
+
+    #[test]
+    fn runtime_schemas_are_depth_bounded() {
+        let mut nested = json!({"type": "string"});
+        for _ in 0..40 {
+            nested = json!({"type": "object", "properties": {"next": nested}});
+        }
+        let error =
+            validate_output_schema(&object(nested), "output").expect_err("deep schema must fail");
+        assert_eq!(error.code, ValidationCode::LimitExceeded);
+    }
 
     #[test]
     fn identifiers_are_ascii_and_bounded() {

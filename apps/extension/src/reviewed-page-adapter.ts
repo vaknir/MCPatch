@@ -12,6 +12,9 @@ import {
   PageAdapterExecutionError,
   type PageAdapter,
 } from "./page-content-model.js";
+import { PackNavigationGate } from "./pack-navigation-gate.js";
+import type { RealmNetworkPolicy } from "./realm-lockdown.js";
+import type { RealmNavigation } from "./realm-navigation.js";
 import {
   validateCompiledPacks,
   validateRuntimeOptions,
@@ -26,7 +29,10 @@ const TOOL_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/;
 export interface ReviewedPageAdapterDefinition {
   readonly pack: CompiledPackSubject;
   readonly tools: readonly string[];
-  readonly create: (document: Document) => PageAdapter;
+  readonly create: (
+    document: Document,
+    services: { readonly navigate: (url: string) => void },
+  ) => PageAdapter;
 }
 
 interface ReviewedPageAdapterEntry {
@@ -38,6 +44,9 @@ interface ReviewedPageAdapterEntry {
 interface ActivePackAdapter {
   readonly adapter: PageAdapter;
   readonly tools: ReadonlySet<string>;
+  /** Tools this pack declares as actions, the only ones that may navigate. */
+  readonly actions: ReadonlySet<string>;
+  readonly gate: PackNavigationGate;
 }
 
 /** Creates one document-local router from static reviewed definitions. */
@@ -46,6 +55,7 @@ export function createReviewedDocumentAdapter(
   url: string,
   definitions: readonly ReviewedPageAdapterDefinition[],
   options: CompiledPackRuntimeOptions,
+  navigation: RealmNavigation,
   native?: PageAdapter,
 ): PageAdapter {
   const entries = validateDefinitions(definitions, options);
@@ -55,12 +65,39 @@ export function createReviewedDocumentAdapter(
         packMatchesLocation(entry.manifest, page.location),
       )
     : [];
-  return new ReviewedDocumentAdapter(document, matching, native);
+  return new ReviewedDocumentAdapter(document, matching, navigation, native);
+}
+
+/**
+ * The realm network policy for a page: every request origin declared by the
+ * reviewed packs whose match rules select this location. Used to lock the
+ * isolated content-script realm before any pack code runs. Reuses the same
+ * validation and matching as {@link createReviewedDocumentAdapter}, so a
+ * malformed definition fails closed here too.
+ */
+export function reviewedRealmNetworkPolicy(
+  url: string,
+  definitions: readonly ReviewedPageAdapterDefinition[],
+  options: CompiledPackRuntimeOptions,
+): RealmNetworkPolicy {
+  const entries = validateDefinitions(definitions, options);
+  const page = canonicalizePageLocation(url);
+  const allowed = new Set<string>();
+  if (page.ok) {
+    for (const entry of entries) {
+      if (!packMatchesLocation(entry.manifest, page.location)) continue;
+      const policy = entry.manifest.networkPolicy.extensionRequests;
+      if (policy === "none") continue;
+      for (const origin of policy.origins) allowed.add(origin);
+    }
+  }
+  return Object.freeze({ allowedOrigins: Object.freeze([...allowed]) });
 }
 
 class ReviewedDocumentAdapter implements PageAdapter {
   readonly #document: Document;
   readonly #entries: readonly ReviewedPageAdapterEntry[];
+  readonly #navigation: RealmNavigation;
   readonly #native: PageAdapter | undefined;
   #packs: readonly ActivePackAdapter[] = Object.freeze([]);
   #routes = new Map<string, PageAdapter>();
@@ -69,10 +106,12 @@ class ReviewedDocumentAdapter implements PageAdapter {
   constructor(
     document: Document,
     entries: readonly ReviewedPageAdapterEntry[],
+    navigation: RealmNavigation,
     native: PageAdapter | undefined,
   ) {
     this.#document = document;
     this.#entries = entries;
+    this.#navigation = navigation;
     this.#native = native;
   }
 
@@ -101,13 +140,25 @@ class ReviewedDocumentAdapter implements PageAdapter {
     const packs: ActivePackAdapter[] = [];
     for (const entry of selected) {
       let adapter: PageAdapter;
+      const gate = new PackNavigationGate(entry.manifest, this.#navigation);
       try {
-        adapter = entry.create(this.#document);
+        adapter = entry.create(this.#document, {
+          navigate: (url: string) => {
+            gate.navigate(url);
+          },
+        });
         validateAdapter(adapter);
       } catch {
         throw new TypeError("reviewed page adapter factory failed");
       }
-      packs.push(Object.freeze({ adapter, tools: entry.tools }));
+      packs.push(
+        Object.freeze({
+          adapter,
+          tools: entry.tools,
+          actions: actionTools(entry.manifest),
+          gate,
+        }),
+      );
     }
     this.#packs = Object.freeze(packs);
     this.#routes.clear();
@@ -160,6 +211,10 @@ class ReviewedDocumentAdapter implements PageAdapter {
     if (adapter === undefined) {
       throw new PageAdapterExecutionError("TOOL_UNAVAILABLE");
     }
+    // Navigation is permitted only while an approved action is running, and
+    // withdrawn again however the call ends.
+    const pack = this.#packs.find((candidate) => candidate.adapter === adapter);
+    if (pack?.actions.has(tool) === true) pack.gate.arm(signal);
     try {
       return await adapter.execute(tool, args, signal);
     } catch (error) {
@@ -167,6 +222,8 @@ class ReviewedDocumentAdapter implements PageAdapter {
         throw new PageAdapterExecutionError(error.code);
       }
       throw error;
+    } finally {
+      pack?.gate.disarm();
     }
   }
 
@@ -195,6 +252,19 @@ class ReviewedDocumentAdapter implements PageAdapter {
       this.#routes.clear();
       unsubscribeAll(unsubscribes);
     };
+  }
+
+  close(): void {
+    this.#routes.clear();
+    for (const adapter of this.#adapters()) {
+      try {
+        adapter.close?.();
+      } catch {
+        // Child authority has already been removed from this router.
+      }
+    }
+    this.#packs = Object.freeze([]);
+    this.#subscribed = false;
   }
 
   #adapters(): readonly PageAdapter[] {
@@ -360,7 +430,9 @@ function validateAdapter(adapter: PageAdapter): void {
     adapter === null ||
     typeof adapter.capabilities !== "function" ||
     typeof adapter.execute !== "function" ||
-    (adapter.subscribe !== undefined && typeof adapter.subscribe !== "function")
+    (adapter.subscribe !== undefined &&
+      typeof adapter.subscribe !== "function") ||
+    (adapter.close !== undefined && typeof adapter.close !== "function")
   ) {
     throw new TypeError("invalid reviewed page adapter");
   }
@@ -382,4 +454,15 @@ function unsubscribeAll(unsubscribes: readonly (() => void)[]): void {
       // Cleanup is best-effort after routes have already been revoked.
     }
   }
+}
+
+/** Tool names a pack's manifest declares as approved actions. */
+function actionTools(manifest: PackManifest): ReadonlySet<string> {
+  return Object.freeze(
+    new Set(
+      manifest.tools
+        .filter((tool) => tool.risk === "action")
+        .map((tool) => tool.name),
+    ),
+  );
 }

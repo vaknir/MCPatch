@@ -146,13 +146,18 @@ page data, or excessive content through tool output, errors, or logs.
 
 Mitigations:
 
-- no cookie or credential APIs in the pack context;
+- no cookie or credential APIs in the pack context; the isolated-world realm
+  lockdown removes the network primitives and makes `document.cookie` throw for
+  compiled packs ([realm lockdown](docs/architecture/realm-lockdown.md), #187);
 - expose task-specific DOM adapters instead of a document handle where practical;
 - require output schemas and byte limits;
 - use allowlisted structured log fields with opaque identifiers;
 - never log raw arguments, results, page text, grants, or transport frames; and
 - classify tools that can read sensitive page content as `SENSITIVE` even if they
-  do not mutate state.
+  do not mutate state, using the rules in
+  [ADR 0015](docs/adr/0015-sensitive-read-classification.md): rendered content
+  and credential-free network reads are `READ`; undisplayed account data and
+  high-impact content are `SENSITIVE`.
 
 Content-level secret detection can reduce accidents but is not the primary boundary;
 the capability API must make credential access unavailable.
@@ -211,6 +216,33 @@ Mitigations:
   publication sequence, compatibility, and revocation locally before presentation;
 - keep registry control-plane traffic separate from pack `EXTERNAL_NETWORK`
   authority; community read-only packs cannot invoke it;
+
+### Deceptive or substituted community submission
+
+**Threat:** a contributor supplies misleading descriptions, selectors, fixtures, or
+marketplace metadata; swaps source after review; expands authority without calling
+it out; or attempts to make an unsigned artifact publish itself.
+
+**Mitigations:**
+
+- contributor output is always unsigned and has no registry publication command or
+  signing authority;
+- review reports expose exact origins, paths, schemas, operations, risks,
+  permissions, compatibility, network policy, digest, and source commit while
+  excluding fixture payloads and results;
+- maintainers treat every report field as untrusted and review the declarative
+  source directly;
+- publication requires clean registry and pack repositories, reproduces the exact
+  reviewed source commit and report, re-runs all synthetic fixtures, and compares
+  the signed bundle digest before registry signing; and
+- publisher signing, independent registry attestation, user installation, and
+  browser-origin permission remain separate authorities.
+- reject reuse of one publisher/pack/version identity for different bytes and bound
+  signed history to three releases per identity;
+- stage every higher release as non-authoritative until explicit extension-owned
+  review, retaining at most one still-valid rollback artifact; and
+- adopt a newer valid signed index before discovery so emergency revocation closes
+  authority before script and permission cleanup.
 - stage candidates separately from active bytes and require explicit review for any
   digest or authority change; and
 - reject invalid, conflicting, rolled-back, or partial records before installation.
@@ -239,6 +271,9 @@ the user or reviewer.
 
 Mitigations:
 
+- require an argument-bound approval for every native WebMCP call, whose risk and
+  permissions are page-declared, and emit no behavioural hints for it
+  ([ADR 0016](docs/adr/0016-native-webmcp-approval.md));
 - derive policy from locally validated manifest fields and operation semantics, not
   descriptions, annotations, or page text;
 - show exact origins/paths, schemas, risk, permissions, network policy, publisher
@@ -334,6 +369,37 @@ Mitigations:
 - signed releases and pack bundles before external distribution; and
 - key rotation and revocation procedures before the first public release.
 
+## Pack-boundary enforcement status
+
+Several boundaries below are honoured by **review** rather than by a runtime
+mechanism for the compiled (bundled) pack tier — every reviewed pack until the
+declarative interpreter exists. The table states, per claim, what enforces it
+today, so a reviewer never trusts a control that is not there for the tier they
+are reviewing. Each enforcement PR flips its row and links its issue; moving a row
+from review to mechanism is a trust-boundary change and needs an ADR
+(CONTRIBUTING.md, "Before implementation" step 2).
+
+| Claim (compiled pack tier)                                 | Enforced by today                                                                         |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| No cookies or tokens in results                            | review + closed output schema (#176); `document.cookie` blocked by realm lockdown (#187)  |
+| Network only to declared origins                           | realm lockdown + host permissions (#187)                                                  |
+| No network under `networkPolicy.extensionRequests: "none"` | realm lockdown: no reachable network primitive (#187)                                     |
+| No navigation from `READ` tools                            | review for ambient unforgeable `Location`; action gate for the supported SDK route (#188) |
+| Image result within its capture scope                      | review; MIME, dimensions, and byte size by mechanism                                      |
+| Origin binding                                             | mechanism                                                                                 |
+| Path binding                                               | content-script registration from the manifest path rules (#180)                           |
+| Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)             |
+| Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                        |
+
+The **declarative community tier**, including local developer mode and signed
+registry installation, accepts only the bounded read operations schema and never
+loads pack JavaScript. It therefore has no route to navigation, mutation, cookies,
+storage, or network primitives. The signed fixed-origin client, extension-owned
+review, exact-origin grant proof, immutable publisher bundle, independent registry
+attestation, and fresh offline restore are implemented (#149–#150). Updates,
+emergency revocation operations, submissions, and the real-site pilot remain gated
+by #151–#154.
+
 ## Permission classes
 
 The policy vocabulary begins with these non-exclusive classes:
@@ -350,10 +416,12 @@ The policy vocabulary begins with these non-exclusive classes:
 Risk labels shown to users are derived from permissions and reviewed metadata. They
 do not replace enforcement.
 
-Community declarative packs begin with `READ` only and
-`networkPolicy.extensionRequests: "none"`. Declarative actions and external
-network methods require their own future ADR and cannot be smuggled in through
-registry metadata or a schema.
+Community declarative Operations v1 remains `READ` only. Operations v2 adds one
+`ACTION` primitive: an approved, typed same-origin navigation whose static URL
+shape is signed by the pack and whose old document is revoked before navigation.
+Both require `networkPolicy.extensionRequests: "none"`. External network methods
+and any other action primitive require a future ADR and cannot be smuggled in
+through registry metadata or a schema.
 
 ## Residual risks
 

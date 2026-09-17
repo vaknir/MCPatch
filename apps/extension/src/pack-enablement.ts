@@ -4,7 +4,6 @@ import type {
 } from "./page-context-model.js";
 import {
   ENABLEMENT_STORAGE_KEY,
-  REGISTRATION_PREFIX,
   type ChromeActionTab,
   type ChromeEnablementApi,
   type EnabledPackRecord,
@@ -15,15 +14,9 @@ import {
   type PackSiteCatalogFactory,
   type ReviewedPackSite,
 } from "./enablement-model.js";
-import {
-  EMPTY_ORIGIN_CONFIG,
-  ORIGIN_CONFIG_STORAGE_KEY,
-  parseOriginConfigState,
-  type OriginConfigState,
-} from "./configured-origins.js";
-import { provesExactOrigins } from "./permission-proof.js";
 import { showEnablementAction, validActionTabId } from "./enablement-action.js";
-import { reconcileContentScripts } from "./enablement-registration.js";
+import { hasExactHostPermissions } from "./exact-host-permissions.js";
+import type { PackContentSource } from "./pack-content-catalog.js";
 import {
   createEnablementState,
   EMPTY_ENABLEMENT_STATE,
@@ -32,11 +25,19 @@ import {
   sameEnablementState,
 } from "./enablement-storage.js";
 import { recordForSite } from "./reviewed-pack-catalog.js";
+import {
+  EMPTY_ORIGIN_CONFIG,
+  ORIGIN_CONFIG_STORAGE_KEY,
+  parseOriginConfigState,
+  type OriginConfigState,
+} from "./configured-origins.js";
 
 export class PackEnablementController implements PackEnablementRuntime {
   readonly #api: ChromeEnablementApi;
   readonly #createCatalog: PackSiteCatalogFactory;
   #catalog: PackSiteCatalog;
+  readonly #content: PackContentSource;
+  readonly #fallbackAction: ((tab: ChromeActionTab) => void) | undefined;
   readonly #effective = new Map<string, ReviewedPackSite>();
   readonly #pendingSites = new Set<string>();
   readonly #requested = new Map<string, EnabledPackRecord>();
@@ -49,10 +50,17 @@ export class PackEnablementController implements PackEnablementRuntime {
     authorize: (identity: PageSenderIdentity) => this.#authorize(identity),
   };
 
-  constructor(api: ChromeEnablementApi, createCatalog: PackSiteCatalogFactory) {
+  constructor(
+    api: ChromeEnablementApi,
+    createCatalog: PackSiteCatalogFactory,
+    content: PackContentSource,
+    fallbackAction?: (tab: ChromeActionTab) => void,
+  ) {
     this.#api = api;
     this.#createCatalog = createCatalog;
     this.#catalog = createCatalog(EMPTY_ORIGIN_CONFIG.sites);
+    this.#content = content;
+    this.#fallbackAction = fallbackAction;
   }
 
   start(): void {
@@ -111,6 +119,14 @@ export class PackEnablementController implements PackEnablementRuntime {
     const tabId = validActionTabId(tab.id);
     const sites =
       typeof tab.url === "string" ? this.#catalog.match(tab.url) : [];
+    if (
+      tabId !== undefined &&
+      sites.length === 0 &&
+      this.#fallbackAction !== undefined
+    ) {
+      this.#fallbackAction(tab);
+      return;
+    }
     if (tabId === undefined || sites.length !== 1) {
       if (tabId !== undefined) {
         void showEnablementAction(this.#api.action, tabId, "unsupported");
@@ -220,21 +236,8 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#writeState(createEnablementState(records));
     await this.#reconcile();
 
-    const needed = this.#neededPermissionPatterns();
-    const removable = site.permissionPatterns.filter(
-      (pattern) => !needed.has(pattern),
-    );
-    if (removable.length > 0) {
-      try {
-        await this.#api.permissions.remove({
-          origins: removable,
-        });
-      } catch {
-        // Local state and script authority are already revoked. Permission cleanup
-        // is best-effort and is reconciled again below.
-      }
-      await this.#reconcile();
-    }
+    await this.#content.removeUnusedPermissions(site.permissionPatterns);
+    await this.#reconcile();
     await showEnablementAction(this.#api.action, tabId, "disabled", site);
   }
 
@@ -261,6 +264,24 @@ export class PackEnablementController implements PackEnablementRuntime {
     this.#ready = true;
   }
 
+  async #readOriginConfig(): Promise<OriginConfigState> {
+    const container = await this.#api.storage.local.get(
+      ORIGIN_CONFIG_STORAGE_KEY,
+    );
+    const descriptor = Object.getOwnPropertyDescriptor(
+      container,
+      ORIGIN_CONFIG_STORAGE_KEY,
+    );
+    if (descriptor === undefined) return EMPTY_ORIGIN_CONFIG;
+    const state =
+      "value" in descriptor
+        ? parseOriginConfigState(descriptor.value)
+        : undefined;
+    if (state !== undefined) return state;
+    await this.#api.storage.local.remove(ORIGIN_CONFIG_STORAGE_KEY);
+    return EMPTY_ORIGIN_CONFIG;
+  }
+
   async #readState(): Promise<EnablementState> {
     const container = await this.#api.storage.local.get(ENABLEMENT_STORAGE_KEY);
     const descriptor = Object.getOwnPropertyDescriptor(
@@ -281,64 +302,41 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#api.storage.local.set({ [ENABLEMENT_STORAGE_KEY]: state });
   }
 
-  async #readOriginConfig(): Promise<OriginConfigState> {
-    const container = await this.#api.storage.local.get(
-      ORIGIN_CONFIG_STORAGE_KEY,
-    );
-    const descriptor = Object.getOwnPropertyDescriptor(
-      container,
-      ORIGIN_CONFIG_STORAGE_KEY,
-    );
-    if (descriptor === undefined) return EMPTY_ORIGIN_CONFIG;
-    const state =
-      "value" in descriptor
-        ? parseOriginConfigState(descriptor.value)
-        : undefined;
-    if (state !== undefined) return state;
-    await this.#api.storage.local.remove(ORIGIN_CONFIG_STORAGE_KEY);
-    return EMPTY_ORIGIN_CONFIG;
-  }
-
-  /**
-   * Reads the complete granted-origin inventory once and requires each site's
-   * exact patterns within it. A covering all-hosts grant is refused rather than
-   * accepted as proof, so the broad optional declaration that makes
-   * runtime-configured origins expressible can never become authority itself.
-   */
   async #grantedSites(
     candidates: readonly ReviewedPackSite[],
   ): Promise<readonly ReviewedPackSite[]> {
-    if (candidates.length === 0) return Object.freeze([]);
-    let granted: readonly string[];
-    try {
-      granted = (await this.#api.permissions.getAll()).origins ?? [];
-    } catch {
-      return Object.freeze([]);
+    const grants = new Map<string, boolean>();
+    for (const site of candidates) {
+      const key = site.permissionPatterns.join("\u0000");
+      let granted = grants.get(key);
+      if (granted === undefined) {
+        granted = await hasExactHostPermissions(
+          this.#api.permissions,
+          site.permissionPatterns,
+        );
+        grants.set(key, granted);
+      }
     }
     return Object.freeze(
-      candidates.filter((site) =>
-        provesExactOrigins(granted, site.permissionPatterns),
+      candidates.filter(
+        (site) => grants.get(site.permissionPatterns.join("\u0000")) === true,
       ),
     );
   }
 
-  #neededPermissionPatterns(): ReadonlySet<string> {
-    const patterns = new Set<string>();
-    for (const record of this.#requested.values()) {
-      const site = this.#catalog.resolve(record);
-      if (site !== undefined) {
-        for (const pattern of site.permissionPatterns) patterns.add(pattern);
-      }
-    }
-    return patterns;
-  }
-
   async #reconcileScripts(sites: readonly ReviewedPackSite[]): Promise<void> {
-    await reconcileContentScripts(
-      this.#api.scripting,
-      sites,
-      this.#effective.values(),
-      (origin) => this.#invalidateOrigin(origin),
+    await this.#content.replace(
+      sites.map((site) => ({
+        fingerprint: JSON.stringify([
+          "reviewed",
+          site.key,
+          site.manifest.version,
+          site.manifest.digest,
+        ]),
+        matches: site.scriptMatches,
+        origin: site.origin,
+        permissionPatterns: site.permissionPatterns,
+      })),
     );
   }
 
@@ -366,13 +364,7 @@ export class PackEnablementController implements PackEnablementRuntime {
     this.#requested.clear();
     for (const origin of origins) this.#revoke(origin);
     try {
-      const current = await this.#api.scripting.getRegisteredContentScripts();
-      const ids = current
-        .filter((script) => script.id.startsWith(REGISTRATION_PREFIX))
-        .map((script) => script.id);
-      if (ids.length > 0) {
-        await this.#api.scripting.unregisterContentScripts({ ids });
-      }
+      await this.#content.replace([]);
     } catch {
       // The controller remains unavailable and exposes no page authority.
     }

@@ -15,6 +15,7 @@ import {
   type PageContentRuntimeOptions,
 } from "./page-content-model.js";
 import { MCPATCH_PAGE_PORT_NAME, type PagePort } from "./page-context-model.js";
+import { SnapshotGate } from "./page-snapshot-gate.js";
 import {
   IMPLEMENTATION_VERSION,
   systemScheduler,
@@ -41,6 +42,10 @@ export class PageContentRuntime {
   #handshakeTimer: unknown;
   #port: PagePort | undefined;
   #refreshGeneration = 0;
+  /** Canonical capabilities of the last published snapshot, so an unchanged
+   * republication costs the bridge nothing. */
+  #publishedCapabilities: string | undefined;
+  readonly #gate: SnapshotGate;
   #retryAttempt = 0;
   #retryTimer: unknown;
   #running = false;
@@ -56,6 +61,7 @@ export class PageContentRuntime {
     this.#adapter = adapter;
     this.#expectedOrigin = canonicalOrigin(options.expectedOrigin);
     this.#scheduler = options.scheduler ?? systemScheduler;
+    this.#gate = new SnapshotGate(this.#scheduler);
     this.#handshakeTimeoutMs =
       options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
     this.#retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
@@ -64,6 +70,7 @@ export class PageContentRuntime {
       throw new TypeError("page retry delays must not be empty");
     }
     for (const delay of this.#retryDelaysMs) validateTimer(delay);
+    this.#adapter.bindContextRevocation?.(() => this.stop());
     options.lifecycle?.addEventListener("pagehide", () => this.stop(), {
       once: true,
     });
@@ -94,7 +101,10 @@ export class PageContentRuntime {
   }
 
   refresh(): void {
-    if (this.#binding !== undefined) this.#publishCapabilities();
+    if (this.#binding === undefined) return;
+    this.#gate.request(() => {
+      if (this.#binding !== undefined) this.#publishCapabilities();
+    });
   }
 
   #connect(): void {
@@ -191,7 +201,7 @@ export class PageContentRuntime {
       this.#adapterFailed();
       return;
     }
-    this.#publishCapabilities();
+    this.refresh();
   }
 
   #publishCapabilities(): void {
@@ -221,6 +231,7 @@ export class PageContentRuntime {
             capabilities,
           } as const;
           let accepted: readonly PageCapability[];
+          let published: string;
           try {
             const frame = encodePageToWorkerMessage(message);
             const parsed = parsePageToWorkerFrame(frame);
@@ -238,6 +249,8 @@ export class PageContentRuntime {
             }
             const port = this.#port;
             if (port === undefined) throw new Error("page port unavailable");
+            published = canonicalCapabilities(parsed.capabilities);
+            if (published === this.#publishedCapabilities) return;
             port.postMessage(frame);
             accepted = parsed.capabilities;
           } catch {
@@ -245,6 +258,7 @@ export class PageContentRuntime {
             return;
           }
           this.#snapshotRevision = snapshotRevision;
+          this.#publishedCapabilities = published;
           this.#executor?.setCapabilities(accepted);
         },
         () => {
@@ -309,6 +323,8 @@ export class PageContentRuntime {
     this.#executor?.close();
     this.#executor = undefined;
     this.#clearHandshake();
+    this.#gate.cancel();
+    this.#publishedCapabilities = undefined;
     this.#discovery?.abort();
     this.#discovery = undefined;
     try {
@@ -317,6 +333,11 @@ export class PageContentRuntime {
       // Adapter cleanup cannot prevent cancellation and port revocation.
     }
     this.#unsubscribe = undefined;
+    try {
+      this.#adapter.close?.();
+    } catch {
+      // Authority and pending calls are already revoked at this point.
+    }
     if (disconnect) disconnectQuietly(port);
   }
 
@@ -393,4 +414,15 @@ function disconnectQuietly(port: PagePort | undefined): void {
   } catch {
     // A disconnected content port is already terminal.
   }
+}
+
+/**
+ * A stable string for one capability set, used only to skip republishing an
+ * unchanged set. The capabilities come from parsing our own encoded frame, so
+ * their shape and key order are already canonical.
+ */
+function canonicalCapabilities(
+  capabilities: readonly PageCapability[],
+): string {
+  return JSON.stringify(capabilities);
 }

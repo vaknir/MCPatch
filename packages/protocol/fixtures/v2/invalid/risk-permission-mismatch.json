@@ -6,7 +6,7 @@
   "origin": "https://example.com",
   "capabilities": [
     {
-      "name": "example.write",
+      "name": "native.www_google_com.example.write",
       "description": "Write a synthetic value.",
       "origin": "https://example.com",
       "source": "native_webmcp",

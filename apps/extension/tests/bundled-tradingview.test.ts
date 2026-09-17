@@ -1,8 +1,6 @@
 import {
   TRADINGVIEW_CHART_PATH,
   TRADINGVIEW_ORIGIN,
-  TRADINGVIEW_PRICE_ALERTS_ORIGIN,
-  TRADINGVIEW_SYMBOL_SEARCH_ORIGIN,
   TRADINGVIEW_TOOLS,
   tradingViewBrowserPack,
   tradingViewPack,
@@ -50,19 +48,13 @@ describe("bundled TradingView production pack", () => {
     expect(catalog.match("https://tradingview.com/chart/")).toEqual([]);
   });
 
-  it("declares only optional site authority in the extension manifest", () => {
+  it("declares only optional runtime-discovered HTTPS authority", () => {
     const manifest = JSON.parse(
       readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
     ) as Record<string, unknown>;
-    expect(manifest["optional_host_permissions"]).toContain(
-      `${TRADINGVIEW_ORIGIN}/*`,
-    );
-    expect(manifest["optional_host_permissions"]).toContain(
-      `${TRADINGVIEW_SYMBOL_SEARCH_ORIGIN}/*`,
-    );
-    expect(manifest["optional_host_permissions"]).toContain(
-      `${TRADINGVIEW_PRICE_ALERTS_ORIGIN}/*`,
-    );
-    expect(manifest).not.toHaveProperty("host_permissions");
+    expect(manifest["optional_host_permissions"]).toEqual(["https://*/*"]);
+    expect(manifest["host_permissions"]).toEqual([
+      "https://registry.mcpatch.dev/*",
+    ]);
   });
 });

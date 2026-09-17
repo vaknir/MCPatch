@@ -12,6 +12,7 @@ import {
 } from "../src/page-channel.js";
 import type { PageAdapter } from "../src/page-content-model.js";
 import { PageContentRuntime } from "../src/page-content-runtime.js";
+import { MIN_SNAPSHOT_INTERVAL_MS } from "../src/page-snapshot-gate.js";
 import { MCPATCH_PAGE_PORT_NAME } from "../src/page-context-model.js";
 import { FakeScheduler } from "./support/native-session.js";
 import {
@@ -192,8 +193,10 @@ describe("page content runtime", () => {
 
   it("cancels exact calls and closes on crossed bindings", async () => {
     let executionSignal: AbortSignal | undefined;
+    const close = vi.fn();
     const state = setup(
       createAdapter({
+        close,
         execute(_tool, _args, signal) {
           executionSignal = signal;
           return new Promise<JsonValue>(() => undefined);
@@ -222,6 +225,7 @@ describe("page content runtime", () => {
       }),
     );
     expect(port.disconnected).toBe(true);
+    expect(close).toHaveBeenCalledOnce();
     state.scheduler.advanceBy(10);
     expect(state.runtime.ports).toHaveLength(2);
   });
@@ -229,9 +233,11 @@ describe("page content runtime", () => {
   it("refreshes monotonically and stops cleanly on pagehide", async () => {
     let listener: (() => void) | undefined;
     const capabilities = [CAPABILITY];
+    const close = vi.fn();
     const unsubscribe = vi.fn();
     const adapter = createAdapter({
       capabilities: async () => capabilities,
+      close,
       subscribe(next) {
         listener = next;
         return unsubscribe;
@@ -244,6 +250,10 @@ describe("page content runtime", () => {
 
     capabilities.push({ source: "pack", name: "flights.results" });
     listener?.();
+    await settle();
+    // The refresh lands inside the window opened by the first publication, so
+    // it coalesces to the boundary rather than publishing immediately.
+    state.scheduler.advanceBy(MIN_SNAPSHOT_INTERVAL_MS);
     await settle();
     expect(posted(port, 2)).toMatchObject({
       type: "page_capability_snapshot",
@@ -258,8 +268,72 @@ describe("page content runtime", () => {
     });
     expect(port.disconnected).toBe(true);
     expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
     state.scheduler.advanceBy(1_000);
     expect(state.runtime.ports).toHaveLength(1);
+  });
+
+  it("collapses a toolchange flood and republishes nothing when unchanged", async () => {
+    let listener: (() => void) | undefined;
+    let discoveries = 0;
+    const adapter = createAdapter({
+      async capabilities() {
+        discoveries += 1;
+        return [CAPABILITY];
+      },
+      subscribe(next) {
+        listener = next;
+        return () => {};
+      },
+    });
+    const state = setup(adapter);
+    const port = ready(state);
+    await settle();
+    // The hello and the first snapshot.
+    expect(port.posted).toHaveLength(2);
+    expect(discoveries).toBe(1);
+    expect(listener).toBeDefined();
+
+    for (let index = 0; index < 1_000; index += 1) listener?.();
+    await settle();
+    state.scheduler.advanceBy(MIN_SNAPSHOT_INTERVAL_MS);
+    await settle();
+
+    // The flood coalesces into a single trailing discovery, and that
+    // discovery finds the same capability set, so nothing is republished.
+    expect(discoveries).toBe(2);
+    expect(port.posted).toHaveLength(2);
+  });
+
+  it("publishes once more when the coalesced refresh finds a changed set", async () => {
+    let listener: (() => void) | undefined;
+    const capabilities = [CAPABILITY];
+    const adapter = createAdapter({
+      async capabilities() {
+        return [...capabilities];
+      },
+      subscribe(next) {
+        listener = next;
+        return () => {};
+      },
+    });
+    const state = setup(adapter);
+    const port = ready(state, [CAPABILITY.name, "flights.results"]);
+    await settle();
+    expect(port.posted).toHaveLength(2);
+
+    capabilities.push({ source: "pack", name: "flights.results" });
+    for (let index = 0; index < 50; index += 1) listener?.();
+    await settle();
+    state.scheduler.advanceBy(MIN_SNAPSHOT_INTERVAL_MS);
+    await settle();
+
+    expect(port.posted).toHaveLength(3);
+    expect(posted(port, 2)).toMatchObject({
+      type: "page_capability_snapshot",
+      snapshotRevision: 2,
+      capabilities,
+    });
   });
 
   it("fails closed when discovery throws synchronously or sends invalid data", async () => {

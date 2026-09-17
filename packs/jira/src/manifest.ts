@@ -124,11 +124,15 @@ const mcp = new MCPatch<JiraSite>({
   version: "0.1.0",
   // Reviewed manifest identity; enforced by tests/digest.test.ts.
   digest:
-    "sha256:d077f6277030c6f74ab12d0a7ec49e495c3d6208682f8a3a838e4a650f947eb0",
+    "sha256:2c6923aacec515dd02a967fb0771f371727124cec988e39bd9977103f744daaf",
   matches: [
     {
       origin: JIRA_ORIGIN_PLACEHOLDER,
+      // Jira is one application per host: issues, boards, projects and
+      // dashboards all live under the same origin, so the pack declares the
+      // whole origin explicitly rather than guessing a path prefix.
       paths: [{ kind: "prefix", path: JIRA_PATH_PREFIX }] as const,
+      wholeOrigin: true,
     },
   ],
 });

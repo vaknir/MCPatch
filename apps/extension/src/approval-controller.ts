@@ -8,12 +8,25 @@ import {
   type ApprovalReady,
   type ApprovalScheduler,
   type ApprovalSurface,
+  type ApprovalWithdrawn,
   type ChromeApprovalRuntimeApi,
   type ChromeApprovalTabsApi,
 } from "./approval-model.js";
 
 const MAX_PENDING_APPROVALS = 8;
 const MAX_APPROVAL_LIFETIME_MS = 5 * 60 * 1_000;
+/**
+ * After a denial, further prompts open in the background for this long so a
+ * looping caller cannot keep yanking focus; the user pulls the next prompt
+ * from the toolbar instead of having it pushed at them.
+ */
+const RECENT_DENIAL_WINDOW_MS = 60 * 1_000;
+/**
+ * When the MCP client gives up while a prompt is on screen, the prompt stays
+ * visible this long with an explanation instead of vanishing under the
+ * user's cursor. The decision surface is already gone by then.
+ */
+const WITHDRAWN_GRACE_MS = 8 * 1_000;
 
 interface PendingApproval {
   readonly message: ApprovalRequired;
@@ -50,6 +63,7 @@ export class ApprovalController implements ApprovalSurface {
   readonly #pendingByApproval = new Map<string, PendingApproval>();
   readonly #approvalByRequest = new Map<string, string>();
   readonly #approvalByTab = new Map<number, string>();
+  #lastDenialAt: number | undefined;
 
   constructor(
     runtime: ChromeApprovalRuntimeApi,
@@ -94,8 +108,11 @@ export class ApprovalController implements ApprovalSurface {
     );
     this.#pendingByApproval.set(message.approvalId, pending);
     this.#approvalByRequest.set(message.requestId, message.approvalId);
+    const active =
+      this.#lastDenialAt === undefined ||
+      now - this.#lastDenialAt >= RECENT_DENIAL_WINDOW_MS;
     try {
-      void this.#tabs.create({ active: true, url }).then(
+      void this.#tabs.create({ active, url }).then(
         (tab) => this.#tabCreated(message.approvalId, pending, tab.id),
         () => this.#finish(message.approvalId, "denied"),
       );
@@ -109,7 +126,13 @@ export class ApprovalController implements ApprovalSurface {
   cancel(requestId: string): boolean {
     const approvalId = this.#approvalByRequest.get(requestId);
     if (approvalId === undefined) return false;
-    this.#discard(approvalId);
+    const pending = this.#take(approvalId);
+    if (pending === undefined) return false;
+    if (pending.presented && pending.port !== undefined) {
+      this.#withdraw(pending, pending.port);
+    } else {
+      this.#cleanUp(pending);
+    }
     return true;
   }
 
@@ -231,8 +254,10 @@ export class ApprovalController implements ApprovalSurface {
         approvalId: pending.message.approvalId,
         tool: pending.message.tool,
         origin: pending.message.origin,
+        args: pending.message.args,
         argsHash: pending.message.argsHash,
         expiresAt: pending.message.expiresAt,
+        requester: pending.message.requester,
       };
       try {
         port.postMessage(presentation);
@@ -280,6 +305,9 @@ export class ApprovalController implements ApprovalSurface {
   #finish(approvalId: string, decision: ApprovalDecision): void {
     const pending = this.#take(approvalId);
     if (pending === undefined) return;
+    if (decision === "denied") {
+      this.#lastDenialAt = this.#scheduler.now().getTime();
+    }
     try {
       pending.resolve(decision);
     } finally {
@@ -290,6 +318,28 @@ export class ApprovalController implements ApprovalSurface {
   #discard(approvalId: string): void {
     const pending = this.#take(approvalId);
     if (pending !== undefined) this.#cleanUp(pending);
+  }
+
+  /**
+   * The record is already removed, so a late decision has nowhere to land.
+   * Tell the page why it is closing, drop the channel, and remove the tab
+   * after a short grace period.
+   */
+  #withdraw(pending: PendingApproval, port: ApprovalPort): void {
+    const notice: ApprovalWithdrawn = {
+      type: "approval_withdrawn",
+      approvalId: pending.message.approvalId,
+    };
+    try {
+      port.postMessage(notice);
+    } catch {
+      // The page already went away; closing the tab below is enough.
+    }
+    disconnectQuietly(pending.candidate?.port);
+    disconnectQuietly(port);
+    const tabId = pending.tabId;
+    if (tabId === undefined) return;
+    this.#scheduler.schedule(() => this.#removeTab(tabId), WITHDRAWN_GRACE_MS);
   }
 
   #take(approvalId: string): PendingApproval | undefined {

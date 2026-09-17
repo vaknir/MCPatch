@@ -15,8 +15,10 @@
         "contextRevision",
         "origin",
         "tool",
+        "args",
         "argsHash",
-        "expiresAt"
+        "expiresAt",
+        "requester"
       ],
       "properties": {
         "protocolVersion": {
@@ -43,12 +45,32 @@
         "tool": {
           "$ref": "common.schema.json#/$defs/toolName"
         },
+        "args": {
+          "type": "object",
+          "maxProperties": 128
+        },
         "argsHash": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         },
         "expiresAt": {
           "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "requester": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["client", "session"],
+          "properties": {
+            "client": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[!-~](?:[ -~]*[!-~])?$"
+            },
+            "session": {
+              "$ref": "common.schema.json#/$defs/identifier"
+            }
+          }
         }
       }
     },

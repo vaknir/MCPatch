@@ -463,6 +463,9 @@ fn connection_error(code: LocalCoreConnectionErrorCode) -> LocalCoreConnectionEr
     {
         let code = match code {
             LocalCoreConnectionErrorCode::Unavailable => UnixIpcErrorCode::EndpointUnavailable,
+            LocalCoreConnectionErrorCode::RuntimeDirectoryUnavailable => {
+                UnixIpcErrorCode::RuntimeUnavailable
+            }
             LocalCoreConnectionErrorCode::Unauthorized => UnixIpcErrorCode::PeerUnauthorized,
             LocalCoreConnectionErrorCode::UnsafeRuntime => UnixIpcErrorCode::UnsafeRuntimeDirectory,
             LocalCoreConnectionErrorCode::Transport => UnixIpcErrorCode::Io,
@@ -473,7 +476,12 @@ fn connection_error(code: LocalCoreConnectionErrorCode) -> LocalCoreConnectionEr
     #[cfg(windows)]
     {
         let code = match code {
-            LocalCoreConnectionErrorCode::Unavailable => WindowsIpcErrorCode::EndpointUnavailable,
+            // Windows has no runtime directory; the nearest observable failure
+            // for these tests is an unavailable endpoint.
+            LocalCoreConnectionErrorCode::Unavailable
+            | LocalCoreConnectionErrorCode::RuntimeDirectoryUnavailable => {
+                WindowsIpcErrorCode::EndpointUnavailable
+            }
             LocalCoreConnectionErrorCode::Unauthorized => WindowsIpcErrorCode::PeerUnauthorized,
             LocalCoreConnectionErrorCode::UnsafeRuntime
             | LocalCoreConnectionErrorCode::Transport => WindowsIpcErrorCode::Io,

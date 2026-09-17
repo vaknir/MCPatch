@@ -1,6 +1,6 @@
 import type { PackManifest } from "./types.js";
 import {
-  DECLARATIVE_OPERATIONS_VERSION,
+  DECLARATIVE_OPERATIONS_VERSIONS,
   DECLARATIVE_PACK_BUNDLE_VERSION,
   BUNDLE_SIGNATURE_VERSION,
   REGISTRY_ATTESTATION_VERSION,
@@ -61,7 +61,9 @@ export function validateDeclarativePackBundle(
   const manifest = value.manifest as PackManifest;
   if (
     manifest.execution.kind !== "declarative" ||
-    manifest.execution.operationsVersion !== DECLARATIVE_OPERATIONS_VERSION
+    !DECLARATIVE_OPERATIONS_VERSIONS.includes(
+      manifest.execution.operationsVersion as 1 | 2,
+    )
   ) {
     return bundleIssue("INVALID_VALUE", "manifest.execution");
   }
@@ -101,7 +103,9 @@ export function validateBundleContent(
   const manifest = value.manifest as PackManifest;
   if (
     manifest.execution.kind !== "declarative" ||
-    manifest.execution.operationsVersion !== DECLARATIVE_OPERATIONS_VERSION
+    !DECLARATIVE_OPERATIONS_VERSIONS.includes(
+      manifest.execution.operationsVersion as 1 | 2,
+    )
   ) {
     return bundleIssue("INVALID_VALUE", "manifest.execution");
   }
@@ -112,8 +116,15 @@ export function validateBundleContent(
   );
   if (operationUnknown !== undefined)
     return bundleIssue("UNKNOWN_FIELD", "operations");
-  if (operations.operationsVersion !== DECLARATIVE_OPERATIONS_VERSION) {
+  if (
+    !DECLARATIVE_OPERATIONS_VERSIONS.includes(
+      operations.operationsVersion as 1 | 2,
+    )
+  ) {
     return bundleIssue("UNSUPPORTED_VERSION", "operations.operationsVersion");
+  }
+  if (operations.operationsVersion !== manifest.execution.operationsVersion) {
+    return bundleIssue("INVALID_VALUE", "operations.operationsVersion");
   }
   if (operations.program === undefined)
     return bundleIssue("INVALID_VALUE", "operations.program");
@@ -126,6 +137,7 @@ export function validateBundleContent(
   const operationsIssue = validateDeclarativeOperations(
     operations.program,
     manifest.tools,
+    operations.operationsVersion as 1 | 2,
   );
   if (operationsIssue !== undefined) return operationsIssue;
   const metadata = value.metadata;

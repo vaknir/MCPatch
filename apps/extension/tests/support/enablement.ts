@@ -71,12 +71,15 @@ export class FakePermissions implements ChromePermissionsApi {
   readonly granted = new Set<string>();
   readonly requests: ChromePermissionSet[] = [];
   log: string[] = [];
+  inventoryOrigins: readonly string[] | undefined;
   nextRequest = true;
   throwGetAll = false;
 
   async getAll(): Promise<ChromePermissionSet> {
-    if (this.throwGetAll) throw new Error("getAll failed");
-    return { origins: [...this.granted] };
+    if (this.throwGetAll) throw new Error("get all failed");
+    return {
+      origins: [...(this.inventoryOrigins ?? this.granted)].sort(),
+    };
   }
 
   async remove(permissions: ChromePermissionSet): Promise<boolean> {
@@ -103,6 +106,8 @@ export class FakeScripting implements ChromeScriptingApi {
   readonly registrations = new Map<string, ChromeRegisteredContentScript>();
   log: string[] = [];
   throwGet = false;
+  throwRegister = false;
+  throwUnregister = false;
 
   async getRegisteredContentScripts(): Promise<
     readonly ChromeRegisteredContentScript[]
@@ -116,6 +121,7 @@ export class FakeScripting implements ChromeScriptingApi {
   async registerContentScripts(
     scripts: readonly ChromeRegisteredContentScript[],
   ): Promise<void> {
+    if (this.throwRegister) throw new Error("register scripts failed");
     this.log.push("scripts.register");
     for (const script of scripts) {
       if (this.registrations.has(script.id))
@@ -127,6 +133,7 @@ export class FakeScripting implements ChromeScriptingApi {
   async unregisterContentScripts(filter: {
     readonly ids: readonly string[];
   }): Promise<void> {
+    if (this.throwUnregister) throw new Error("unregister scripts failed");
     this.log.push("scripts.unregister");
     for (const id of filter.ids) this.registrations.delete(id);
   }
@@ -144,6 +151,7 @@ export class FakeStorage implements ChromeStorageApi {
   accessLevels: string[] = [];
   log: string[] = [];
   throwAccess = false;
+  throwSet = false;
 
   constructor() {
     this.local = {
@@ -160,6 +168,7 @@ export class FakeStorage implements ChromeStorageApi {
         this.onChanged.emit({ [key]: { oldValue } }, "local");
       },
       set: async (items) => {
+        if (this.throwSet) throw new Error("storage set failed");
         this.log.push("storage.set");
         for (const [key, value] of Object.entries(items)) {
           const oldValue = this.data[key];

@@ -7,11 +7,14 @@ import type { SessionScheduler } from "./native-session.js";
 
 export interface ChromePageClientRuntimeApi {
   connect(connectInfo: { readonly name: string }): PagePort;
+  sendMessage?(message: unknown): Promise<unknown>;
 }
 
 export interface PageAdapter {
   authorizePackTools?(tools: readonly string[]): void;
+  bindContextRevocation?(revoke: () => void): void;
   capabilities(signal: AbortSignal): Promise<readonly PageCapability[]>;
+  close?(): void;
   execute(
     tool: string,
     args: JsonObject,

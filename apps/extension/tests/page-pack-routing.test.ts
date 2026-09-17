@@ -15,6 +15,12 @@ import type {
   PageRuntimeTool,
 } from "../src/compiled-pack-runtime.js";
 import { flushPromises, packRuntime } from "./support/compiled-pack.js";
+import {
+  LOCAL_ORIGIN,
+  LOCAL_TOOL,
+  LOCAL_URL,
+  localBundle,
+} from "./support/local-pack.js";
 
 const CONTEXT_ID = "page.7";
 const URL = `${GOOGLE_FLIGHTS_ORIGIN}${GOOGLE_FLIGHTS_SEARCH_PATH}`;
@@ -157,7 +163,7 @@ describe("page-backed compiled-pack routing", () => {
     expect(outside.sent).toEqual([]);
   });
 
-  it("keeps native WebMCP precedence over a colliding page-pack route", async () => {
+  it("publishes a native tool beside a same-named pack tool without either hiding the other", async () => {
     const pageExecute = vi.fn(() => ({ ...CURRENT_RESULT, origin: "Page" }));
     const nativeExecute = vi.fn(() => ({
       ...CURRENT_RESULT,
@@ -167,7 +173,13 @@ describe("page-backed compiled-pack routing", () => {
       (candidate) => candidate.name === FLIGHTS_CURRENT_SEARCH,
     );
     if (tool === undefined) throw new Error("missing current-search tool");
-    const native: NativeRuntimeTool = { tool, execute: nativeExecute };
+    // A page-declared tool reaches the runtime already namespaced, so the name
+    // a reviewed pack publishes is not one a page can take.
+    const nativeName = `native.www_google_com.${FLIGHTS_CURRENT_SEARCH}`;
+    const native: NativeRuntimeTool = {
+      tool: { ...tool, name: nativeName },
+      execute: nativeExecute,
+    };
     const { runtime, sent } = packRuntime([googleFlightsPack]);
 
     runtime.activateContext({
@@ -177,14 +189,72 @@ describe("page-backed compiled-pack routing", () => {
       page: [pageTool(FLIGHTS_CURRENT_SEARCH, pageExecute)],
     });
     expect(sent[0]).toMatchObject({
-      capabilities: [{ name: FLIGHTS_CURRENT_SEARCH, source: "native_webmcp" }],
+      capabilities: [
+        { name: FLIGHTS_CURRENT_SEARCH, source: "pack" },
+        { name: nativeName, source: "native_webmcp" },
+      ],
     });
+
     runtime.handle(call());
     await flushPromises();
+    expect(pageExecute).toHaveBeenCalledOnce();
+    expect(nativeExecute).not.toHaveBeenCalled();
+    expect(sent[1]).toMatchObject({ result: { origin: "Page" } });
+  });
 
-    expect(nativeExecute).toHaveBeenCalledOnce();
-    expect(pageExecute).not.toHaveBeenCalled();
-    expect(sent[1]).toMatchObject({ result: { origin: "Native" } });
+  it("publishes and routes a validated local declarative definition only through a page handler", async () => {
+    const bundle = await localBundle();
+    const execute = vi.fn(() => ({ text: "Visible item" }));
+    const { runtime, sent } = packRuntime([]);
+
+    await expect(runtime.replaceDeclarativeDefinitions([bundle])).resolves.toBe(
+      true,
+    );
+    expect(
+      runtime.activateContext({
+        contextId: CONTEXT_ID,
+        url: LOCAL_URL,
+        native: [],
+        page: [pageTool(LOCAL_TOOL, execute)],
+      }),
+    ).toEqual({ ok: true, published: true, contextRevision: 1 });
+    expect(sent[0]).toMatchObject({
+      type: "capability_snapshot",
+      origin: LOCAL_ORIGIN,
+      capabilities: [
+        {
+          name: LOCAL_TOOL,
+          source: "pack",
+          pack: {
+            publisher: bundle.manifest.publisher,
+            id: bundle.manifest.id,
+            digest: bundle.manifest.digest,
+          },
+        },
+      ],
+    });
+
+    await expect(runtime.replaceDeclarativeDefinitions([bundle])).resolves.toBe(
+      true,
+    );
+    expect(sent).toHaveLength(1);
+
+    runtime.handle({
+      protocolVersion: PROTOCOL_VERSION,
+      type: "tool_call",
+      requestId: "request-local-1",
+      contextId: CONTEXT_ID,
+      contextRevision: 1,
+      origin: LOCAL_ORIGIN,
+      tool: LOCAL_TOOL,
+      args: {},
+    });
+    await flushPromises();
+    expect(execute).toHaveBeenCalledOnce();
+    expect(sent[1]).toMatchObject({
+      type: "tool_result",
+      result: { text: "Visible item" },
+    });
   });
 });
 

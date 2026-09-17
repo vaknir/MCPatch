@@ -27,16 +27,21 @@ prefix, which always ends in `/`, so `/items/` cannot match `/items` or `/itemse
 Candidates are grouped by validated tool name. Names and pack identities use fixed
 code-unit ordering; input arrival order is never a tie-breaker.
 
-| Native candidates | Matching pack candidates | Outcome | Diagnostic        |
-| ----------------- | ------------------------ | ------- | ----------------- |
-| 0                 | 1                        | pack    | none              |
-| 0                 | more than 1              | hidden  | ambiguous pack    |
-| 1                 | 0                        | native  | none              |
-| 1                 | 1 or more                | native  | native precedence |
-| more than 1       | any                      | hidden  | ambiguous native  |
+Native and pack candidates can no longer share a name: every page-declared tool
+is published under the reserved `native` namespace qualified by its origin, so
+the two groups occupy disjoint name spaces and each resolves on its own.
 
-Collision diagnostics contain only the tool name, counts, immutable pack identities,
-and the deterministic outcome. They are local product diagnostics, not permission to
+| Candidates for one name | Outcome | Diagnostic |
+| ----------------------- | ------- | ---------- |
+| 1                       | publish | none       |
+| more than 1             | hidden  | ambiguous  |
+
+A page therefore cannot hide or shadow a reviewed pack tool by declaring one
+with its name; both are published, under their own names. Every native call
+still takes an approval, and the bridge presents its own description for it.
+
+Ambiguity diagnostics contain only the tool name, counts, immutable pack
+identities, and the deterministic outcome. They are local product diagnostics, not permission to
 fall back to a lower-precedence implementation.
 
 ## Context binding and lifecycle

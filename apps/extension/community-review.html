@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" data-theme="business">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Review MCPatch community pack</title>
+    <link rel="stylesheet" href="approval.css" />
+  </head>
+  <body class="bg-base-200 min-h-screen p-4 sm:p-8">
+    <main class="mx-auto grid max-w-5xl gap-6">
+      <header>
+        <p
+          class="text-base-content/60 text-sm font-semibold tracking-wide uppercase"
+        >
+          MCPatch verified registry
+        </p>
+        <h1 class="text-3xl font-bold">Review before installing</h1>
+        <p class="text-base-content/70 mt-2 max-w-3xl">
+          The browser has not granted this pack access yet. Confirm the exact
+          signed identity, website scope, and typed tools below.
+        </p>
+      </header>
+
+      <div
+        id="freshness-warning"
+        role="alert"
+        class="alert alert-warning"
+        hidden
+      >
+        <span class="badge badge-warning badge-outline">Cached</span>
+        <span>
+          The registry is offline. This artifact was previously verified and is
+          still inside its signed freshness window.
+        </span>
+      </div>
+
+      <section class="card bg-base-100 shadow" aria-labelledby="identity-title">
+        <div class="card-body gap-5">
+          <div class="flex flex-wrap items-center gap-3">
+            <span id="trust" class="badge badge-info"></span>
+            <span id="change-kind" class="badge badge-outline"></span>
+            <h2 id="identity-title" class="card-title"></h2>
+          </div>
+          <p id="description" class="text-base-content/70"></p>
+          <dl class="grid gap-3 sm:grid-cols-[11rem_1fr]">
+            <dt class="font-semibold">Publisher / pack</dt>
+            <dd id="identity" class="break-all"></dd>
+            <dt class="font-semibold">Version</dt>
+            <dd id="version"></dd>
+            <dt class="font-semibold">Bundle digest</dt>
+            <dd id="digest" class="font-mono text-xs break-all"></dd>
+            <dt class="font-semibold">Publisher key</dt>
+            <dd id="publisher-key" class="font-mono text-xs break-all"></dd>
+            <dt class="font-semibold">Registry key</dt>
+            <dd id="registry-key" class="font-mono text-xs break-all"></dd>
+          </dl>
+        </div>
+      </section>
+
+      <div id="current-artifact" role="status" class="alert alert-info" hidden>
+        <span>
+          Currently active: <strong id="current-version"></strong>. Activation
+          replaces authority only after every check succeeds.
+        </span>
+      </div>
+
+      <section
+        class="card bg-base-100 shadow"
+        aria-labelledby="authority-title"
+      >
+        <div class="card-body gap-4">
+          <h2 id="authority-title" class="card-title">Website authority</h2>
+          <p>
+            Chromium grants origins, while MCPatch additionally enforces the
+            signed path rules on every discovery and call.
+          </p>
+          <ul id="paths" class="list"></ul>
+          <p id="network-policy" class="alert alert-info"></p>
+        </div>
+      </section>
+
+      <section class="card bg-base-100 shadow" aria-labelledby="tools-title">
+        <div class="card-body gap-4">
+          <h2 id="tools-title" class="card-title">Typed tools</h2>
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Tool</th>
+                  <th>Risk</th>
+                  <th>Permissions</th>
+                  <th>Schemas</th>
+                </tr>
+              </thead>
+              <tbody id="tools"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card bg-base-100 shadow" aria-labelledby="evidence-title">
+        <div class="card-body gap-4">
+          <h2 id="evidence-title" class="card-title">Verification evidence</h2>
+          <div
+            class="stats stats-vertical border-base-300 border sm:stats-horizontal"
+          >
+            <div class="stat">
+              <div class="stat-title">Fixture tests</div>
+              <div id="tests" class="stat-value text-2xl"></div>
+              <div id="verified-at" class="stat-desc"></div>
+            </div>
+            <div class="stat">
+              <div class="stat-title">Registry sequence</div>
+              <div id="sequence" class="stat-value text-2xl"></div>
+              <div id="fresh-until" class="stat-desc"></div>
+            </div>
+            <div class="stat">
+              <div class="stat-title">Compatibility</div>
+              <div id="runtime" class="stat-value text-lg"></div>
+              <div id="bridge" class="stat-desc"></div>
+            </div>
+          </div>
+          <p id="source-commit" class="font-mono text-xs break-all"></p>
+        </div>
+      </section>
+
+      <div id="status" role="status" class="alert" hidden></div>
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button id="cancel" type="button" class="btn">Cancel</button>
+        <button id="install" type="button" class="btn btn-primary">
+          Grant exact origins and install
+        </button>
+      </div>
+    </main>
+    <script type="module" src="community-review.js"></script>
+  </body>
+</html>

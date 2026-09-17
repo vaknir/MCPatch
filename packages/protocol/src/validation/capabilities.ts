@@ -1,6 +1,7 @@
+import { NATIVE_TOOL_NAMESPACE } from "../types/capabilities.js";
 import type { ValidationIssue } from "./error.js";
 import { validateOrigin, validateSemVer } from "./formats.js";
-import { validateJsonObject } from "./json.js";
+import { validateRuntimeSchema } from "./json.js";
 import {
   checkClosedObject,
   issue,
@@ -124,20 +125,22 @@ function validateCapability(
     if (titleIssue !== undefined) return titleIssue;
   }
 
-  const sourceIssue = validateSource(capability, prefix);
+  const sourceIssue =
+    validateSource(capability, prefix) ??
+    validateSourceNamespace(capability, prefix);
   if (sourceIssue !== undefined) return sourceIssue;
 
   const permissionIssue = validatePermissions(capability, prefix);
   if (permissionIssue !== undefined) return permissionIssue;
 
-  const inputIssue = validateJsonObject(
+  const inputIssue = validateRuntimeSchema(
     capability.inputSchema,
     `${prefix}.inputSchema`,
     true,
   );
   if (inputIssue !== undefined) return inputIssue;
   if (Object.hasOwn(capability, "outputSchema")) {
-    const outputIssue = validateJsonObject(
+    const outputIssue = validateRuntimeSchema(
       capability.outputSchema,
       `${prefix}.outputSchema`,
     );
@@ -155,6 +158,11 @@ function validateSource(
     if (!Object.hasOwn(capability, "pack")) {
       return issue("INVALID_CAPABILITY", `${prefix}.pack`);
     }
+    // A pack result crosses to the MCP client only through its declared
+    // output schema, so a pack capability without one has no allowlist.
+    if (!Object.hasOwn(capability, "outputSchema")) {
+      return issue("INVALID_CAPABILITY", `${prefix}.outputSchema`);
+    }
     return validatePack(capability.pack, `${prefix}.pack`);
   }
   if (capability.source === "native_webmcp") {
@@ -163,6 +171,23 @@ function validateSource(
       : undefined;
   }
   return issue("INVALID_VALUE", `${prefix}.source`);
+}
+
+/**
+ * Tool names carry their provenance: a page-declared tool lives under the
+ * reserved native namespace and a reviewed pack tool never does, so neither
+ * can be published under the other's name.
+ */
+function validateSourceNamespace(
+  capability: JsonRecord,
+  prefix: string,
+): ValidationIssue | undefined {
+  const namespaced =
+    typeof capability.name === "string" &&
+    capability.name.startsWith(`${NATIVE_TOOL_NAMESPACE}.`);
+  return namespaced === (capability.source === "native_webmcp")
+    ? undefined
+    : issue("INVALID_CAPABILITY", `${prefix}.name`);
 }
 
 function validatePack(

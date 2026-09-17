@@ -160,3 +160,38 @@ screenshots containing live results, or request logs.
 - [ADR 0008: origin-scoped content runtime](../adr/0008-origin-scoped-content-runtime.md)
 - [Pack resolution and native precedence](pack-resolution.md)
 - [Extension page-channel protocol](page-channel-protocol.md)
+
+## Search navigation and its acknowledgement
+
+`flights.search` returns `state: "accepted"` and the page navigates immediately
+afterwards. The acknowledgement deliberately precedes the navigation, and the
+shape is now structural rather than incidental: navigating unloads the
+document, which destroys the page runtime that would have delivered the tool
+result. The reviewed navigation gate therefore authorizes the navigation
+synchronously, while the approved action is running and the gate still knows
+which tool asked, and performs it on the next task so the result reaches the
+client first.
+
+Two things follow from that split:
+
+- An unauthorized target fails during the call. A URL outside the pack's
+  declared matches, or any navigation attempted by a tool that is not an
+  approved action, throws before the acknowledgement rather than failing
+  silently afterwards.
+- A call cancelled after authorization does not navigate. The deferred
+  navigation checks the call's abort signal first, so a late cancel is
+  honoured instead of the timer firing regardless.
+
+The opaque `tfs` parameter is encoded locally from validated arguments with
+field numbers fixed by observation. `decodeGoogleFlightsSearchUrl` reads it
+back, and a golden round-trip test asserts that encoding the validated input
+and decoding it again returns the same origin, destination and dates. A silent
+renumbering of the encoder therefore fails a test in review rather than
+sending a user to a search they did not approve.
+
+**Not yet covered.** A navigation that never happens, because a `beforeunload`
+handler or a navigation policy blocked it, still reports `accepted`: the result
+has already been sent, and the page channel has no way to amend it. Detecting
+that needs the separate read described in
+[#183](https://github.com/vaknir/MCPatch/issues/183), which would fail closed
+when the expected search state is absent.

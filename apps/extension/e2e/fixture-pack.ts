@@ -6,6 +6,7 @@ import {
 
 import {
   FIXTURE_ORIGIN,
+  FIXTURE_PROBE_TOOL,
   FIXTURE_STATE_TOOL,
   FIXTURE_WAIT_TOOL,
 } from "./fixture-constants.js";
@@ -56,6 +57,36 @@ const fallbackWait = defineTool({
   },
 });
 
+const fallbackProbe = defineTool({
+  name: FIXTURE_PROBE_TOOL,
+  description:
+    "Report whether the isolated realm lockdown blocks each network primitive.",
+  risk: "read",
+  permissions: ["READ"],
+  inputSchema: emptyInput,
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "fetchUndeclaredBlocked",
+      "fetchHttpBlocked",
+      "xhrBlocked",
+      "sendBeaconBlocked",
+      "cookieBlocked",
+    ],
+    properties: {
+      fetchUndeclaredBlocked: { type: "boolean" },
+      fetchHttpBlocked: { type: "boolean" },
+      xhrBlocked: { type: "boolean" },
+      sendBeaconBlocked: { type: "boolean" },
+      cookieBlocked: { type: "boolean" },
+    },
+  },
+  execute() {
+    throw new PackToolExecutionError("TOOL_NOT_FOUND");
+  },
+});
+
 export const fixturePack = definePack({
   manifestVersion: 1,
   publisher: "fixture",
@@ -74,10 +105,13 @@ export const fixturePack = definePack({
     {
       origin: FIXTURE_ORIGIN,
       paths: [{ kind: "prefix", path: "/" }],
+      // The synthetic fixture serves its pages from the whole host, so it
+      // declares that deliberately rather than relying on a bare "/" prefix.
+      wholeOrigin: true,
     },
   ],
   networkPolicy: { extensionRequests: "none" },
-  tools: [fallbackState, fallbackWait],
+  tools: [fallbackState, fallbackWait, fallbackProbe],
   fixtures: [
     {
       id: "state-fallback",
@@ -88,6 +122,12 @@ export const fixturePack = definePack({
     {
       id: "wait-fallback",
       tool: FIXTURE_WAIT_TOOL,
+      input: {},
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "probe-fallback",
+      tool: FIXTURE_PROBE_TOOL,
       input: {},
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },

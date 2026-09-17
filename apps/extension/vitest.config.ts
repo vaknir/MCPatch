@@ -23,8 +23,14 @@ export default defineConfig({
       "@mcpatch/sdk/browser": fileURLToPath(
         new URL("../../packages/sdk/src/browser.ts", import.meta.url),
       ),
+      "@mcpatch/sdk/declarative": fileURLToPath(
+        new URL("../../packages/sdk/src/declarative.ts", import.meta.url),
+      ),
       "@mcpatch/sdk/runtime": fileURLToPath(
         new URL("../../packages/sdk/src/runtime.ts", import.meta.url),
+      ),
+      "@mcpatch/sdk": fileURLToPath(
+        new URL("../../packages/sdk/src/index.ts", import.meta.url),
       ),
       "@mcpatch/tradingview-pack": fileURLToPath(
         new URL("../../packs/tradingview/src/index.ts", import.meta.url),

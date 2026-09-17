@@ -4,7 +4,10 @@ import {
   createGoogleFlightsPageAdapter,
   type GoogleFlightsPageAdapter,
 } from "./adapter.js";
-import { createGoogleFlightsDocumentSource } from "./document-source.js";
+import {
+  createGoogleFlightsDocumentSource,
+  createGrantedSearchNavigation,
+} from "./document-source.js";
 
 import {
   FLIGHTS_CURRENT_SEARCH,
@@ -276,8 +279,13 @@ export const googleFlightsBrowserPack = mcp.build({
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
   ],
-  create: (document) =>
-    createGoogleFlightsPageAdapter(createGoogleFlightsDocumentSource(document)),
+  create: (document, services) =>
+    createGoogleFlightsPageAdapter(
+      createGoogleFlightsDocumentSource(
+        document,
+        createGrantedSearchNavigation(services.navigate),
+      ),
+    ),
   async discover({ site, signal }) {
     return (await site.capabilities(signal)).map(
       (capability) => capability.name,

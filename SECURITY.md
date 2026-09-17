@@ -89,3 +89,6 @@ The community distribution decisions are recorded in
 [ADR 0013](docs/adr/0013-community-pack-trust-and-lifecycle.md),
 [ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md), and the
 [community pack lifecycle](docs/architecture/community-pack-lifecycle.md).
+Contribution and protected release procedures are documented in
+[community pack contributions](docs/community-pack-contributions.md) and
+[registry publishing](docs/registry-publishing.md).

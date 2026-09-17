@@ -29,9 +29,7 @@ import type { GoogleFlightsSearchInput } from "./search-input.js";
 
 export function createGoogleFlightsDocumentSource(
   document: Document,
-  navigation: GoogleFlightsSearchNavigation = createDocumentSearchNavigation(
-    document,
-  ),
+  navigation: GoogleFlightsSearchNavigation,
 ): GoogleFlightsSnapshotSource {
   return new GoogleFlightsDocumentSource(document, navigation);
 }
@@ -133,20 +131,17 @@ class GoogleFlightsDocumentSource implements GoogleFlightsSnapshotSource {
   }
 }
 
-function createDocumentSearchNavigation(
-  document: Document,
+/**
+ * Navigation the extension granted this pack. The isolated realm's own
+ * navigation primitives are gone, so this is the only way the search action
+ * can move the page, and it works only while that approved action is running.
+ */
+export function createGrantedSearchNavigation(
+  navigate: (url: string) => void,
 ): GoogleFlightsSearchNavigation {
-  const view = document.defaultView;
-  if (view === null) {
-    return {
-      schedule() {
-        throw new TypeError("Google Flights document cannot navigate");
-      },
-    };
-  }
   return {
     schedule(url) {
-      view.setTimeout(() => view.location.assign(url), 0);
+      navigate(url);
     },
   };
 }

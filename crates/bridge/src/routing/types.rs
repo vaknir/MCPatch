@@ -283,7 +283,7 @@ pub(super) struct ActiveRequest {
     pub context_id: String,
     pub context_revision: u64,
     pub origin: String,
-    pub output_validator: Option<jsonschema::Validator>,
+    pub output_validator: Option<Arc<jsonschema::Validator>>,
     pub revocation: CancellationToken,
 }
 
