@@ -83,6 +83,22 @@ export {
   DeclarativePackBundleValidationError,
 } from "./declarative-bundle-types.js";
 export type * from "./declarative-bundle-types.js";
+export {
+  communityBundlePath,
+  indexSigningBytes,
+  MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
+  MAX_COMMUNITY_REGISTRY_PACKS,
+  parseCommunityRegistryIndex,
+  signCommunityRegistryIndex,
+  signRegistryAttestation,
+  validateCommunityRegistryIndex,
+  verifyCommunityRegistryIndex,
+} from "./community-registry.js";
+export {
+  COMMUNITY_REGISTRY_INDEX_VERSION,
+  COMMUNITY_REGISTRY_SIGNATURE_VERSION,
+} from "./community-registry-types.js";
+export type * from "./community-registry-types.js";
 export { validateDeclarativeOperations } from "./declarative-operations-validation.js";
 export {
   DECLARATIVE_OPERATION_RUNTIME_LIMITS,

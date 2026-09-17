@@ -53,6 +53,8 @@ describe("bundled TradingView production pack", () => {
       readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
     ) as Record<string, unknown>;
     expect(manifest["optional_host_permissions"]).toEqual(["https://*/*"]);
-    expect(manifest).not.toHaveProperty("host_permissions");
+    expect(manifest["host_permissions"]).toEqual([
+      "https://registry.mcpatch.dev/*",
+    ]);
   });
 });

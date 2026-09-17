@@ -29,6 +29,7 @@ export class PackEnablementController implements PackEnablementRuntime {
   readonly #api: ChromeEnablementApi;
   readonly #catalog: PackSiteCatalog;
   readonly #content: PackContentSource;
+  readonly #fallbackAction: ((tab: ChromeActionTab) => void) | undefined;
   readonly #effective = new Map<string, ReviewedPackSite>();
   readonly #pendingSites = new Set<string>();
   readonly #requested = new Map<string, EnabledPackRecord>();
@@ -45,10 +46,12 @@ export class PackEnablementController implements PackEnablementRuntime {
     api: ChromeEnablementApi,
     catalog: PackSiteCatalog,
     content: PackContentSource,
+    fallbackAction?: (tab: ChromeActionTab) => void,
   ) {
     this.#api = api;
     this.#catalog = catalog;
     this.#content = content;
+    this.#fallbackAction = fallbackAction;
   }
 
   start(): void {
@@ -103,6 +106,14 @@ export class PackEnablementController implements PackEnablementRuntime {
     const tabId = validActionTabId(tab.id);
     const sites =
       typeof tab.url === "string" ? this.#catalog.match(tab.url) : [];
+    if (
+      tabId !== undefined &&
+      sites.length === 0 &&
+      this.#fallbackAction !== undefined
+    ) {
+      this.#fallbackAction(tab);
+      return;
+    }
     if (tabId === undefined || sites.length !== 1) {
       if (tabId !== undefined) {
         void showEnablementAction(this.#api.action, tabId, "unsupported");

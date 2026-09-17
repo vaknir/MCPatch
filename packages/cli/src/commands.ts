@@ -13,15 +13,22 @@ import { sourceCommit } from "./git-attribution.js";
 import { PACK_SOURCE_FILE } from "./model.js";
 import { preparePackSource } from "./source.js";
 import { syntheticFixtureRunner } from "./synthetic-runner.js";
+import { buildStaticRegistry } from "./registry.js";
 
 export interface CommandContext {
   readonly currentDirectory: string;
+  readonly environment: Readonly<Record<string, string | undefined>>;
 }
 
 export async function executeCommand(
   args: readonly string[],
   context: CommandContext,
 ): Promise<Readonly<Record<string, unknown>>> {
+  if (args[0] === "registry") {
+    if (args[1] !== "build" || args.length > 3) cliError("USAGE");
+    const target = resolveTargetDirectory(args[2], context.currentDirectory);
+    return buildStaticRegistry(target, context.environment);
+  }
   if (args[0] !== "pack") cliError("USAGE");
   const command = args[1];
   if (command === "create") {

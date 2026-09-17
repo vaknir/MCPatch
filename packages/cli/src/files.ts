@@ -4,12 +4,13 @@ import {
   lstat,
   mkdir,
   open,
+  readdir,
   rename,
   rm,
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { MAX_DECLARATIVE_BUNDLE_BYTES } from "@mcpatch/sdk";
 
@@ -202,7 +203,10 @@ async function ensureOutputDirectory(path: string): Promise<void> {
   }
 }
 
-async function requireDirectory(path: string, field: string): Promise<void> {
+export async function requireDirectory(
+  path: string,
+  field: string,
+): Promise<void> {
   let metadata;
   try {
     metadata = await lstat(path);
@@ -234,6 +238,153 @@ async function readSafeRegularFile(path: string): Promise<Uint8Array> {
     return await handle.readFile();
   } finally {
     await handle.close();
+  }
+}
+
+export async function readBoundedRelativeFile(
+  rootDirectory: string,
+  relativePath: string,
+  maximumBytes: number,
+): Promise<Uint8Array> {
+  const parts = safeRelativeParts(relativePath);
+  let current = rootDirectory;
+  for (const part of parts.slice(0, -1)) {
+    current = join(current, part);
+    const metadata = await safeMetadata(current, "registry.bundle");
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      cliError("UNSAFE_PATH", "registry.bundle");
+    }
+  }
+  const path = join(rootDirectory, ...parts);
+  const metadata = await safeMetadata(path, "registry.bundle");
+  if (
+    metadata.isSymbolicLink() ||
+    !metadata.isFile() ||
+    metadata.size <= 0 ||
+    metadata.size > maximumBytes
+  ) {
+    cliError("UNSAFE_PATH", "registry.bundle");
+  }
+  const bytes = await readSafeRegularFile(path);
+  if (bytes.byteLength === 0 || bytes.byteLength > maximumBytes) {
+    cliError("REGISTRY_SOURCE_INVALID", "registry.bundle");
+  }
+  return bytes;
+}
+
+export async function publishStaticTree(
+  rootDirectory: string,
+  outputName: string,
+  files: ReadonlyMap<string, Uint8Array>,
+): Promise<{ readonly path: string; readonly reused: boolean }> {
+  if (!/^[a-z][a-z0-9-]{1,63}$/u.test(outputName) || files.size === 0) {
+    cliError("INTERNAL_ERROR");
+  }
+  const outputPath = join(rootDirectory, outputName);
+  const stagingPath = join(rootDirectory, `.${outputName}.tmp`);
+  if (await pathExists(stagingPath)) {
+    cliError("WRITE_INTERRUPTED", outputName);
+  }
+  if (await pathExists(outputPath)) {
+    if (!(await treeEquals(outputPath, files))) {
+      cliError("OUTPUT_DIRTY", outputName);
+    }
+    return Object.freeze({ path: outputPath, reused: true });
+  }
+
+  await mkdir(stagingPath, { mode: 0o700 });
+  try {
+    for (const [relativePath, bytes] of [...files].sort(([left], [right]) =>
+      left.localeCompare(right),
+    )) {
+      const parts = safeRelativeParts(relativePath);
+      const directory = join(stagingPath, ...parts.slice(0, -1));
+      await mkdir(directory, { mode: 0o700, recursive: true });
+      await writeFile(join(stagingPath, ...parts), bytes, {
+        flag: "wx",
+        mode: 0o600,
+      });
+    }
+    await rename(stagingPath, outputPath);
+  } catch (error) {
+    await rm(stagingPath, { force: true, recursive: true }).catch(
+      () => undefined,
+    );
+    throw error;
+  }
+  return Object.freeze({ path: outputPath, reused: false });
+}
+
+function safeRelativeParts(relativePath: string): readonly string[] {
+  if (
+    relativePath.length === 0 ||
+    relativePath.length > 512 ||
+    relativePath.includes("\0") ||
+    relativePath.includes("\\") ||
+    relativePath.startsWith("/") ||
+    relativePath.endsWith("/")
+  ) {
+    cliError("UNSAFE_PATH", "registry.path");
+  }
+  const parts = relativePath.split("/");
+  if (
+    parts.length > 16 ||
+    parts.some(
+      (part) =>
+        part.length === 0 ||
+        part === "." ||
+        part === ".." ||
+        part.includes(sep),
+    )
+  ) {
+    cliError("UNSAFE_PATH", "registry.path");
+  }
+  return parts;
+}
+
+async function treeEquals(
+  outputPath: string,
+  files: ReadonlyMap<string, Uint8Array>,
+): Promise<boolean> {
+  const metadata = await safeMetadata(outputPath, "registry-dist");
+  if (metadata.isSymbolicLink() || !metadata.isDirectory()) return false;
+  const actual = await listTree(outputPath, "");
+  if (actual.length !== files.size) return false;
+  for (const relativePath of actual) {
+    const expected = files.get(relativePath);
+    if (expected === undefined) return false;
+    const bytes = await readSafeRegularFile(
+      join(outputPath, ...relativePath.split("/")),
+    );
+    if (!Buffer.from(bytes).equals(Buffer.from(expected))) return false;
+  }
+  return true;
+}
+
+async function listTree(root: string, prefix: string): Promise<string[]> {
+  const directory = prefix === "" ? root : join(root, ...prefix.split("/"));
+  const entries = await readdir(directory, { withFileTypes: true });
+  const paths: string[] = [];
+  for (const entry of entries) {
+    if (entry.isSymbolicLink() || (!entry.isDirectory() && !entry.isFile())) {
+      return ["__unsafe_node__"];
+    }
+    const relativePath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) {
+      paths.push(...(await listTree(root, relativePath)));
+    } else {
+      paths.push(relativePath);
+    }
+  }
+  return paths.sort();
+}
+
+async function safeMetadata(path: string, field: string) {
+  try {
+    return await lstat(path);
+  } catch (error) {
+    if (isNodeError(error, "ENOENT")) cliError("SOURCE_NOT_FOUND", field);
+    throw error;
   }
 }
 

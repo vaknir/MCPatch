@@ -8,6 +8,15 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- A fixed-origin signed static community registry with bounded versioned index
+  schema, independent publisher signatures and registry attestations, immutable
+  digest-addressed bundles, rollback/freshness enforcement, credential-free strict
+  transport, verified offline restore, extension-owned install review, exact-origin
+  activation, transactional multi-source declarative registration, and a
+  reproducible environment-keyed `mcpatch registry build` publisher. A disposable
+  Chromium fixture now proves dynamic registry install through Native Messaging,
+  the Rust bridge, MCP discovery, and MCP invocation.
+
 - A dynamic exact-origin content catalog that combines reviewed and installed
   declarative packs behind one deterministic packaged content-script registration
   per origin, verifies grants from Chromium's complete permission inventory,

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
+      "@mcpatch/sdk": ["../../packages/sdk/src/index.ts"],
       "@mcpatch/example-packs": ["../../packs/examples/src/index.ts"],
       "@mcpatch/google-flights-pack": [
         "../../packs/google-flights/src/index.ts"

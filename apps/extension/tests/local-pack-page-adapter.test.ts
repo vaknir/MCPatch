@@ -42,14 +42,14 @@ describe("local pack page adapter composition", () => {
     expect(child.execute).toHaveBeenCalledOnce();
   });
 
-  it("reports an ambiguous pack name once but creates no executable route", async () => {
+  it("hides an ambiguous pack name and creates no executable route", async () => {
     const first = fakeAdapter([{ source: "pack", name: TOOL }], { source: 1 });
     const second = fakeAdapter([{ source: "pack", name: TOOL }], { source: 2 });
     const composite = new CompositePageAdapter([first.adapter, second.adapter]);
 
-    expect(await composite.capabilities(new AbortController().signal)).toEqual([
-      { source: "pack", name: TOOL },
-    ]);
+    expect(await composite.capabilities(new AbortController().signal)).toEqual(
+      [],
+    );
     expect(() =>
       composite.execute(TOOL, {}, new AbortController().signal),
     ).toThrow(PageAdapterExecutionError);
@@ -79,9 +79,9 @@ describe("local pack page adapter composition", () => {
     });
     const composite = new CompositePageAdapter([native.adapter, pack.adapter]);
 
-    expect(
-      await composite.capabilities(new AbortController().signal),
-    ).toHaveLength(2);
+    expect(await composite.capabilities(new AbortController().signal)).toEqual([
+      expect.objectContaining({ source: "native_webmcp", name: TOOL }),
+    ]);
     await expect(
       composite.execute(TOOL, {}, new AbortController().signal),
     ).resolves.toEqual({ source: "native" });

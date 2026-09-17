@@ -55,8 +55,23 @@ export {
   parseDeclarativePackBundleContentBytes,
   parseDeclarativePackBundle,
   validateDeclarativePackBundle,
+  verifyDeclarativePackBundle,
+  verifyRegistryAttestation,
 } from "./declarative-bundle.js";
 export type * from "./declarative-bundle-types.js";
+export {
+  communityBundlePath,
+  MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
+  MAX_COMMUNITY_REGISTRY_PACKS,
+  parseCommunityRegistryIndex,
+  validateCommunityRegistryIndex,
+  verifyCommunityRegistryIndex,
+} from "./community-registry.js";
+export {
+  COMMUNITY_REGISTRY_INDEX_VERSION,
+  COMMUNITY_REGISTRY_SIGNATURE_VERSION,
+} from "./community-registry-types.js";
+export type * from "./community-registry-types.js";
 export {
   MAX_ATTRIBUTE_CHARS,
   MAX_NODE_VISITS,

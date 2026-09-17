@@ -38,7 +38,8 @@ The current architecture and security invariants are documented in
 The repository has its initial architecture, threat model, protocol contracts,
 and build foundation. The Rust bridge provides bounded MCP and Native Messaging
 adapters, a transport-independent browser connection boundary, and a deterministic
-capability registry. A zero-site-permission MV3 extension scaffold is also present;
+capability registry. The MV3 extension has no required website permission; its only
+required host is the fixed credential-free registry control plane;
 private Unix and Windows local transports and bridge-core lifecycles are implemented,
 along with bounded connect-first rendezvous and isolated bridge-core process start.
 Both public adapters now use their distinct authenticated bridge-core endpoints;
@@ -57,11 +58,14 @@ have independent compatibility versions.
 
 Which pack-boundary claims are enforced by mechanism and which by review today is stated per tier in the enforcement-status tables in [THREAT_MODEL.md](THREAT_MODEL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [docs/architecture/pack-manifest-v1.md](docs/architecture/pack-manifest-v1.md).
 
-The Phase 13 community-pack trust, lifecycle, discovery, and exact-origin authority
-decisions are documented in
+The Phase 13 community-pack trust, lifecycle, signed static registry, discovery,
+extension-owned installation review, and exact-origin authority are implemented.
+The contracts are documented in
 [ADR 0013](docs/adr/0013-community-pack-trust-and-lifecycle.md),
 [ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md), and the
-[community pack lifecycle](docs/architecture/community-pack-lifecycle.md).
+[community pack lifecycle](docs/architecture/community-pack-lifecycle.md), with the
+wire and publisher contract in
+[community registry v1](docs/architecture/community-registry-v1.md).
 
 The supported transport proof is described in
 [docs/local-demo.md](docs/local-demo.md). Local packaging and registration are

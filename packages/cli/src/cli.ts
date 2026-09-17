@@ -3,6 +3,7 @@ import { executeCommand } from "./commands.js";
 
 export interface CliIo {
   readonly currentDirectory: string;
+  readonly environment?: Readonly<Record<string, string | undefined>>;
   readonly stderr: { write(value: string): unknown };
   readonly stdout: { write(value: string): unknown };
 }
@@ -14,6 +15,7 @@ export async function runCli(
   try {
     const result = await executeCommand(args, {
       currentDirectory: io.currentDirectory,
+      environment: io.environment ?? {},
     });
     io.stdout.write(`${JSON.stringify(result)}\n`);
     return 0;

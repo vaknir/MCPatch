@@ -103,7 +103,7 @@ documented in [Pack Manifest version 1](docs/architecture/pack-manifest-v1.md).
 
 ### Registry
 
-The future registry distributes immutable, signed declarative pack releases and
+The registry v1 implementation distributes immutable, signed declarative pack releases and
 compatibility evidence from one fixed HTTPS control-plane origin. The extension
 fetches bounded signed metadata only through its own registry client; packs,
 pages, agents, and MCP calls cannot select or invoke that client. Registry metadata
@@ -118,6 +118,8 @@ That declaration and the packaged declarative interpreter are explicit Chrome We
 Store release gates; see [ADR 0014](docs/adr/0014-registry-discovery-and-origin-authority.md).
 Runtime operation can continue offline only for a previously verified, fresh, and
 unrevoked cached artifact, with freshness visible to the user.
+The exact index, transport, publisher, cache, and install contracts are in
+[Community registry v1](docs/architecture/community-registry-v1.md).
 
 ## Capability resolution
 
@@ -214,11 +216,12 @@ from review to mechanism is a trust-boundary change and needs an ADR
 | Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)            |
 | Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                       |
 
-The **declarative community tier** is not yet shippable. Its stronger invariants —
-no dynamic selectors, code, navigation, mutation, cookies, storage, or network
-primitive — become mechanism as the interpreter and operations schema land
-(#143–#147 under Phase 13, #141). Until then no declarative pack can activate, so
-those rows do not yet describe running code.
+The **declarative community tier** now enforces its stronger invariants by
+mechanism: no dynamic selectors, code, navigation, mutation, cookies, storage, or
+network primitive. Signed registry discovery and explicit exact-origin installation
+are live, but production release remains gated by update/revocation operations,
+submission review, real-site pilot validation, and Chrome Web Store policy review
+(#151–#154 and #165).
 
 ## Protocol boundaries
 
