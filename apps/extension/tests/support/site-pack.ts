@@ -7,6 +7,30 @@ export const SITE_ORIGIN = "https://example.com";
 export const SITE_TOOL = "mcpatch.site.status";
 export const NETWORK_ORIGIN = "https://search.example.com";
 
+function siteStatusTool() {
+  return defineTool({
+    name: SITE_TOOL,
+    description: "Read deterministic site status.",
+    risk: "read",
+    permissions: ["READ"],
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 0,
+      properties: {},
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["status"],
+      properties: { status: { const: "ready", type: "string" } },
+    },
+    execute() {
+      return { status: "ready" as const };
+    },
+  });
+}
+
 export const sitePack = definePack({
   ...demoPack.manifest,
   id: "site-demo",
@@ -18,29 +42,7 @@ export const sitePack = definePack({
       paths: [{ kind: "prefix", path: "/app/" }],
     },
   ],
-  tools: [
-    defineTool({
-      name: SITE_TOOL,
-      description: "Read deterministic site status.",
-      risk: "read",
-      permissions: ["READ"],
-      inputSchema: {
-        type: "object",
-        additionalProperties: false,
-        maxProperties: 0,
-        properties: {},
-      },
-      outputSchema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["status"],
-        properties: { status: { const: "ready", type: "string" } },
-      },
-      execute() {
-        return { status: "ready" as const };
-      },
-    }),
-  ],
+  tools: [siteStatusTool()],
   fixtures: [
     {
       id: "ready",
@@ -90,6 +92,31 @@ export const networkSitePack = definePack({
   ],
 });
 
+export const CONFIGURABLE_PLACEHOLDER = "https://self-hosted.invalid";
+
+/** A pack whose real deployment origin is configured by the user at runtime. */
+export const configurableSitePack = definePack({
+  ...sitePack.manifest,
+  id: "self-hosted-demo",
+  name: "Self-hosted demo",
+  digest: `sha256:${"c".repeat(64)}`,
+  matches: [
+    {
+      origin: CONFIGURABLE_PLACEHOLDER,
+      paths: [{ kind: "prefix", path: "/app/" }],
+    },
+  ],
+  tools: [siteStatusTool()],
+  fixtures: [
+    {
+      id: "ready",
+      tool: SITE_TOOL,
+      input: {},
+      expect: { kind: "result", result: { status: "ready" } },
+    },
+  ],
+});
+
 export function testCatalog(
   declaredOrigins: readonly string[] = [SITE_ORIGIN],
 ) {
@@ -97,6 +124,19 @@ export function testCatalog(
     [demoPack, sitePack],
     runtimeOptions(),
     declaredOrigins,
+  );
+}
+
+export function configurableCatalog(configured: readonly string[]) {
+  return createReviewedPackCatalog(
+    [configurableSitePack],
+    runtimeOptions(),
+    [],
+    configured.map((origin) => ({
+      publisher: configurableSitePack.manifest.publisher,
+      id: configurableSitePack.manifest.id,
+      origin,
+    })),
   );
 }
 

@@ -8,6 +8,7 @@
       "@mcpatch/google-flights-pack": [
         "../../packs/google-flights/src/index.ts"
       ],
+      "@mcpatch/jira-pack": ["../../packs/jira/src/index.ts"],
       "@mcpatch/protocol": ["../../packages/protocol/src/index.ts"],
       "@mcpatch/sdk/browser": ["../../packages/sdk/src/browser.ts"],
       "@mcpatch/sdk/runtime": ["../../packages/sdk/src/runtime.ts"],

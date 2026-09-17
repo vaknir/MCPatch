@@ -13,10 +13,21 @@ At build time, the extension validates every compiled pack again and derives a
 catalog of pack identity, exact HTTPS page origin, path rules, tool names, and
 declared network origins. Every page or network origin must also occur in the
 closed `DECLARED_OPTIONAL_ORIGINS` list
-mirrored by `optional_host_permissions`. Synthetic `.invalid` packs are excluded.
-Wildcards, undeclared origins, duplicate identities, incompatible packs, and
-overlong registration identities reject the catalog before the service worker
-starts.
+mirrored by `optional_host_permissions`. Wildcards, undeclared origins, duplicate
+identities, incompatible packs, and overlong registration identities reject the
+catalog before the service worker starts.
+
+A pack that declares a synthetic `.invalid` origin is a **configurable-origin**
+pack: its real deployment is self-hosted, so the catalog substitutes each origin
+the user configured for that pack identity and binds the reviewed manifest and
+its path rules to it. Such a pack contributes no site until configuration exists,
+and its placeholder origin is never requested, granted, or matched. Configured
+origins are not in `DECLARED_OPTIONAL_ORIGINS`; they are expressed through the
+broad optional declaration and proved exactly by `hasExactHostPermissions`. The
+catalog is rebuilt whenever that configuration changes. Reviewed pack identity is
+derived from the bundled pack list rather than from catalog sites, so a pack
+awaiting configuration still cannot be impersonated. See
+[ADR 0015](../adr/0015-configurable-pack-origins.md).
 
 The dynamic catalog applies the same origin and path checks to every locally
 validated declarative bundle. It uses Chromium's broad optional declaration only
@@ -57,6 +68,10 @@ are permission proof only and never become content-script registrations.
   ]
 }
 ```
+
+`chrome.storage.local["mcpatch.origins.v1"]` separately stores at most 32
+closed `{publisher, id, origin}` records naming which self-hosted site a
+configurable pack should be offered on. It is likewise only a request.
 
 Storage access is restricted to `TRUSTED_CONTEXTS` before reads. A record is only a
 request: the current pack identity, current Chromium permission, and

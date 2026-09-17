@@ -1,5 +1,6 @@
 import type { PackManifest } from "@mcpatch/sdk/runtime";
 
+import type { ConfiguredPackOrigin } from "./configured-origins.js";
 import type { ChromeEvent, ChromeRuntimeLifecycleApi } from "./lifecycle.js";
 import type { PageAuthority } from "./page-context-model.js";
 
@@ -40,6 +41,11 @@ export interface PackSiteCatalog {
   match(url: string): readonly ReviewedPackSite[];
   resolve(record: EnabledPackRecord): ReviewedPackSite | undefined;
 }
+
+/** Rebuilds the catalog whenever the user's configured origins change. */
+export type PackSiteCatalogFactory = (
+  configured: readonly ConfiguredPackOrigin[],
+) => PackSiteCatalog;
 
 export interface ChromeActionTab {
   readonly id?: number;

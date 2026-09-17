@@ -3,8 +3,13 @@ import {
   canonicalizePageLocation,
   packMatchesLocation,
   type PackManifest,
+  type PackMatch,
 } from "@mcpatch/sdk/runtime";
 
+import {
+  configuredKey,
+  type ConfiguredPackOrigin,
+} from "./configured-origins.js";
 import type {
   EnabledPackRecord,
   PackSiteCatalog,
@@ -23,6 +28,7 @@ export function createReviewedPackCatalog(
   subjects: readonly CompiledPackSubject[],
   options: CompiledPackRuntimeOptions,
   declaredOrigins: readonly string[],
+  configured: readonly ConfiguredPackOrigin[] = [],
 ): PackSiteCatalog {
   const checkedOptions = validateRuntimeOptions(options);
   const origins = validateDeclaredOrigins(declaredOrigins);
@@ -45,34 +51,44 @@ export function createReviewedPackCatalog(
       }
     }
     for (const match of pack.manifest.matches) {
-      const origin = match.origin;
-      if (origin.endsWith(".invalid")) continue;
-      if (!origins.has(origin)) {
-        throw new TypeError(
-          "reviewed pack origin is not declared optional authority",
+      // A synthetic origin marks a pack whose real deployment is self-hosted,
+      // so its sites come from the user's stored configuration rather than a
+      // compile-time list. Nothing is emitted until that configuration exists.
+      const configurable = match.origin.endsWith(".invalid");
+      const bindings = configurable
+        ? configuredOriginsFor(configured, pack.manifest)
+        : [match.origin];
+      for (const origin of bindings) {
+        if (!configurable && !origins.has(origin)) {
+          throw new TypeError(
+            "reviewed pack origin is not declared optional authority",
+          );
+        }
+        const bound = boundMatch(match, origin);
+        const key = `${pack.manifest.publisher}/${pack.manifest.id}@${origin}`;
+        if (keys.has(key)) throw new TypeError("duplicate reviewed pack site");
+        keys.add(key);
+        sites.push(
+          Object.freeze({
+            key,
+            manifest: boundManifest(pack.manifest, bound, configurable),
+            origin,
+            permissionPattern: `${origin}/*`,
+            permissionPatterns: Object.freeze(
+              [origin, ...requestOrigins]
+                .filter(
+                  (value, index, values) => values.indexOf(value) === index,
+                )
+                .sort()
+                .map((value) => `${value}/*`),
+            ),
+            scriptMatches: contentScriptMatches(bound),
+            tools: Object.freeze(
+              new Set(pack.manifest.tools.map((tool) => tool.name)),
+            ),
+          }),
         );
       }
-      const key = `${pack.manifest.publisher}/${pack.manifest.id}@${origin}`;
-      if (keys.has(key)) throw new TypeError("duplicate reviewed pack site");
-      keys.add(key);
-      sites.push(
-        Object.freeze({
-          key,
-          manifest: pack.manifest,
-          origin,
-          permissionPattern: `${origin}/*`,
-          permissionPatterns: Object.freeze(
-            [origin, ...requestOrigins]
-              .filter((value, index, values) => values.indexOf(value) === index)
-              .sort()
-              .map((value) => `${value}/*`),
-          ),
-          scriptMatches: contentScriptMatches(match),
-          tools: Object.freeze(
-            new Set(pack.manifest.tools.map((tool) => tool.name)),
-          ),
-        }),
-      );
     }
   }
   sites.sort((left, right) => left.key.localeCompare(right.key));
@@ -99,6 +115,48 @@ export function createReviewedPackCatalog(
       );
     },
   });
+}
+
+function configuredOriginsFor(
+  configured: readonly ConfiguredPackOrigin[],
+  manifest: PackManifest,
+): readonly string[] {
+  const seen = new Set<string>();
+  return Object.freeze(
+    configured
+      .filter(
+        (site) =>
+          site.publisher === manifest.publisher && site.id === manifest.id,
+      )
+      .filter((site) => {
+        const key = configuredKey(site);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((site) => site.origin),
+  );
+}
+
+function boundMatch(match: PackMatch, origin: string): PackMatch {
+  return match.origin === origin
+    ? match
+    : Object.freeze({ origin, paths: match.paths });
+}
+
+/**
+ * The declared manifest keeps its reviewed identity and digest; only the origin
+ * it is matched and registered against is bound at runtime. The enablement
+ * record already stores that origin separately from the digest, so a configured
+ * site is identified by both.
+ */
+function boundManifest(
+  manifest: PackManifest,
+  match: PackMatch,
+  configurable: boolean,
+): PackManifest {
+  if (!configurable) return manifest;
+  return Object.freeze({ ...manifest, matches: Object.freeze([match]) });
 }
 
 function networkRequestOrigins(manifest: PackManifest): readonly string[] {

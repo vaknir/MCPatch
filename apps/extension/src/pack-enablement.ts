@@ -11,6 +11,7 @@ import {
   type PackEnablementHooks,
   type PackEnablementRuntime,
   type PackSiteCatalog,
+  type PackSiteCatalogFactory,
   type ReviewedPackSite,
 } from "./enablement-model.js";
 import { showEnablementAction, validActionTabId } from "./enablement-action.js";
@@ -24,10 +25,17 @@ import {
   sameEnablementState,
 } from "./enablement-storage.js";
 import { recordForSite } from "./reviewed-pack-catalog.js";
+import {
+  EMPTY_ORIGIN_CONFIG,
+  ORIGIN_CONFIG_STORAGE_KEY,
+  parseOriginConfigState,
+  type OriginConfigState,
+} from "./configured-origins.js";
 
 export class PackEnablementController implements PackEnablementRuntime {
   readonly #api: ChromeEnablementApi;
-  readonly #catalog: PackSiteCatalog;
+  readonly #createCatalog: PackSiteCatalogFactory;
+  #catalog: PackSiteCatalog;
   readonly #content: PackContentSource;
   readonly #fallbackAction: ((tab: ChromeActionTab) => void) | undefined;
   readonly #effective = new Map<string, ReviewedPackSite>();
@@ -44,12 +52,13 @@ export class PackEnablementController implements PackEnablementRuntime {
 
   constructor(
     api: ChromeEnablementApi,
-    catalog: PackSiteCatalog,
+    createCatalog: PackSiteCatalogFactory,
     content: PackContentSource,
     fallbackAction?: (tab: ChromeActionTab) => void,
   ) {
     this.#api = api;
-    this.#catalog = catalog;
+    this.#createCatalog = createCatalog;
+    this.#catalog = createCatalog(EMPTY_ORIGIN_CONFIG.sites);
     this.#content = content;
     this.#fallbackAction = fallbackAction;
   }
@@ -71,7 +80,11 @@ export class PackEnablementController implements PackEnablementRuntime {
       this.#invalidateAndReconcile(),
     );
     this.#api.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && Object.hasOwn(changes, ENABLEMENT_STORAGE_KEY)) {
+      if (
+        area === "local" &&
+        (Object.hasOwn(changes, ENABLEMENT_STORAGE_KEY) ||
+          Object.hasOwn(changes, ORIGIN_CONFIG_STORAGE_KEY))
+      ) {
         this.#invalidateAndReconcile();
       }
     });
@@ -232,6 +245,7 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#api.storage.local.setAccessLevel({
       accessLevel: "TRUSTED_CONTEXTS",
     });
+    this.#catalog = this.#createCatalog((await this.#readOriginConfig()).sites);
     const stored = await this.#readState();
     const resolved = stored.enabled
       .map((record) => this.#catalog.resolve(record))
@@ -248,6 +262,24 @@ export class PackEnablementController implements PackEnablementRuntime {
     }
     this.#replaceAuthority(finalSites);
     this.#ready = true;
+  }
+
+  async #readOriginConfig(): Promise<OriginConfigState> {
+    const container = await this.#api.storage.local.get(
+      ORIGIN_CONFIG_STORAGE_KEY,
+    );
+    const descriptor = Object.getOwnPropertyDescriptor(
+      container,
+      ORIGIN_CONFIG_STORAGE_KEY,
+    );
+    if (descriptor === undefined) return EMPTY_ORIGIN_CONFIG;
+    const state =
+      "value" in descriptor
+        ? parseOriginConfigState(descriptor.value)
+        : undefined;
+    if (state !== undefined) return state;
+    await this.#api.storage.local.remove(ORIGIN_CONFIG_STORAGE_KEY);
+    return EMPTY_ORIGIN_CONFIG;
   }
 
   async #readState(): Promise<EnablementState> {

@@ -373,7 +373,7 @@ function controllerFor(
   const content = new PackContentCatalog(api.scripting, api.permissions);
   return new PackEnablementController(
     api,
-    catalog,
+    () => catalog,
     content.createSource("reviewed"),
   );
 }

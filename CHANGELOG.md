@@ -8,6 +8,45 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- Configurable pack origins for self-hosted sites: a reviewed bundled pack may
+  declare a synthetic placeholder origin, and the user configures the real
+  deployment origin in extension storage (`mcpatch.origins.v1`, at most eight
+  closed records) instead of rebuilding the extension. The catalog substitutes
+  that origin for the placeholder, binding the reviewed manifest identity and
+  path rules to it; an unconfigured pack contributes no site and the placeholder
+  is never requested, granted, or matched. Enablement still requests only the
+  exact configured origin at a user gesture. See
+  [ADR 0015](docs/adr/0015-configurable-pack-origins.md).
+
+- A reviewed Jira Data Center pack that reaches the core capability surface of an
+  MCP Atlassian server through the user's existing browser session instead of an
+  Atlassian Cloud API token. It exposes bounded `jira.current_context`,
+  `jira.get_issue`, `jira.search_issues`, `jira.list_projects`,
+  `jira.list_comments`, `jira.list_transitions`, `jira.list_issue_links`,
+  `jira.list_issue_link_types`, `jira.list_worklogs`, `jira.list_attachments`,
+  `jira.get_user`, `jira.list_versions`, `jira.list_boards`,
+  `jira.list_sprints`, and `jira.list_sprint_issues` reads plus approved
+  `jira.add_comment`, `jira.transition_issue`, `jira.create_issue`,
+  `jira.update_issue`, `jira.assign_issue`, `jira.unassign_issue`,
+  `jira.link_issues`, `jira.remove_issue_link`, `jira.add_worklog`,
+  `jira.create_version`, `jira.create_sprint`, and `jira.delete_issue` actions.
+  Every call is one same-origin request under two fixed REST roots,
+  `/rest/api/2` and `/rest/agile/1.0`, so the pack requests no
+  `EXTERNAL_NETWORK` authority. `jira.update_issue`
+  takes named bounded fields rather than a field-id map, so every approved value
+  stays visible in the approval hash; assignment is split into two tools so no
+  username can collide with an "unassign" sentinel; `jira.remove_issue_link`
+  proves the link id is on the approved issue before deleting it; transitions are
+  validated against the transitions the server currently offers; appending,
+  creating, and destroying actions are consumed once per document context; and
+  an unconfirmed write is reported rather than retried. `jira.delete_issue`
+  reads its target first, reports the summary it destroyed, and refuses to
+  cascade into subtasks unless that is in the approved arguments.
+  `jira.list_attachments` reports metadata only; attachment bytes are a separate
+  capability class that this pack does not transfer. Because Jira Data
+  Center is self-hosted, the pack declares a synthetic placeholder origin and
+  grants no browser authority until the user configures their instance origin in
+  the extension.
 - Declarative Operations v2 typed same-origin navigation actions, with static
   signed path/query templates, bounded component-encoded arguments, ACTION-only
   one-time approval, revoke-before-navigation document lifecycle, SDK and CLI

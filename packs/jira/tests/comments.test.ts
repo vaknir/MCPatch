@@ -1,0 +1,129 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  JiraPackError,
+  addJiraComment,
+  listJiraComments,
+  validateJiraAddCommentInput,
+} from "../src/index.js";
+import { json, restClient, signal } from "./support/jira.js";
+
+const COMMENT = {
+  id: 20_001,
+  author: { name: "jdoe", displayName: "Jane Doe" },
+  created: "2026-09-16T09:00:00.000+0000",
+  updated: "2026-09-16T09:05:00.000+0000",
+  body: "Reproduced on 9.12.",
+};
+
+describe("Jira comment reads", () => {
+  it("returns bounded typed comments", async () => {
+    const fetchRequest = vi
+      .fn()
+      .mockResolvedValue(json({ total: 3, comments: [COMMENT] }));
+
+    await expect(
+      listJiraComments(
+        restClient(fetchRequest),
+        { issueKey: "ABC-1", limit: 5 },
+        signal(),
+      ),
+    ).resolves.toEqual({
+      fingerprint: "jira-datacenter-rest2-v1",
+      issueKey: "ABC-1",
+      total: 3,
+      comments: [
+        {
+          id: "20001",
+          author: { name: "jdoe", displayName: "Jane Doe" },
+          created: "2026-09-16T09:00:00.000+0000",
+          updated: "2026-09-16T09:05:00.000+0000",
+          body: "Reproduced on 9.12.",
+          bodyTruncated: false,
+        },
+      ],
+    });
+  });
+
+  it("truncates an oversized comment body", async () => {
+    const fetchRequest = vi.fn().mockResolvedValue(
+      json({
+        total: 1,
+        comments: [{ ...COMMENT, body: "b".repeat(5_000) }],
+      }),
+    );
+
+    const result = await listJiraComments(
+      restClient(fetchRequest),
+      { issueKey: "ABC-1" },
+      signal(),
+    );
+
+    expect(result.comments[0]?.bodyTruncated).toBe(true);
+    expect(result.comments[0]?.body).toHaveLength(4_096);
+  });
+
+  it("never truncates a comment body into a lone surrogate", async () => {
+    const fetchRequest = vi.fn().mockResolvedValue(
+      json({
+        total: 1,
+        comments: [{ ...COMMENT, body: `${"b".repeat(4_095)}\u{1f600}` }],
+      }),
+    );
+
+    const result = await listJiraComments(
+      restClient(fetchRequest),
+      { issueKey: "ABC-1" },
+      signal(),
+    );
+
+    expect(result.comments[0]?.body).toHaveLength(4_095);
+    expect(result.comments[0]?.body).toBe("b".repeat(4_095));
+  });
+});
+
+describe("Jira approved comment action", () => {
+  it("posts one comment body and confirms the stored identity", async () => {
+    const fetchRequest = vi
+      .fn()
+      .mockResolvedValue(
+        json({ id: "20002", created: "2026-09-16T10:00:00.000+0000" }, 201),
+      );
+
+    await expect(
+      addJiraComment(
+        restClient(fetchRequest),
+        { issueKey: "ABC-1", body: "Fixed in 9.12.1." },
+        signal(),
+      ),
+    ).resolves.toEqual({
+      fingerprint: "jira-datacenter-rest2-v1",
+      state: "added",
+      issueKey: "ABC-1",
+      commentId: "20002",
+      created: "2026-09-16T10:00:00.000+0000",
+    });
+    const [url, init] = fetchRequest.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/rest\/api\/2\/issue\/ABC-1\/comment$/u);
+    expect(JSON.parse(String(init.body))).toEqual({
+      body: "Fixed in 9.12.1.",
+    });
+  });
+
+  it("accepts multi-line text but no other control characters", () => {
+    expect(
+      validateJiraAddCommentInput({ issueKey: "ABC-1", body: "one\ntwo" }).body,
+    ).toBe("one\ntwo");
+    expect(() =>
+      validateJiraAddCommentInput({ issueKey: "ABC-1", body: "one\u0000two" }),
+    ).toThrow(JiraPackError);
+  });
+
+  it.each([
+    ["an empty body", { issueKey: "ABC-1", body: "" }],
+    ["an untrimmed body", { issueKey: "ABC-1", body: " padded " }],
+    ["an extra argument", { issueKey: "ABC-1", body: "ok", visibility: "all" }],
+  ])("rejects %s", (_label, input) => {
+    expect(() => validateJiraAddCommentInput(input)).toThrow(JiraPackError);
+  });
+});

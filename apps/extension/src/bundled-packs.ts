@@ -3,6 +3,7 @@ import {
   GOOGLE_FLIGHTS_ORIGIN,
   googleFlightsBrowserPack,
 } from "@mcpatch/google-flights-pack";
+import { jiraBrowserPack } from "@mcpatch/jira-pack";
 import { PROTOCOL_VERSION } from "@mcpatch/protocol";
 import {
   TRADINGVIEW_ORIGIN,
@@ -16,6 +17,7 @@ import type { CompiledPackRuntimeOptions } from "./compiled-pack-validation.js";
 export const BUNDLED_PACKS = Object.freeze([
   demoPack,
   googleFlightsBrowserPack.definition,
+  jiraBrowserPack.definition,
   tradingViewBrowserPack.definition,
 ]);
 
@@ -29,6 +31,9 @@ export const PACK_RUNTIME_OPTIONS: CompiledPackRuntimeOptions = Object.freeze({
   ] as const),
 });
 
+// A reviewed pack whose deployment origin is self-hosted, such as Jira Data
+// Center, is absent here on purpose: its origin is configured by the user at
+// runtime and proved exactly at enablement. See ADR 0015.
 // This closed list bounds reviewed compiled-pack authority. The manifest declares
 // only the broader optional HTTPS request envelope needed for exact origins that
 // are discovered from validated local/community packs at runtime; no origin is

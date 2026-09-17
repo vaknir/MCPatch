@@ -205,6 +205,9 @@ importers:
       '@mcpatch/google-flights-pack':
         specifier: workspace:*
         version: link:../../packs/google-flights
+      '@mcpatch/jira-pack':
+        specifier: workspace:*
+        version: link:../../packs/jira
       '@mcpatch/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -286,6 +289,16 @@ importers:
         version: 24.13.4
 
   packs/google-flights:
+    dependencies:
+      '@mcpatch/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.4
+        version: 24.13.4
+
+  packs/jira:
     dependencies:
       '@mcpatch/sdk':
         specifier: workspace:*

@@ -12,6 +12,7 @@ import {
 import type { ChromeEnablementApi } from "./enablement-model.js";
 import { PackEnablementController } from "./pack-enablement.js";
 import { createReviewedPackCatalog } from "./reviewed-pack-catalog.js";
+import type { ConfiguredPackOrigin } from "./configured-origins.js";
 import { LocalPackController } from "./local-pack-controller.js";
 import type { ChromeRuntimeMessageApi } from "./local-pack-model.js";
 import type { PageContextOwner } from "./page-context-owner.js";
@@ -34,11 +35,13 @@ declare const chrome: Omit<ChromeEnablementApi, "lifecycle"> & {
   readonly tabs: ChromeApprovalTabsApi;
 };
 
-const catalog = createReviewedPackCatalog(
-  BUNDLED_PACKS,
-  PACK_RUNTIME_OPTIONS,
-  DECLARED_OPTIONAL_ORIGINS,
-);
+const createCatalog = (configured: readonly ConfiguredPackOrigin[]) =>
+  createReviewedPackCatalog(
+    BUNDLED_PACKS,
+    PACK_RUNTIME_OPTIONS,
+    DECLARED_OPTIONAL_ORIGINS,
+    configured,
+  );
 const contentCatalog = new PackContentCatalog(
   chrome.scripting,
   chrome.permissions,
@@ -50,7 +53,7 @@ const definitions = new DeclarativeDefinitionCatalog();
 const localDefinitions = definitions.createSource("local");
 const communityDefinitions = definitions.createSource("community");
 const reviewedIdentities = new Set(
-  catalog.sites.map((site) => `${site.manifest.publisher}/${site.manifest.id}`),
+  BUNDLED_PACKS.map((pack) => `${pack.manifest.publisher}/${pack.manifest.id}`),
 );
 const registryClient = new CommunityRegistryClient(
   {
@@ -86,7 +89,7 @@ const enablement = new PackEnablementController(
     scripting: chrome.scripting,
     storage: chrome.storage,
   },
-  catalog,
+  createCatalog,
   reviewedContent,
   (tab) => communityPacks.handleAction(tab),
 );

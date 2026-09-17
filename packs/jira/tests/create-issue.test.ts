@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  JiraPackError,
+  createJiraIssue,
+  issuePayload,
+  validateJiraCreateIssueInput,
+} from "../src/index.js";
+import { json, restClient, signal } from "./support/jira.js";
+
+const INPUT = {
+  projectKey: "ABC",
+  issueType: "Task",
+  summary: "Rotate the staging certificate",
+};
+
+describe("Jira approved create action", () => {
+  it("creates one issue from validated fields only", async () => {
+    const fetchRequest = vi
+      .fn()
+      .mockResolvedValue(json({ id: 10_050, key: "ABC-7" }, 201));
+
+    await expect(
+      createJiraIssue(
+        restClient(fetchRequest),
+        { ...INPUT, description: "Expires soon.", labels: ["ops"] },
+        signal(),
+      ),
+    ).resolves.toEqual({
+      fingerprint: "jira-datacenter-rest2-v1",
+      state: "created",
+      issueKey: "ABC-7",
+      id: "10050",
+      projectKey: "ABC",
+      issueType: "Task",
+    });
+    const [, init] = fetchRequest.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      fields: {
+        project: { key: "ABC" },
+        issuetype: { name: "Task" },
+        summary: "Rotate the staging certificate",
+        description: "Expires soon.",
+        labels: ["ops"],
+      },
+    });
+  });
+
+  it("omits optional fields the caller did not supply", () => {
+    expect(issuePayload(validateJiraCreateIssueInput(INPUT))).toEqual({
+      fields: {
+        project: { key: "ABC" },
+        issuetype: { name: "Task" },
+        summary: "Rotate the staging certificate",
+      },
+    });
+  });
+
+  it.each([
+    ["a raw custom field", { ...INPUT, customfield_10001: "x" }],
+    ["a malformed project key", { ...INPUT, projectKey: "abc" }],
+    ["a multi-line summary", { ...INPUT, summary: "one\ntwo" }],
+    ["duplicate labels", { ...INPUT, labels: ["ops", "ops"] }],
+    ["a label containing a space", { ...INPUT, labels: ["needs triage"] }],
+    [
+      "a label containing a control character",
+      { ...INPUT, labels: ["a\u0000b"] },
+    ],
+  ])("rejects %s", (_label, input) => {
+    expect(() => validateJiraCreateIssueInput(input)).toThrow(JiraPackError);
+  });
+});

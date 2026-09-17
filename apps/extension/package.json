@@ -15,6 +15,7 @@
   "dependencies": {
     "@mcpatch/example-packs": "workspace:*",
     "@mcpatch/google-flights-pack": "workspace:*",
+    "@mcpatch/jira-pack": "workspace:*",
     "@mcpatch/protocol": "workspace:*",
     "@mcpatch/sdk": "workspace:*",
     "@mcpatch/tradingview-pack": "workspace:*"

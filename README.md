@@ -84,6 +84,13 @@ typed reads, returns a bounded active-chart MCP image, resolves company/ticker
 queries to canonical symbols, and changes charts through one approved
 canonical-symbol action; its contract is documented in
 [docs/architecture/tradingview-adapter.md](docs/architecture/tradingview-adapter.md).
+A bundled Jira Data Center adapter reaches the core capability surface of an MCP
+Atlassian server through the user's existing self-hosted Jira session, with
+bounded issue, search, project, comment, and workflow reads plus approved
+comment, transition, create, and link actions over same-origin REST v2 only. Its
+contract, and the deployment-origin step it needs before it grants any browser
+authority, are documented in
+[docs/architecture/jira-adapter.md](docs/architecture/jira-adapter.md).
 
 Pack development now has a separately versioned, closed Pack Manifest v1 contract
 with TypeScript types, JSON Schema, bounded semantic validation, and golden cases.
