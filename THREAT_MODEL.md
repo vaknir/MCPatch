@@ -216,6 +216,27 @@ Mitigations:
   publication sequence, compatibility, and revocation locally before presentation;
 - keep registry control-plane traffic separate from pack `EXTERNAL_NETWORK`
   authority; community read-only packs cannot invoke it;
+
+### Deceptive or substituted community submission
+
+**Threat:** a contributor supplies misleading descriptions, selectors, fixtures, or
+marketplace metadata; swaps source after review; expands authority without calling
+it out; or attempts to make an unsigned artifact publish itself.
+
+**Mitigations:**
+
+- contributor output is always unsigned and has no registry publication command or
+  signing authority;
+- review reports expose exact origins, paths, schemas, operations, risks,
+  permissions, compatibility, network policy, digest, and source commit while
+  excluding fixture payloads and results;
+- maintainers treat every report field as untrusted and review the declarative
+  source directly;
+- publication requires clean registry and pack repositories, reproduces the exact
+  reviewed source commit and report, re-runs all synthetic fixtures, and compares
+  the signed bundle digest before registry signing; and
+- publisher signing, independent registry attestation, user installation, and
+  browser-origin permission remain separate authorities.
 - reject reuse of one publisher/pack/version identity for different bytes and bound
   signed history to three releases per identity;
 - stage every higher release as non-authoritative until explicit extension-owned

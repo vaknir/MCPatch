@@ -16,6 +16,7 @@
     "test": "pnpm -r --if-present test && node --test scripts/*.test.mjs",
     "test:browser": "pnpm --filter @mcpatch/extension test:browser",
     "verify:cli": "pnpm --filter @mcpatch/cli verify",
+    "verify:community-pack": "pnpm --filter @mcpatch/cli build && node packages/cli/dist/index.js pack submit",
     "verify:packs": "pnpm --filter @mcpatch/sdk test:fixtures && pnpm --filter './packs/**' test",
     "typecheck": "pnpm -r --if-present typecheck"
   },

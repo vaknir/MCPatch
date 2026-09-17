@@ -272,6 +272,23 @@ export async function readBoundedRelativeFile(
   return bytes;
 }
 
+export async function resolveSafeRelativeDirectory(
+  rootDirectory: string,
+  relativePath: string,
+  field: string,
+): Promise<string> {
+  const parts = safeRelativeParts(relativePath);
+  let current = rootDirectory;
+  for (const part of parts) {
+    current = join(current, part);
+    const metadata = await safeMetadata(current, field);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      cliError("UNSAFE_PATH", field);
+    }
+  }
+  return current;
+}
+
 export async function publishStaticTree(
   rootDirectory: string,
   outputName: string,

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { PROTOCOL_VERSION } from "@mcpatch/protocol";
 import {
   COMMUNITY_REGISTRY_INDEX_VERSION,
@@ -20,13 +22,19 @@ import {
 
 import { cliError } from "./errors.js";
 import {
+  loadPackSource,
   publishStaticTree,
   readBoundedRelativeFile,
   requireDirectory,
+  resolveSafeRelativeDirectory,
 } from "./files.js";
+import { cleanRepositoryCommit, sourceCommit } from "./git-attribution.js";
+import { preparePackSource } from "./source.js";
+import { createSubmissionReview } from "./submission.js";
 
 export const REGISTRY_SOURCE_FILE = "mcpatch.registry.json";
 const REGISTRY_SOURCE_VERSION = 1;
+const PUBLICATION_SOURCE_VERSION = 2;
 const REGISTRY_OUTPUT_DIRECTORY = "registry-dist";
 const CURRENT_RUNTIME_VERSION = "0.1.0";
 const REGISTRY_PRIVATE_KEY_ENV = "MCPATCH_REGISTRY_PRIVATE_KEY";
@@ -38,6 +46,8 @@ type RegistryEnvironment = Readonly<Record<string, string | undefined>>;
 
 type RegistryPackSource = Readonly<{
   readonly bundle: string;
+  readonly source?: string;
+  readonly reviewReport?: string;
   readonly publisherKey: string;
   readonly trust: CommunityPackTrust;
   readonly verification: CommunityRegistryVerificationEvidence;
@@ -45,12 +55,105 @@ type RegistryPackSource = Readonly<{
 }>;
 
 type RegistrySource = Readonly<{
+  readonly sourceVersion: number;
   readonly registryId: string;
   readonly publicationSequence: number;
   readonly issuedAt: string;
   readonly expiresAt: string;
   readonly packs: readonly RegistryPackSource[];
 }>;
+
+export async function publishStaticRegistry(
+  targetDirectory: string,
+  environment: RegistryEnvironment,
+): Promise<Readonly<Record<string, unknown>>> {
+  await requireDirectory(targetDirectory, "registry.target");
+  signingKeys(environment);
+  const repositoryCommit = await cleanRepositoryCommit(targetDirectory);
+  const sourceBytes = await readBoundedRelativeFile(
+    targetDirectory,
+    REGISTRY_SOURCE_FILE,
+    MAX_COMMUNITY_REGISTRY_INDEX_BYTES,
+  );
+  const source = readRegistrySource(sourceBytes);
+  if (source.sourceVersion !== PUBLICATION_SOURCE_VERSION) {
+    cliError("REGISTRY_SOURCE_INVALID", "$registry.registrySourceVersion");
+  }
+
+  for (const packSource of source.packs) {
+    if (
+      packSource.source === undefined ||
+      packSource.reviewReport === undefined
+    ) {
+      cliError("REGISTRY_SOURCE_INVALID", "registry.packs.review");
+    }
+    const packDirectory = await resolveSafeRelativeDirectory(
+      targetDirectory,
+      packSource.source,
+      "registry.packs.source",
+    );
+    const packRepositoryCommit = await cleanRepositoryCommit(packDirectory);
+    const loaded = await loadPackSource(packDirectory);
+    const commit = await sourceCommit(
+      packDirectory,
+      loaded.sourcePath,
+      loaded.bytes,
+    );
+    if (
+      commit !== packRepositoryCommit ||
+      commit !== packSource.verification.sourceCommit
+    ) {
+      cliError(
+        "PUBLICATION_REPRODUCTION_FAILED",
+        "registry.packs.sourceCommit",
+      );
+    }
+    const reproduced = await preparePackSource(loaded.bytes, {
+      sourceCommit: commit,
+    });
+    const expectedReview = await createSubmissionReview(reproduced, commit);
+    const reviewBytes = await readBoundedRelativeFile(
+      targetDirectory,
+      packSource.reviewReport,
+      MAX_DECLARATIVE_BUNDLE_BYTES,
+    );
+    let submittedReview: unknown;
+    try {
+      submittedReview = decodeDeclarativePackBundle(reviewBytes);
+    } catch {
+      cliError("REVIEW_REPORT_INVALID", "registry.packs.reviewReport");
+    }
+    if (JSON.stringify(submittedReview) !== JSON.stringify(expectedReview)) {
+      cliError("REVIEW_REPORT_INVALID", "registry.packs.reviewReport");
+    }
+    const bundleBytes = await readBoundedRelativeFile(
+      targetDirectory,
+      packSource.bundle,
+      MAX_DECLARATIVE_BUNDLE_BYTES,
+    );
+    const verified = await verifyDeclarativePackBundle(bundleBytes, {
+      trustedPublicKey: packSource.publisherKey,
+      runtimeVersion: CURRENT_RUNTIME_VERSION,
+      bridgeProtocolVersion: PROTOCOL_VERSION,
+    });
+    if (
+      !verified.ok ||
+      verified.bundle.registryAttestation !== undefined ||
+      verified.bundle.manifest.digest !== reproduced.manifest.digest ||
+      verified.bundle.metadata.sourceCommit !== commit
+    ) {
+      cliError("PUBLICATION_REPRODUCTION_FAILED", "registry.packs.bundle");
+    }
+  }
+
+  const output = await buildStaticRegistry(targetDirectory, environment);
+  return Object.freeze({
+    ...output,
+    status: "published",
+    sourceCommit: repositoryCommit,
+    reproducedPacks: source.packs.length,
+  });
+}
 
 export async function buildStaticRegistry(
   targetDirectory: string,
@@ -211,7 +314,8 @@ export async function buildStaticRegistry(
   } catch {
     cliError("REGISTRY_SOURCE_INVALID", "registry.packs");
   }
-  files.set("v1/index.json", UTF8.encode(`${JSON.stringify(index)}\n`));
+  const indexBytes = UTF8.encode(`${JSON.stringify(index)}\n`);
+  files.set("v1/index.json", indexBytes);
   files.set("_headers", UTF8.encode(staticHeaders()));
   const output = await publishStaticTree(
     targetDirectory,
@@ -224,6 +328,8 @@ export async function buildStaticRegistry(
     packs: entries.length,
     publicationSequence: source.publicationSequence,
     registryId: source.registryId,
+    indexDigest: `sha256:${createHash("sha256").update(indexBytes).digest("hex")}`,
+    bundleDigests: entries.map((entry) => entry.bundleDigest),
     reproducible: true,
     reused: output.reused,
   });
@@ -249,7 +355,8 @@ function readRegistrySource(input: Uint8Array): RegistrySource {
     "$registry",
   );
   if (
-    source.registrySourceVersion !== REGISTRY_SOURCE_VERSION ||
+    (source.registrySourceVersion !== REGISTRY_SOURCE_VERSION &&
+      source.registrySourceVersion !== PUBLICATION_SOURCE_VERSION) ||
     typeof source.registryId !== "string" ||
     !/^[a-z][a-z0-9.-]{1,63}$/u.test(source.registryId) ||
     !positiveSafeInteger(source.publicationSequence) ||
@@ -263,24 +370,41 @@ function readRegistrySource(input: Uint8Array): RegistrySource {
     cliError("REGISTRY_SOURCE_INVALID", "$registry");
   }
   return Object.freeze({
+    sourceVersion: source.registrySourceVersion,
     registryId: source.registryId,
     publicationSequence: source.publicationSequence,
     issuedAt: source.issuedAt,
     expiresAt: source.expiresAt,
     packs: Object.freeze(
       source.packs.map((pack, index) =>
-        readPackSource(pack, `$registry.packs[${index}]`),
+        readPackSource(
+          pack,
+          `$registry.packs[${index}]`,
+          source.registrySourceVersion as number,
+        ),
       ),
     ),
   }) as RegistrySource;
 }
 
-function readPackSource(value: unknown, field: string): RegistryPackSource {
-  const source = exactObject(
-    value,
-    ["bundle", "publisherKey", "trust", "verification", "revocation"],
-    field,
-  );
+function readPackSource(
+  value: unknown,
+  field: string,
+  sourceVersion: number,
+): RegistryPackSource {
+  const fields =
+    sourceVersion === PUBLICATION_SOURCE_VERSION
+      ? [
+          "bundle",
+          "source",
+          "reviewReport",
+          "publisherKey",
+          "trust",
+          "verification",
+          "revocation",
+        ]
+      : ["bundle", "publisherKey", "trust", "verification", "revocation"];
+  const source = exactObject(value, fields, field);
   const verification = exactObject(
     source.verification,
     ["verifiedAt", "fixtureTestsPassed", "fixtureTestsTotal", "sourceCommit"],
@@ -290,6 +414,10 @@ function readPackSource(value: unknown, field: string): RegistryPackSource {
   if (
     typeof source.bundle !== "string" ||
     !source.bundle.endsWith(".mcpack") ||
+    (sourceVersion === PUBLICATION_SOURCE_VERSION &&
+      (typeof source.source !== "string" ||
+        typeof source.reviewReport !== "string" ||
+        !source.reviewReport.endsWith(".review.json"))) ||
     typeof source.publisherKey !== "string" ||
     !/^[A-Za-z0-9_-]{43}$/u.test(source.publisherKey) ||
     (source.trust !== "OFFICIAL" && source.trust !== "REVIEWED_COMMUNITY") ||
@@ -304,6 +432,12 @@ function readPackSource(value: unknown, field: string): RegistryPackSource {
   }
   return Object.freeze({
     bundle: source.bundle,
+    ...(sourceVersion === PUBLICATION_SOURCE_VERSION
+      ? {
+          source: source.source as string,
+          reviewReport: source.reviewReport as string,
+        }
+      : {}),
     publisherKey: source.publisherKey,
     trust: source.trust,
     verification: Object.freeze({

@@ -25,6 +25,7 @@ mcpatch pack inspect ./my-pack
 git -C ./my-pack add mcpatch.pack.json README.md package.json
 git -C ./my-pack commit -m "feat: add my pack"
 mcpatch pack build ./my-pack
+mcpatch pack submit ./my-pack
 ```
 
 `create` refuses an existing target rather than mixing generated files with an
@@ -57,6 +58,13 @@ extension's explicit [local developer mode](local-pack-developer-mode.md), which
 shows its exact authority and retains the unsigned trust label; publisher signing
 and submission remain separate workflows.
 
+`pack submit` is the contributor release-preparation gate. It runs validation and
+every synthetic fixture against an attributable commit, then atomically emits an
+unsigned canonical artifact and payload-free authority report under
+`submission-dist/`. The report includes selectors/operations and schemas but never
+fixture documents, expected values, or results. See
+[Contributing community packs](community-pack-contributions.md).
+
 ## Static registry publisher
 
 Maintainers can build a reviewed static registry from already publisher-signed
@@ -81,6 +89,12 @@ digest-addressed bundle paths, and static hosting headers atomically. A second r
 reuses only byte-identical output; changed or partial output fails closed. See
 [Community registry v1](architecture/community-registry-v1.md).
 
+Actual reviewed releases use `mcpatch registry publish` with source version 2. It
+requires clean registry and source checkouts, reproduces the bundle and review
+report, re-runs fixtures, verifies the separate publisher signature, and only then
+applies registry attestation. See
+[Community registry publishing](registry-publishing.md).
+
 ## Source contract
 
 The top level is closed and versioned by `sourceVersion: 1`. It contains pack
@@ -95,4 +109,5 @@ Run the complete local CLI gate with:
 
 ```sh
 pnpm verify:cli
+pnpm verify:community-pack ./my-pack
 ```

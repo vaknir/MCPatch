@@ -53,6 +53,23 @@ export async function sourceCommit(
   return commit;
 }
 
+/** Returns HEAD only when the entire repository has no tracked or untracked changes. */
+export async function cleanRepositoryCommit(
+  targetDirectory: string,
+): Promise<string> {
+  const root = await git(targetDirectory, ["rev-parse", "--show-toplevel"]);
+  const canonicalRoot = await realpath(resolve(root));
+  const status = await git(canonicalRoot, [
+    "status",
+    "--porcelain=v1",
+    "--untracked-files=all",
+  ]);
+  if (status !== "") cliError("SOURCE_UNATTRIBUTED", "repository");
+  const commit = await git(canonicalRoot, ["rev-parse", "HEAD"]);
+  if (!COMMIT.test(commit)) cliError("SOURCE_UNATTRIBUTED", "repository");
+  return commit;
+}
+
 function gitBytes(directory: string, args: readonly string[]): Promise<Buffer> {
   return new Promise<Buffer>((resolveBytes, rejectBytes) => {
     execFile(
