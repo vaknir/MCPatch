@@ -23,6 +23,9 @@ export default defineConfig({
       "@mcpatch/sdk/runtime": fileURLToPath(
         new URL("../../packages/sdk/src/runtime.ts", import.meta.url),
       ),
+      "@mcpatch/sdk": fileURLToPath(
+        new URL("../../packages/sdk/src/index.ts", import.meta.url),
+      ),
       "@mcpatch/tradingview-pack": fileURLToPath(
         new URL("../../packs/tradingview/src/index.ts", import.meta.url),
       ),

@@ -15,6 +15,7 @@ import {
   CompositePageAdapter,
   loadLocalPackPageAdapter,
 } from "./local-pack-page-adapter.js";
+import { loadCommunityPackPageAdapter } from "./community-pack-page-adapter.js";
 
 declare const chrome: { readonly runtime: ChromePageClientRuntimeApi };
 
@@ -45,7 +46,12 @@ async function bootstrap(): Promise<void> {
     globalThis.document,
     globalThis.location,
   );
-  const adapter = new CompositePageAdapter([reviewed, local]);
+  const community = await loadCommunityPackPageAdapter(
+    chrome.runtime,
+    globalThis.document,
+    globalThis.location,
+  );
+  const adapter = new CompositePageAdapter([reviewed, local, community]);
   const runtime = new PageContentRuntime(chrome.runtime, adapter, {
     expectedOrigin: globalThis.location.origin,
     lifecycle: globalThis as unknown as PageLifecycleApi,

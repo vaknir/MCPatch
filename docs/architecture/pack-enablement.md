@@ -24,6 +24,13 @@ to make an exact selected-origin request expressible; the declaration itself is
 never requested or treated as pack authority. See
 [ADR 0014](../adr/0014-registry-discovery-and-origin-authority.md).
 
+Signed community bundles enter the same catalog only after the fixed-origin client
+has independently verified the fresh index, registry attestation, publisher
+signature, content digest, compatibility, and exact summary. Their install record
+retains that full identity and can contribute only the packaged declarative
+interpreter plus its signed tool allowlist. See
+[Community registry v1](community-registry-v1.md).
+
 The toolbar action uses the browser-provided clicked tab and `activeTab` grant. It
 enables only when exactly one catalog pack matches that URL. The permission request
 is issued in the synchronous user-gesture turn and atomically contains that site's

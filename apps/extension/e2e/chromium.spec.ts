@@ -19,6 +19,9 @@ import {
 } from "@playwright/test";
 
 import {
+  COMMUNITY_ORIGIN,
+  COMMUNITY_REGISTRY_ORIGIN,
+  COMMUNITY_TOOL,
   FIXTURE_LOCAL_TOOL,
   FIXTURE_ORIGIN,
   FIXTURE_PROBE_TOOL,
@@ -26,6 +29,7 @@ import {
   FIXTURE_WAIT_TOOL,
   OTHER_ORIGIN,
 } from "./fixture-constants.js";
+import { communityRegistryFixture } from "./fixture-community-registry.js";
 import { McpStdioClient, structuredContent } from "./mcp-client.js";
 
 const extensionPath = fileURLToPath(
@@ -58,6 +62,8 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
   expect(browserName).toBe("chromium");
   const fixtureHtml = await readFile(fixtureHtmlPath, "utf8");
   const fixtureCss = await readFile(fixtureCssPath, "utf8");
+  const registry = await communityRegistryFixture();
+  const registryRequests: string[] = [];
   const profile = testInfo.outputPath("chromium-profile");
   let runtimeDirectory: string | undefined;
   let context: BrowserContext | undefined;
@@ -76,7 +82,13 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
       ],
       env: { ...process.env, MCPATCH_RUNTIME_DIR: runtimeDirectory },
     });
-    await installNetworkBoundary(context, fixtureHtml, fixtureCss);
+    await installNetworkBoundary(
+      context,
+      fixtureHtml,
+      fixtureCss,
+      registry,
+      registryRequests,
+    );
     const worker =
       context.serviceWorkers()[0] ??
       (await context.waitForEvent("serviceworker"));
@@ -218,6 +230,68 @@ test("routes and revokes a synthetic page through real Chromium and MCP", async 
     await disableFixture(control);
     await expectTools(client, [demoTool]);
     await expect.poll(() => registeredContentScriptCount(worker)).toBe(0);
+
+    const communityPage = await context.newPage();
+    await communityPage.goto(`${COMMUNITY_ORIGIN}/portfolio`);
+    await communityPage.bringToFront();
+    const communityTabId = await activeTabId(worker);
+    await triggerCommunityDiscovery(
+      worker,
+      communityTabId,
+      `${COMMUNITY_ORIGIN}/portfolio`,
+    );
+    await expect
+      .poll(() => communityCandidateStatus(worker))
+      .toEqual({ candidate: true, installed: 0, sequence: 1 });
+    await expect
+      .poll(
+        () =>
+          (context?.pages() ?? []).some((candidate) =>
+            candidate
+              .url()
+              .startsWith(
+                `chrome-extension://${extensionId}/community-review.html`,
+              ),
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+    const review = context
+      .pages()
+      .find((candidate) =>
+        candidate
+          .url()
+          .startsWith(
+            `chrome-extension://${extensionId}/community-review.html`,
+          ),
+      );
+    if (review === undefined) throw new Error("community review page missing");
+    await review.waitForLoadState("domcontentloaded");
+    await expect(review.locator("#trust")).toHaveText("REVIEWED_COMMUNITY");
+    await expect(review.locator("#identity")).toHaveText(
+      "community/visible-page",
+    );
+    await expect(review.locator("#paths")).toContainText(COMMUNITY_ORIGIN);
+    await expect(review.locator("#tools")).toContainText(COMMUNITY_TOOL);
+    await review.locator("#install").click();
+    await expect(review.locator("#status")).toHaveText(
+      "The verified pack is installed and enabled.",
+    );
+    await expect.poll(() => registeredContentScriptCount(worker)).toBe(1);
+
+    await communityPage.reload();
+    await expect
+      .poll(() =>
+        communityPage.locator("html").getAttribute("data-fixture-runtime"),
+      )
+      .toBe("ready");
+    await expectTools(client, [demoTool, COMMUNITY_TOOL]);
+    expect(
+      structuredContent(await client.callTool(COMMUNITY_TOOL).response),
+    ).toMatchObject({
+      text: expect.stringContaining("Synthetic website state"),
+    });
+    expect(registryRequests).toEqual(["/v1/index.json", registry.bundlePath]);
   } finally {
     await mcp?.close();
     await context?.close();
@@ -252,6 +326,12 @@ async function installNetworkBoundary(
   context: BrowserContext,
   fixtureHtml: string,
   fixtureCss: string,
+  registry: {
+    readonly bundleBytes: Uint8Array;
+    readonly bundlePath: string;
+    readonly indexBytes: Uint8Array;
+  },
+  registryRequests: string[],
 ): Promise<void> {
   await context.route("**/*", async (route) => {
     const url = new URL(route.request().url());
@@ -259,7 +339,37 @@ async function installNetworkBoundary(
       await route.continue();
       return;
     }
-    if (url.origin !== FIXTURE_ORIGIN && url.origin !== OTHER_ORIGIN) {
+    if (url.origin === COMMUNITY_REGISTRY_ORIGIN) {
+      const body =
+        url.pathname === "/v1/index.json"
+          ? registry.indexBytes
+          : url.pathname === registry.bundlePath
+            ? registry.bundleBytes
+            : undefined;
+      if (body === undefined) {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      registryRequests.push(url.pathname);
+      await route.fulfill({
+        body: Buffer.from(body),
+        contentType:
+          url.pathname === "/v1/index.json"
+            ? "application/vnd.mcpatch.registry-index+json"
+            : "application/vnd.mcpatch.pack+json",
+        headers: {
+          "content-length": String(body.byteLength),
+          "x-content-type-options": "nosniff",
+        },
+        status: 200,
+      });
+      return;
+    }
+    if (
+      url.origin !== FIXTURE_ORIGIN &&
+      url.origin !== OTHER_ORIGIN &&
+      url.origin !== COMMUNITY_ORIGIN
+    ) {
       await route.abort("blockedbyclient");
       return;
     }
@@ -280,6 +390,99 @@ async function installNetworkBoundary(
       },
       status: 200,
     });
+  });
+}
+
+async function activeTabId(worker: {
+  evaluate<Result>(
+    pageFunction: () => Result | Promise<Result>,
+  ): Promise<Result>;
+}): Promise<number> {
+  return worker.evaluate(async () => {
+    const scope = globalThis as typeof globalThis & {
+      chrome: {
+        tabs: {
+          query(value: {
+            readonly active: true;
+            readonly currentWindow: true;
+          }): Promise<readonly { readonly id?: number }[]>;
+        };
+      };
+    };
+    const tabs = await scope.chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    const id = tabs[0]?.id;
+    if (typeof id !== "number") throw new Error("active fixture tab missing");
+    return id;
+  });
+}
+
+async function triggerCommunityDiscovery(
+  worker: {
+    evaluate<Argument, Result>(
+      pageFunction: (argument: Argument) => Result | Promise<Result>,
+      argument: Argument,
+    ): Promise<Result>;
+  },
+  tabId: number,
+  url: string,
+): Promise<void> {
+  await worker.evaluate(
+    (tab) => {
+      const discover = (
+        globalThis as typeof globalThis & {
+          __MCPATCH_FIXTURE_DISCOVER__?: (value: {
+            readonly id: number;
+            readonly url: string;
+          }) => void;
+        }
+      ).__MCPATCH_FIXTURE_DISCOVER__;
+      if (discover === undefined)
+        throw new Error("fixture discovery seam missing");
+      discover(tab);
+    },
+    { id: tabId, url },
+  );
+}
+
+async function communityCandidateStatus(worker: {
+  evaluate<Result>(
+    pageFunction: () => Result | Promise<Result>,
+  ): Promise<Result>;
+}): Promise<{
+  readonly candidate: boolean;
+  readonly installed: number;
+  readonly sequence: number;
+}> {
+  return worker.evaluate(async () => {
+    const scope = globalThis as typeof globalThis & {
+      chrome: {
+        storage: {
+          local: {
+            get(key: string): Promise<Record<string, unknown>>;
+          };
+        };
+      };
+    };
+    const key = "mcpatch.community-packs.v1";
+    const stored = await scope.chrome.storage.local.get(key);
+    const state = stored[key] as
+      | {
+          readonly candidate?: unknown;
+          readonly highWaterSequence?: unknown;
+          readonly installed?: readonly unknown[];
+        }
+      | undefined;
+    return {
+      candidate: state?.candidate !== undefined,
+      installed: Array.isArray(state?.installed) ? state.installed.length : -1,
+      sequence:
+        typeof state?.highWaterSequence === "number"
+          ? state.highWaterSequence
+          : -1,
+    };
   });
 }
 

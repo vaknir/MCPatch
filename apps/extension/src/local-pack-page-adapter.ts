@@ -23,30 +23,54 @@ import { emptyPageAdapter } from "./page-content-runtime.js";
 const INSTALL_ID = /^local\.[a-f0-9]{32}$/u;
 const MAX_LOCAL_PAGE_PACKS = 4;
 
+export interface DeclarativePageSourceOptions {
+  readonly contextPrefix: "local" | "registry";
+  readonly installId: RegExp;
+  readonly maximumPacks: number;
+  readonly requestType:
+    "community_pack_content_config" | "local_pack_content_config";
+  readonly trust: ReadonlySet<string>;
+}
+
 /** Loads only the exact validated local programs selected by the worker. */
 export async function loadLocalPackPageAdapter(
   runtime: ChromePageClientRuntimeApi,
   document: Document,
   location: Location,
 ): Promise<PageAdapter> {
+  return loadDeclarativePackPageAdapter(runtime, document, location, {
+    contextPrefix: "local",
+    installId: INSTALL_ID,
+    maximumPacks: MAX_LOCAL_PAGE_PACKS,
+    requestType: "local_pack_content_config",
+    trust: new Set([LOCAL_PACK_TRUST]),
+  });
+}
+
+export async function loadDeclarativePackPageAdapter(
+  runtime: ChromePageClientRuntimeApi,
+  document: Document,
+  location: Location,
+  options: DeclarativePageSourceOptions,
+): Promise<PageAdapter> {
   if (runtime.sendMessage === undefined) return emptyPageAdapter;
   const page = canonicalizePageLocation(location.href);
   if (!page.ok) return emptyPageAdapter;
   let response: unknown;
   try {
-    response = await runtime.sendMessage({ type: "local_pack_content_config" });
+    response = await runtime.sendMessage({ type: options.requestType });
   } catch {
     return emptyPageAdapter;
   }
-  const records = contentRecords(response);
+  const records = contentRecords(response, options);
   if (records === undefined) return emptyPageAdapter;
   const adapters: PageAdapter[] = [];
   for (const [index, record] of records.entries()) {
     const binding: DeclarativeRuntimeBinding = Object.freeze({
       bundleDigest: record.bundle.manifest.digest,
-      contextId: `local.${record.installId.slice("local.".length)}.${index}`,
+      contextId: `${options.contextPrefix}.${record.installId.slice(`${options.contextPrefix}.`.length)}.${index}`,
       contextRevision: 1,
-      documentId: `local-document.${record.installId.slice("local.".length)}`,
+      documentId: `${options.contextPrefix}-document.${record.installId.slice(`${options.contextPrefix}.`.length)}`,
       origin: page.location.origin,
       path: page.location.path,
       tabId: 0,
@@ -94,40 +118,44 @@ export class CompositePageAdapter implements PageAdapter {
   }
 
   async capabilities(signal: AbortSignal): Promise<readonly PageCapability[]> {
-    const capabilities: PageCapability[] = [];
+    const nativeCapabilities: PageCapability[] = [];
+    const packCapabilities = new Map<string, PageCapability>();
     const routes = new Map<string, PageAdapter>();
+    const nativeNames = new Set<string>();
     const packOwners = new Map<string, PageAdapter | undefined>();
     for (const adapter of this.#adapters) {
       const discovered = await adapter.capabilities(signal);
       for (const capability of discovered) {
         if (capability.source === "native_webmcp") {
-          if (
-            capabilities.some(
-              (candidate) =>
-                candidate.source === "native_webmcp" &&
-                candidate.name === capability.name,
-            )
-          ) {
+          if (nativeNames.has(capability.name)) {
             throw new PageAdapterExecutionError("EXECUTION_FAILED");
           }
-          capabilities.push(capability);
+          nativeNames.add(capability.name);
+          nativeCapabilities.push(capability);
           routes.set(capability.name, adapter);
           continue;
         }
         const previous = packOwners.get(capability.name);
         if (!packOwners.has(capability.name)) {
           packOwners.set(capability.name, adapter);
-          capabilities.push(capability);
+          packCapabilities.set(capability.name, capability);
         } else if (previous !== adapter) {
           packOwners.set(capability.name, undefined);
+          packCapabilities.delete(capability.name);
         }
       }
     }
     for (const [name, owner] of packOwners) {
-      if (owner !== undefined && !routes.has(name)) routes.set(name, owner);
+      if (owner !== undefined && !nativeNames.has(name))
+        routes.set(name, owner);
     }
     this.#routes = routes;
-    return Object.freeze(capabilities);
+    return Object.freeze([
+      ...nativeCapabilities,
+      ...[...packCapabilities.values()].filter(
+        (capability) => !nativeNames.has(capability.name),
+      ),
+    ]);
   }
 
   execute(
@@ -173,7 +201,10 @@ export class CompositePageAdapter implements PageAdapter {
   }
 }
 
-function contentRecords(response: unknown):
+function contentRecords(
+  response: unknown,
+  options: DeclarativePageSourceOptions,
+):
   | readonly {
       readonly installId: string;
       readonly bundle: ReturnType<typeof parseDeclarativePackBundleContent>;
@@ -184,7 +215,7 @@ function contentRecords(response: unknown):
   }
   if (
     !Array.isArray(response.value) ||
-    response.value.length > MAX_LOCAL_PAGE_PACKS
+    response.value.length > options.maximumPacks
   ) {
     return undefined;
   }
@@ -193,8 +224,9 @@ function contentRecords(response: unknown):
     if (
       !dataObject(value, ["installId", "trust", "bundle"]) ||
       typeof value.installId !== "string" ||
-      !INSTALL_ID.test(value.installId) ||
-      value.trust !== LOCAL_PACK_TRUST
+      !options.installId.test(value.installId) ||
+      typeof value.trust !== "string" ||
+      !options.trust.has(value.trust)
     ) {
       return undefined;
     }

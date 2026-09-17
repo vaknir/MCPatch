@@ -46,6 +46,7 @@ export class CompiledPackRuntime {
   readonly #send: MessageSender;
   readonly #options: ValidatedCompiledPackRuntimeOptions;
   readonly #calls: CompiledPackCallDispatcher;
+  readonly #onDefinitionsChanged: (() => boolean) | undefined;
   readonly #contexts = new Map<string, ActiveContext>();
   readonly #lastRevisions = new Map<string, number>();
   #compiledPacks: readonly ValidatedCompiledPack[];
@@ -56,6 +57,7 @@ export class CompiledPackRuntime {
     send: MessageSender,
     definitions: readonly CompiledPackSubject[],
     options: CompiledPackRuntimeOptions,
+    onDefinitionsChanged?: () => boolean,
   ) {
     const checkedOptions = validateRuntimeOptions(options);
     const packs =
@@ -68,6 +70,7 @@ export class CompiledPackRuntime {
     this.#send = send;
     this.#options = checkedOptions;
     this.#calls = new CompiledPackCallDispatcher(send);
+    this.#onDefinitionsChanged = onDefinitionsChanged;
     this.#compiledPacks = packs;
     this.#packs = packs;
   }
@@ -140,7 +143,11 @@ export class CompiledPackRuntime {
     const packs = validateCompiledPacks(definitions, this.#options);
     this.closeAll("pack_disabled");
     this.#compiledPacks = packs ?? Object.freeze([]);
-    return packs !== undefined && this.#replaceCombined();
+    return (
+      packs !== undefined &&
+      this.#replaceCombined() &&
+      (this.#onDefinitionsChanged?.() ?? true)
+    );
   }
 
   async replaceDeclarativeDefinitions(
@@ -155,7 +162,11 @@ export class CompiledPackRuntime {
     }
     this.closeAll("pack_disabled");
     this.#declarativePacks = packs ?? Object.freeze([]);
-    return packs !== undefined && this.#replaceCombined();
+    return (
+      packs !== undefined &&
+      this.#replaceCombined() &&
+      (this.#onDefinitionsChanged?.() ?? true)
+    );
   }
 
   disablePack(publisher: string, id: string): boolean {

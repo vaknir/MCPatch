@@ -16,6 +16,7 @@ import {
   NativeSessionSupervisor,
 } from "../src/native-session.js";
 import { startExtensionRuntime } from "../src/runtime.js";
+import type { CompiledPackRuntime } from "../src/compiled-pack-runtime.js";
 import {
   encodePageToWorkerMessage,
   PAGE_PROTOCOL_VERSION,
@@ -36,12 +37,45 @@ import {
   runtimeOptions,
   sitePack,
 } from "./support/site-pack.js";
+import { localBundle } from "./support/local-pack.js";
 
 /** What the bridge sees: a page-declared tool is published under the reserved
  * native namespace, qualified by the origin that declared it. */
 const PUBLISHED_SITE_TOOL = `native.example_com.${SITE_TOOL}`;
 
 describe("native session supervisor", () => {
+  it("republishes the synthetic context after declarative definitions change", async () => {
+    const runtime = new FakeRuntime();
+    const scheduler = new FakeScheduler();
+    let packs: CompiledPackRuntime | undefined;
+    startExtensionRuntime(runtime, {
+      ...TEST_OPTIONS,
+      scheduler,
+      onPackRuntime(value) {
+        packs = value;
+      },
+    });
+    const port = runtime.latestPort;
+    port.emitMessage(helloAck());
+    const bundle = await localBundle();
+
+    await expect(packs?.replaceDeclarativeDefinitions([bundle])).resolves.toBe(
+      true,
+    );
+    expect(parsePosted(port, 2)).toMatchObject({
+      type: "context_closed",
+      contextId: DEMO_CONTEXT_ID,
+      contextRevision: 1,
+      reason: "pack_disabled",
+    });
+    expect(parsePosted(port, 3)).toMatchObject({
+      type: "capability_snapshot",
+      contextId: DEMO_CONTEXT_ID,
+      contextRevision: 2,
+      capabilities: [{ name: "mcpatch.demo.status" }],
+    });
+  });
+
   it("registers lifecycle listeners and opens only the fixed native host", () => {
     const runtime = new FakeRuntime();
     const scheduler = new FakeScheduler();

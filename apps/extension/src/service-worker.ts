@@ -15,8 +15,17 @@ import { createReviewedPackCatalog } from "./reviewed-pack-catalog.js";
 import { LocalPackController } from "./local-pack-controller.js";
 import type { ChromeRuntimeMessageApi } from "./local-pack-model.js";
 import type { PageContextOwner } from "./page-context-owner.js";
-import type { CompiledPackRuntime } from "./compiled-pack-runtime.js";
 import { PackContentCatalog } from "./pack-content-catalog.js";
+import { CommunityPackController } from "./community-pack-controller.js";
+import { CommunityRegistryClient } from "./community-registry-client.js";
+import type { RegistryFetch } from "./community-registry-client.js";
+import {
+  COMMUNITY_REGISTRY_ID,
+  COMMUNITY_REGISTRY_INDEX_PATH,
+  COMMUNITY_REGISTRY_ORIGIN,
+  COMMUNITY_REGISTRY_PUBLIC_KEY,
+} from "./community-registry-config.js";
+import { DeclarativeDefinitionCatalog } from "./declarative-definition-catalog.js";
 
 declare const chrome: Omit<ChromeEnablementApi, "lifecycle"> & {
   readonly runtime: ExtensionRuntimeApi &
@@ -35,7 +44,40 @@ const contentCatalog = new PackContentCatalog(
   chrome.permissions,
 );
 const reviewedContent = contentCatalog.createSource("reviewed");
-const declarativeContent = contentCatalog.createSource("declarative");
+const localContent = contentCatalog.createSource("local");
+const communityContent = contentCatalog.createSource("community");
+const definitions = new DeclarativeDefinitionCatalog();
+const localDefinitions = definitions.createSource("local");
+const communityDefinitions = definitions.createSource("community");
+const reviewedIdentities = new Set(
+  catalog.sites.map((site) => `${site.manifest.publisher}/${site.manifest.id}`),
+);
+const registryClient = new CommunityRegistryClient(
+  {
+    origin: COMMUNITY_REGISTRY_ORIGIN,
+    indexPath: COMMUNITY_REGISTRY_INDEX_PATH,
+    registryId: COMMUNITY_REGISTRY_ID,
+    publicKey: COMMUNITY_REGISTRY_PUBLIC_KEY,
+  },
+  PACK_RUNTIME_OPTIONS,
+  ((url, init) => fetch(url, init)) as RegistryFetch,
+);
+const communityPacks = new CommunityPackController(
+  {
+    action: chrome.action,
+    lifecycle: chrome.runtime,
+    permissions: chrome.permissions,
+    runtime: chrome.runtime,
+    storage: chrome.storage,
+    tabs: chrome.tabs,
+  },
+  {
+    client: registryClient,
+    content: communityContent,
+    definitions: communityDefinitions,
+    reviewedIdentities,
+  },
+);
 const enablement = new PackEnablementController(
   {
     action: chrome.action,
@@ -46,6 +88,7 @@ const enablement = new PackEnablementController(
   },
   catalog,
   reviewedContent,
+  (tab) => communityPacks.handleAction(tab),
 );
 const localPacks = new LocalPackController(
   {
@@ -56,17 +99,16 @@ const localPacks = new LocalPackController(
     storage: chrome.storage,
   },
   {
-    content: declarativeContent,
+    content: localContent,
     runtime: PACK_RUNTIME_OPTIONS,
-    reviewedIdentities: new Set(
-      catalog.sites.map(
-        (site) => `${site.manifest.publisher}/${site.manifest.id}`,
-      ),
-    ),
+    reviewedIdentities,
   },
 );
-contentCatalog.setAuthorities([enablement.authority, localPacks.authority]);
-let runtimePackRuntime: CompiledPackRuntime | undefined;
+contentCatalog.setAuthorities([
+  enablement.authority,
+  localPacks.authority,
+  communityPacks.authority,
+]);
 let pageContextOwner: PageContextOwner | undefined;
 
 // Registration stays synchronous at module evaluation so MV3 cannot miss a wake.
@@ -74,8 +116,7 @@ startExtensionRuntime(chrome.runtime, {
   approvalSurface: new ApprovalController(chrome.runtime, chrome.tabs),
   pageAuthority: contentCatalog.authority,
   onPackRuntime(runtime) {
-    runtimePackRuntime = runtime;
-    updateLocalPackHooks();
+    definitions.setRuntime(runtime);
   },
   onPageContextOwner(owner) {
     pageContextOwner = owner;
@@ -85,18 +126,22 @@ startExtensionRuntime(chrome.runtime, {
         owner.revokeOrigin(origin);
       },
     });
+    communityPacks.setHooks({
+      revokeOrigin(origin) {
+        owner.revokeOrigin(origin);
+      },
+    });
     updateLocalPackHooks();
   },
 });
 enablement.start();
 localPacks.start();
+communityPacks.start();
 
 function updateLocalPackHooks(): void {
   localPacks.setHooks({
     replaceBundles: async (bundles) => {
-      const accepted =
-        await runtimePackRuntime?.replaceDeclarativeDefinitions(bundles);
-      return accepted === true;
+      return localDefinitions.replace(bundles);
     },
     revokeOrigin(origin) {
       pageContextOwner?.revokeOrigin(origin);

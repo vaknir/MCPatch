@@ -37,6 +37,7 @@ describe("extension manifest", () => {
       "action",
       "background",
       "description",
+      "host_permissions",
       "key",
       "manifest_version",
       "minimum_chrome_version",
@@ -55,6 +56,9 @@ describe("extension manifest", () => {
       "storage",
     ]);
     expect(manifest["optional_host_permissions"]).toEqual(["https://*/*"]);
+    expect(manifest["host_permissions"]).toEqual([
+      "https://registry.mcpatch.dev/*",
+    ]);
     expect(
       DECLARED_OPTIONAL_ORIGINS.every(
         (origin) => new URL(origin).origin === origin && !origin.includes("*"),
@@ -66,7 +70,6 @@ describe("extension manifest", () => {
       open_in_tab: true,
     });
     expect(manifest).not.toHaveProperty("optional_permissions");
-    expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
     expect(manifest).not.toHaveProperty("externally_connectable");
     expect(manifest).not.toHaveProperty("web_accessible_resources");
@@ -89,6 +92,12 @@ describe("extension manifest", () => {
       page: "developer.html",
       open_in_tab: true,
     });
+  });
+
+  it("keeps the community review surface unreachable from web content", () => {
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
+    expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(JSON.stringify(manifest)).not.toContain("community-review.html");
   });
 
   it("derives one stable ID from a committed public identity", () => {

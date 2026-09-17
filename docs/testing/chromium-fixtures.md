@@ -36,12 +36,17 @@ The scenario proves:
 - same-origin document reload and fresh context revision;
 - malformed page-channel input without loss of the bridge session;
 - cross-origin navigation revocation; and
-- disable-time script and capability revocation; and
+- disable-time script and capability revocation;
+- fixed-origin signed registry fetch, publisher and registry signature
+  verification, extension-owned community review, dynamic declarative
+  installation, exact-origin registration, MCP discovery, and complete MCP call;
+  and
 - realm lockdown blocking every network primitive and `document.cookie` from a
   pack handler on a real page, via the `fixture.realm_probe` tool, while the
   credential-free DOM read still succeeds.
 
-All HTTP(S) requests outside two synthetic `.test` origins are aborted. Chromium is
+All HTTP(S) requests outside the explicit synthetic site and registry `.test`
+origins are aborted. Chromium is
 also launched with a deny-all DNS resolver rule; allowed fixture responses are
 fulfilled in-process by Playwright. The suite asserts that fixture arguments,
 results, and tool names do not appear in bridge logs.
@@ -49,17 +54,21 @@ results, and tool names do not appear in bridge logs.
 ## Test-only authority boundary
 
 Headless Chromium cannot complete the browser-owned optional-host permission prompt.
-The fixture manifest therefore pre-authorizes exactly
-`https://fixture.mcpatch.test/*`. A click in the extension control page still writes
+The fixture manifest therefore pre-authorizes exactly the synthetic reviewed and
+community site origins plus its fixed registry origin. A click in the extension
+control page still writes
 the same closed enablement record used by production, and disable still exercises
 production reconciliation and revocation. Unit tests separately exercise optional
 permission grant, denial, removal, startup reconciliation, and corruption.
 
-This exception exists only in `.artifacts/chromium-fixture-extension`. The fixture
-build is marked, and it refuses to proceed if the production manifest contains a
-required host permission or if fixture origin/adapter markers appear in production
-JavaScript. Production continues to request one reviewed optional origin from a
-user gesture and defaults to no site authority.
+The community review still runs and verifies that the controller accepts only the
+exact pre-granted pattern; controller tests separately prove grant and denial from
+the synchronous trusted gesture. This exception exists only in
+`.artifacts/chromium-fixture-extension`. The fixture build is marked, and it refuses
+to proceed if the production manifest contains any required site permission or if
+fixture origin/adapter markers appear in production JavaScript. Production's only
+required host is the fixed registry control plane; website authority remains
+optional and exact-origin.
 
 ## Platforms and CI
 

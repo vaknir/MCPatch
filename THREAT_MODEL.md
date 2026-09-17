@@ -364,11 +364,14 @@ from review to mechanism is a trust-boundary change and needs an ADR
 | Private-data reads classified `SENSITIVE`                  | review, per [ADR 0015](docs/adr/0015-sensitive-read-classification.md) (#185)             |
 | Immutable installed bytes                                  | Chrome bundle integrity; manifest digest unverified at load (#179)                        |
 
-The local developer-mode **declarative community tier** accepts only the bounded
-read operations schema and never loads pack JavaScript. It therefore has no
-route to navigation, mutation, cookies, storage, or network primitives. Registry
-distribution and general dynamic enablement remain unshipped (#149–#154 under
-Phase 13, #141).
+The **declarative community tier**, including local developer mode and signed
+registry installation, accepts only the bounded read operations schema and never
+loads pack JavaScript. It therefore has no route to navigation, mutation, cookies,
+storage, or network primitives. The signed fixed-origin client, extension-owned
+review, exact-origin grant proof, immutable publisher bundle, independent registry
+attestation, and fresh offline restore are implemented (#149–#150). Updates,
+emergency revocation operations, submissions, and the real-site pilot remain gated
+by #151–#154.
 
 ## Permission classes
 

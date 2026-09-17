@@ -6,6 +6,7 @@ import {
   readFile,
   rename,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,6 +14,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
+import {
+  parseDeclarativePackBundleContentBytes,
+  serializeDeclarativePackBundle,
+  signDeclarativePackBundle,
+  verifyCommunityRegistryIndex,
+} from "@mcpatch/sdk";
 
 const CLI = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const temporaryDirectories: string[] = [];
@@ -255,7 +262,176 @@ describe("community pack CLI process", () => {
     expect(result.rawStderr).not.toContain("private-expected-value");
     expect(result.rawStderr).not.toContain("Example title");
   });
+
+  it("publishes a reproducible signed static registry without copying signing keys", async () => {
+    const root = await temporaryDirectory();
+    const fixture = await createRegistryFixture(root);
+
+    const first = run(
+      ["registry", "build", fixture.registry],
+      registryEnvironment(),
+    );
+    expect(first).toMatchObject({
+      status: 0,
+      stdout: {
+        status: "built",
+        packs: 1,
+        publicationSequence: 7,
+        registryId: "mcpatch-registry",
+        reproducible: true,
+        reused: false,
+      },
+    });
+    const output = (first.stdout as { artifact: string }).artifact;
+    const indexBytes = await readFile(join(output, "v1", "index.json"));
+    const verified = await verifyCommunityRegistryIndex(indexBytes, {
+      expectedRegistryId: "mcpatch-registry",
+      publicKey: encode(registryKeys().publicKey),
+      now: new Date("2026-09-17T00:00:00.000Z"),
+    });
+    expect(verified).toMatchObject({
+      ok: true,
+      index: {
+        publicationSequence: 7,
+        packs: [
+          {
+            publisher: "localdev",
+            id: "registry-reader",
+            trust: "REVIEWED_COMMUNITY",
+          },
+        ],
+      },
+    });
+    if (!verified.ok) throw new Error("registry verification failed");
+    const entry = verified.index.packs[0];
+    if (entry === undefined) throw new Error("registry entry missing");
+    expect(
+      await readFile(join(output, ...entry.bundlePath.slice(1).split("/"))),
+    ).toEqual(fixture.signedBundle);
+    expect(await readFile(join(output, "_headers"), "utf8")).toContain(
+      "application/vnd.mcpatch.pack+json",
+    );
+    expect(await readdir(output)).toEqual(["_headers", "v1"]);
+    expect(
+      Buffer.concat(
+        await Promise.all([
+          readFile(join(output, "_headers")),
+          readFile(join(output, "v1", "index.json")),
+        ]),
+      ).toString("utf8"),
+    ).not.toContain(registryEnvironment().MCPATCH_REGISTRY_PRIVATE_KEY);
+
+    expect(
+      run(["registry", "build", fixture.registry], registryEnvironment()),
+    ).toMatchObject({ status: 0, stdout: { reused: true } });
+  });
+
+  it("fails closed for registry substitution, unsafe paths, missing keys, and dirty output", async () => {
+    const root = await temporaryDirectory();
+    const substituted = await createRegistryFixture(join(root, "substituted"));
+    const bytes = Buffer.from(substituted.signedBundle);
+    const substitutedOffset = bytes.length - 2;
+    bytes[substitutedOffset] = (bytes[substitutedOffset] ?? 0) ^ 1;
+    await writeFile(substituted.bundlePath, bytes);
+    expect(
+      run(["registry", "build", substituted.registry], registryEnvironment()),
+    ).toMatchObject({
+      status: 1,
+      stderr: {
+        status: "error",
+        code: "REGISTRY_SOURCE_INVALID",
+        field: "registry.packs.bundle",
+      },
+    });
+
+    const missingKey = await createRegistryFixture(join(root, "missing-key"));
+    expect(run(["registry", "build", missingKey.registry])).toMatchObject({
+      status: 1,
+      stderr: {
+        status: "error",
+        code: "SIGNING_KEY_MISSING",
+        field: "registry.signingKey",
+      },
+    });
+
+    const unsafe = await createRegistryFixture(join(root, "unsafe"));
+    await rm(unsafe.bundlePath);
+    await symlink("../mcpatch.registry.json", unsafe.bundlePath);
+    expect(
+      run(["registry", "build", unsafe.registry], registryEnvironment()),
+    ).toMatchObject({
+      status: 1,
+      stderr: { status: "error", code: "UNSAFE_PATH" },
+    });
+
+    const dirty = await createRegistryFixture(join(root, "dirty"));
+    const built = run(
+      ["registry", "build", dirty.registry],
+      registryEnvironment(),
+    );
+    if (built.status !== 0) throw new Error("registry fixture build failed");
+    const output = (built.stdout as { artifact: string }).artifact;
+    await writeFile(join(output, "_headers"), "substituted-output");
+    expect(
+      run(["registry", "build", dirty.registry], registryEnvironment()),
+    ).toMatchObject({
+      status: 1,
+      stderr: {
+        status: "error",
+        code: "OUTPUT_DIRTY",
+        field: "registry-dist",
+      },
+    });
+  });
 });
+
+async function createRegistryFixture(root: string): Promise<{
+  readonly bundlePath: string;
+  readonly registry: string;
+  readonly signedBundle: Buffer;
+}> {
+  await mkdir(root, { recursive: true });
+  const pack = await createPack(join(root, "registry-reader"));
+  commitPack(pack);
+  const built = run(["pack", "build", pack]);
+  if (built.status !== 0) throw new Error("pack build failed");
+  const unsignedPath = (built.stdout as { artifact: string }).artifact;
+  const content = parseDeclarativePackBundleContentBytes(
+    await readFile(unsignedPath),
+  );
+  const signed = await signDeclarativePackBundle(content, publisherKeys());
+  const signedBundle = Buffer.from(serializeDeclarativePackBundle(signed));
+  const registry = join(root, "registry");
+  const inputs = join(registry, "inputs");
+  await mkdir(inputs, { recursive: true });
+  const bundlePath = join(inputs, "registry-reader.mcpack");
+  await writeFile(bundlePath, signedBundle);
+  await writeFile(
+    join(registry, "mcpatch.registry.json"),
+    `${JSON.stringify({
+      registrySourceVersion: 1,
+      registryId: "mcpatch-registry",
+      publicationSequence: 7,
+      issuedAt: "2026-09-16T23:00:00.000Z",
+      expiresAt: "2026-09-24T23:00:00.000Z",
+      packs: [
+        {
+          bundle: "inputs/registry-reader.mcpack",
+          publisherKey: encode(publisherKeys().publicKey),
+          trust: "REVIEWED_COMMUNITY",
+          verification: {
+            verifiedAt: "2026-09-16T22:00:00.000Z",
+            fixtureTestsPassed: 1,
+            fixtureTestsTotal: 1,
+            sourceCommit: content.metadata.sourceCommit,
+          },
+          revocation: { status: "ACTIVE" },
+        },
+      ],
+    })}\n`,
+  );
+  return { bundlePath, registry, signedBundle };
+}
 
 async function createPack(target: string): Promise<string> {
   const result = run(["pack", "create", target]);
@@ -284,7 +460,10 @@ function git(directory: string, args: readonly string[]): void {
   });
 }
 
-function run(args: readonly string[]): {
+function run(
+  args: readonly string[],
+  environment: Readonly<Record<string, string>> = {},
+): {
   readonly rawStderr: string;
   readonly rawStdout: string;
   readonly status: number | null;
@@ -294,7 +473,7 @@ function run(args: readonly string[]): {
   const result = spawnSync(process.execPath, [CLI, ...args], {
     cwd: dirname(CLI),
     encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1" },
+    env: { ...process.env, ...environment, NO_COLOR: "1" },
     timeout: 10_000,
   });
   const rawStdout = result.stdout.trim();
@@ -306,4 +485,43 @@ function run(args: readonly string[]): {
     ...(rawStderr === "" ? {} : { stderr: JSON.parse(rawStderr) as unknown }),
     ...(rawStdout === "" ? {} : { stdout: JSON.parse(rawStdout) as unknown }),
   };
+}
+
+function registryEnvironment(): Readonly<Record<string, string>> {
+  return {
+    MCPATCH_REGISTRY_PRIVATE_KEY: encode(registryKeys().privateKey),
+    MCPATCH_REGISTRY_PUBLIC_KEY: encode(registryKeys().publicKey),
+  };
+}
+
+function registryKeys() {
+  return {
+    privateKey: hex(
+      "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    ),
+    publicKey: hex(
+      "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+    ),
+  };
+}
+
+function publisherKeys() {
+  return {
+    privateKey: hex(
+      "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    ),
+    publicKey: hex(
+      "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    ),
+  };
+}
+
+function hex(value: string): Uint8Array {
+  return Uint8Array.from(value.match(/.{2}/gu) ?? [], (byte) =>
+    Number.parseInt(byte, 16),
+  );
+}
+
+function encode(value: Uint8Array): string {
+  return Buffer.from(value).toString("base64url");
 }

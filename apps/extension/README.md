@@ -5,6 +5,10 @@ worker synchronously installs lifecycle listeners, owns one long-lived Native
 Messaging port to `dev.mcpatch.bridge`, negotiates protocol version 2, and sends a
 heartbeat every 15 seconds while connected.
 
+Its fixed, credential-free `https://registry.mcpatch.dev` control-plane client
+accepts only a bounded signed index and immutable publisher-signed declarative
+bundles. Registry metadata cannot choose another URL or add executable code.
+
 ## Build
 
 ```sh
@@ -88,11 +92,14 @@ own native host.
 
 ## Current permissions
 
-The baseline permissions are exactly `nativeMessaging`, `storage`, and
-`scripting`. The toolbar click that identifies the selected page receives the
+The baseline API permissions are exactly `nativeMessaging`, `storage`, and
+`scripting`. The sole required host permission is
+`https://registry.mcpatch.dev/*`, used only by the extension-owned credential-free
+signed registry client. It is not pack network authority. The toolbar click that
+identifies the selected page receives the
 tab from the `action.onClicked` event itself, so `activeTab` is not declared:
 combined with `scripting`, it would let a click run code on any page, which is a
-capability nothing in the extension uses. The manifest has no permanent
+capability nothing in the extension uses. The manifest has no permanent website
 `host_permissions`, static content scripts, web-accessible resources, or
 externally connectable surface. The optional `https://*/*` declaration grants
 nothing by itself: reviewed sites request their exact closed origin set from a
@@ -100,6 +107,14 @@ matching toolbar click, while local packs request only the exact origins display
 in the trusted developer-page confirmation.
 `apps/extension/tests/manifest.test.ts` pins the exact permission set so any
 widening is a deliberate, reviewed change.
+
+When no bundled pack matches an explicit toolbar action, the worker may consult its
+fresh signed index locally for that selected URL. It verifies and stages the exact
+bundle before opening `community-review.html`; only that extension page can request
+the displayed exact origin. Startup and offline restore re-verify the index,
+attestation, publisher signature, digest, compatibility, permission inventory, and
+packaged content registration. See
+[Community registry v1](../../docs/architecture/community-registry-v1.md).
 
 ADR 0008 fixes the Phase 6 direction: `storage` and `scripting` are baseline
 permissions, while each site remains an optional HTTPS host grant. Reviewed

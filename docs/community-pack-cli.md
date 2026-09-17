@@ -51,11 +51,35 @@ commit is placed in `metadata.sourceCommit`, and canonical bytes are written to
 reuses only byte-identical output. A different existing artifact, a symbolic or
 non-file source, or a leftover staging file fails closed.
 
-The Phase 13 build is an `UNSIGNED_LOCAL_DEVELOPMENT` bundle-content artifact.
+The `pack build` artifact is an `UNSIGNED_LOCAL_DEVELOPMENT` bundle-content artifact.
 It cannot appear as reviewed or registry-signed. Import it only through the
 extension's explicit [local developer mode](local-pack-developer-mode.md), which
 shows its exact authority and retains the unsigned trust label; publisher signing
 and submission remain separate workflows.
+
+## Static registry publisher
+
+Maintainers can build a reviewed static registry from already publisher-signed
+bundles:
+
+```sh
+MCPATCH_REGISTRY_PRIVATE_KEY=... \
+MCPATCH_REGISTRY_PUBLIC_KEY=... \
+mcpatch registry build ./registry-source
+```
+
+The fixed input is `registry-source/mcpatch.registry.json`. Bundle paths must stay
+beneath that directory and cannot traverse or use symbolic links. The source pins
+the registry ID, publication sequence, issue/expiry window, publisher public key,
+trust tier, fixture evidence, source commit, and revocation state for every bundle.
+Private keys are environment-only.
+
+The command verifies each publisher signature, digest, compatibility range,
+identity, fixture count, and source commit before signing independent registry
+attestations and the index. It writes `registry-dist/v1/index.json`, immutable
+digest-addressed bundle paths, and static hosting headers atomically. A second run
+reuses only byte-identical output; changed or partial output fails closed. See
+[Community registry v1](architecture/community-registry-v1.md).
 
 ## Source contract
 
