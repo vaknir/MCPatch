@@ -1,29 +1,17 @@
 /**
  * Jira Data Center is self-hosted, so its exact HTTPS origin is a deployment
- * fact rather than a reviewed constant. Pack Manifest v1 only accepts exact
- * origins, and the extension only grants authority for an origin that is also
- * present in `DECLARED_OPTIONAL_ORIGINS` and `optional_host_permissions`.
+ * fact that only the user knows. Pack Manifest v1 accepts exact origins only,
+ * so the shipped manifest declares one synthetic `.invalid` origin as a marker:
+ * the pack is compiled, validated, and testable, and contributes no site to the
+ * reviewed catalog until the user configures a real origin in the extension.
  *
- * The shipped list therefore contains one synthetic `.invalid` origin: the pack
- * is compiled, validated, and testable, yet it can never become page authority
- * until an operator replaces it with their own Jira base origin in this file,
- * in the extension manifest, and in the extension's declared origin list.
+ * The extension substitutes the configured origin for this placeholder, then
+ * requests and proves that exact origin at a user gesture. The placeholder is
+ * never requested, never granted, and never matched against a real page.
  *
- * Runtime-selected origins are a separate trust decision; see
- * `docs/adr/0014-registry-discovery-and-origin-authority.md`.
+ * See `docs/adr/0015-configurable-pack-origins.md`.
  */
-export const JIRA_PLACEHOLDER_ORIGIN = "https://jira.example.invalid" as const;
+export const JIRA_ORIGIN_PLACEHOLDER = "https://jira.example.invalid" as const;
 
-/** Exact HTTPS origins that this build may expose Jira capabilities on. */
-export const JIRA_SITE_ORIGINS: readonly string[] = Object.freeze([
-  JIRA_PLACEHOLDER_ORIGIN,
-]);
-
-/** Origins that are real browser authority rather than synthetic placeholders. */
-export const JIRA_ENABLEABLE_ORIGINS: readonly string[] = Object.freeze(
-  JIRA_SITE_ORIGINS.filter((origin) => !origin.endsWith(".invalid")),
-);
-
-export function isJiraSiteOrigin(value: unknown): value is string {
-  return typeof value === "string" && JIRA_SITE_ORIGINS.includes(value);
-}
+/** Every path of the configured origin; Jira is one application per host. */
+export const JIRA_PATH_PREFIX = "/" as const;

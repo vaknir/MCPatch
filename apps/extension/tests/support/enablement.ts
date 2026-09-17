@@ -72,11 +72,11 @@ export class FakePermissions implements ChromePermissionsApi {
   readonly requests: ChromePermissionSet[] = [];
   log: string[] = [];
   nextRequest = true;
-  throwContains = false;
+  throwGetAll = false;
 
-  async contains(permissions: ChromePermissionSet): Promise<boolean> {
-    if (this.throwContains) throw new Error("contains failed");
-    return origins(permissions).every((origin) => this.granted.has(origin));
+  async getAll(): Promise<ChromePermissionSet> {
+    if (this.throwGetAll) throw new Error("getAll failed");
+    return { origins: [...this.granted] };
   }
 
   async remove(permissions: ChromePermissionSet): Promise<boolean> {

@@ -26,11 +26,13 @@ const enablement = new PackEnablementController(
     scripting: chrome.scripting,
     storage: chrome.storage,
   },
-  createReviewedPackCatalog(
-    BUNDLED_PACKS,
-    PACK_RUNTIME_OPTIONS,
-    DECLARED_OPTIONAL_ORIGINS,
-  ),
+  (configured) =>
+    createReviewedPackCatalog(
+      BUNDLED_PACKS,
+      PACK_RUNTIME_OPTIONS,
+      DECLARED_OPTIONAL_ORIGINS,
+      configured,
+    ),
 );
 
 // Registration stays synchronous at module evaluation so MV3 cannot miss a wake.

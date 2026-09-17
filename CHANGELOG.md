@@ -6,7 +6,33 @@ All notable MCPatch changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Host-permission proof now reads the complete `permissions.getAll()` origin
+  inventory, requires each of a site's exact patterns within it, and refuses a
+  covering grant (`<all_urls>`, `*://*/*`, `https://*/*`, or a wildcard subdomain
+  covering the host) as proof. `permissions.contains` is removed from the
+  extension's Chromium surface because a broader granted pattern satisfies an
+  exact-looking query. This strengthens every pack and is what makes the broad
+  optional declaration safe to add.
+- The Chromium manifest additionally declares `https://*/*` under
+  `optional_host_permissions` as the narrowest platform pattern that can express
+  a runtime-selected HTTPS host. It is a declaration, never a request: no code
+  path asks for it and proof refuses it. Chrome Web Store review of this
+  declaration (ADR 0014, issue #165) is now a release gate for the whole
+  extension.
+
 ### Added
+
+- Configurable pack origins for self-hosted sites: a reviewed bundled pack may
+  declare a synthetic placeholder origin, and the user configures the real
+  deployment origin in extension storage (`mcpatch.origins.v1`, at most eight
+  closed records) instead of rebuilding the extension. The catalog substitutes
+  that origin for the placeholder, binding the reviewed manifest identity and
+  path rules to it; an unconfigured pack contributes no site and the placeholder
+  is never requested, granted, or matched. Enablement still requests only the
+  exact configured origin at a user gesture. See
+  [ADR 0015](docs/adr/0015-configurable-pack-origins.md).
 
 - A reviewed Jira Data Center pack that reaches the core capability surface of an
   MCP Atlassian server through the user's existing browser session instead of an
@@ -34,10 +60,9 @@ All notable MCPatch changes are documented here. The format follows
   cascade into subtasks unless that is in the approved arguments.
   `jira.list_attachments` reports metadata only; attachment bytes are a separate
   capability class that this pack does not transfer. Because Jira Data
-  Center is self-hosted, the shipped build declares one synthetic `.invalid`
-  deployment origin and therefore grants no browser authority until an operator
-  adds their own instance origin to `packs/jira/src/deployment.ts` and the
-  extension manifest together.
+  Center is self-hosted, the pack declares a synthetic placeholder origin and
+  grants no browser authority until the user configures their instance origin in
+  the extension.
 - Declarative Operations v1 (initial pre-release definition): an immutable, closed,
   read-only AST embedded at
   `operations.program`, with one operation per manifest tool, static role and

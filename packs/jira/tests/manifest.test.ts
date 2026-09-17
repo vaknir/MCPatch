@@ -6,7 +6,6 @@ import {
   JIRA_ASSIGN_ISSUE,
   JIRA_CREATE_ISSUE,
   JIRA_CURRENT_CONTEXT,
-  JIRA_ENABLEABLE_ORIGINS,
   JIRA_GET_ISSUE,
   JIRA_LINK_ISSUES,
   JIRA_LIST_COMMENTS,
@@ -14,8 +13,8 @@ import {
   JIRA_LIST_PROJECTS,
   JIRA_LIST_TRANSITIONS,
   JIRA_REMOVE_ISSUE_LINK,
+  JIRA_ORIGIN_PLACEHOLDER,
   JIRA_SEARCH_ISSUES,
-  JIRA_SITE_ORIGINS,
   JIRA_TOOLS,
   JIRA_TRANSITION_ISSUE,
   JIRA_UNASSIGN_ISSUE,
@@ -44,20 +43,14 @@ const ACTION_TOOLS = [
 ];
 
 describe("Jira reviewed pack manifest", () => {
-  it("declares only the configured deployment origins", () => {
-    expect(jiraPack.manifest.matches).toEqual(
-      JIRA_SITE_ORIGINS.map((origin) => ({
-        origin,
+  it("declares a synthetic placeholder rather than a real origin", () => {
+    expect(jiraPack.manifest.matches).toEqual([
+      {
+        origin: JIRA_ORIGIN_PLACEHOLDER,
         paths: [{ kind: "prefix", path: "/" }],
-      })),
-    );
-  });
-
-  it("ships without enableable browser authority by default", () => {
-    expect(JIRA_ENABLEABLE_ORIGINS).toEqual([]);
-    expect(
-      JIRA_SITE_ORIGINS.every((origin) => origin.endsWith(".invalid")),
-    ).toBe(true);
+      },
+    ]);
+    expect(JIRA_ORIGIN_PLACEHOLDER.endsWith(".invalid")).toBe(true);
   });
 
   it("requests no extension network authority", () => {

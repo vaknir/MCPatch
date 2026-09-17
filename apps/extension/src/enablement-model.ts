@@ -1,5 +1,6 @@
 import type { PackManifest } from "@mcpatch/sdk/runtime";
 
+import type { ConfiguredPackOrigin } from "./configured-origins.js";
 import type { ChromeEvent, ChromeRuntimeLifecycleApi } from "./lifecycle.js";
 import type { PageAuthority } from "./page-context-model.js";
 
@@ -37,6 +38,11 @@ export interface PackSiteCatalog {
   resolve(record: EnabledPackRecord): ReviewedPackSite | undefined;
 }
 
+/** Rebuilds the catalog whenever the user's configured origins change. */
+export type PackSiteCatalogFactory = (
+  configured: readonly ConfiguredPackOrigin[],
+) => PackSiteCatalog;
+
 export interface ChromeActionTab {
   readonly id?: number;
   readonly url?: string;
@@ -61,7 +67,9 @@ export interface ChromeActionApi {
 export interface ChromePermissionsApi {
   readonly onAdded: ChromeEvent<[ChromePermissionSet]>;
   readonly onRemoved: ChromeEvent<[ChromePermissionSet]>;
-  contains(permissions: ChromePermissionSet): Promise<boolean>;
+  // `contains` is deliberately absent: a broader granted pattern satisfies an
+  // exact-looking query, so proof reads the complete inventory instead.
+  getAll(): Promise<ChromePermissionSet>;
   remove(permissions: ChromePermissionSet): Promise<boolean>;
   request(permissions: ChromePermissionSet): Promise<boolean>;
 }

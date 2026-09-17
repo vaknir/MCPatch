@@ -17,9 +17,9 @@ describe("Jira site lifecycle", () => {
     await expect(site.capabilities(signal())).resolves.toEqual([...JIRA_TOOLS]);
   });
 
-  it("refuses every tool on a page that is not the enabled Jira site", async () => {
+  it("refuses every tool on a page without a canonical HTTPS origin", async () => {
     const { site } = createSite(vi.fn(), {
-      origin: "https://other.example.invalid",
+      origin: "http://jira.example.com",
     });
 
     await expect(site.capabilities(signal())).resolves.toEqual([]);

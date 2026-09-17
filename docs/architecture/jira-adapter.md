@@ -15,19 +15,23 @@ holds.
 ## Authority and activation
 
 Jira Data Center is self-hosted, so the pack has no reviewable constant origin.
-Pack Manifest v1 accepts exact HTTPS origins only, and the extension grants
-authority only for an origin present in both `DECLARED_OPTIONAL_ORIGINS` and
-`optional_host_permissions`. The shipped build therefore declares one synthetic
-`.invalid` origin in `packs/jira/src/deployment.ts`: the pack is compiled,
-validated, and fully tested, but contributes no site to the reviewed catalog and
-can never become page authority.
+Pack Manifest v1 accepts exact HTTPS origins only, so the shipped manifest
+declares one synthetic `.invalid` origin in `packs/jira/src/deployment.ts` as a
+marker: this is a **configurable-origin** pack.
 
-An operator enabling one instance edits that deployment list and the extension
-manifest together, then rebuilds. `apps/extension/tests/bundled-jira.test.ts`
-fails if the two lists disagree. Runtime-selected origins, which would remove the
-rebuild step, are the separate trust decision in
-[ADR 0014](../adr/0014-registry-discovery-and-origin-authority.md); this pack
-deliberately does not anticipate it.
+The real origin is configured by the user in extension storage
+(`mcpatch.origins.v1`) and substituted for the placeholder when the catalog is
+built. The extension then requests and proves only that exact origin at a user
+gesture, as [ADR 0015](../adr/0015-configurable-pack-origins.md) sets out. Until
+configuration exists the pack contributes no site, matches no page, and cannot be
+enabled; the placeholder itself is never requested, granted, or matched.
+
+Because the pack's origin is not a compile-time constant, the pack itself does
+not carry an origin allowlist. The binding lives in the extension: the content
+runtime is registered only for the granted origin, and every REST call is built
+from the page's own origin and rechecked against it. The pack's envelope check is
+therefore structural — a canonical HTTPS origin — plus Jira's application
+identity and context path.
 
 The pack matches the whole enabled origin (`prefix` path `/`) because Jira's
 context path, board, issue, project, and dashboard routes are all part of one

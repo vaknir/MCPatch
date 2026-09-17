@@ -10,7 +10,7 @@ import {
   extractJiraCurrentContext,
   inspectJiraEnvelope,
 } from "../src/index.js";
-import { jiraSnapshot } from "./support/jira.js";
+import { JIRA_TEST_ORIGIN, jiraSnapshot } from "./support/jira.js";
 
 const NONE = new Set<never>();
 
@@ -22,7 +22,7 @@ describe("Jira page envelope", () => {
       ),
     ).toEqual({
       fingerprint: "jira-datacenter-rest2-v1",
-      baseUrl: "https://jira.example.invalid/jira",
+      baseUrl: `${JIRA_TEST_ORIGIN}/jira`,
       contextPath: "/jira",
       version: "9.12.0",
       user: "jdoe",
@@ -32,8 +32,14 @@ describe("Jira page envelope", () => {
     });
   });
 
+  // Which origin is enabled is the extension's binding, not the pack's: the
+  // content runtime only ever runs on the granted origin. The pack still
+  // refuses any page whose origin is not a canonical HTTPS origin at all.
   it.each([
-    ["another origin", { origin: "https://jira.other.invalid" }],
+    ["a plaintext origin", { origin: "http://jira.example.com" }],
+    ["an origin carrying a path", { origin: "https://example.com/jira" }],
+    ["a wildcard origin", { origin: "https://*.example.com" }],
+    ["an opaque origin", { origin: "null" }],
     ["a non-Jira application", { application: "Confluence" }],
     ["a missing application", { application: "" }],
     ["a malformed context path", { contextPath: "/a/../b" }],

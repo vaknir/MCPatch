@@ -29,7 +29,13 @@ const enablement = new PackEnablementController(
     scripting: chrome.scripting,
     storage: chrome.storage,
   },
-  createReviewedPackCatalog(packs, runtimeOptions, [FIXTURE_ORIGIN]),
+  (configured) =>
+    createReviewedPackCatalog(
+      packs,
+      runtimeOptions,
+      [FIXTURE_ORIGIN],
+      configured,
+    ),
 );
 
 void FIXTURE_MARKER;

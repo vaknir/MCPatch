@@ -73,7 +73,7 @@ describe("pack enablement controller", () => {
       { ...runtimeOptions(), allowedPermissions: ["READ", "EXTERNAL_NETWORK"] },
       [SITE_ORIGIN, NETWORK_ORIGIN],
     );
-    const controller = new PackEnablementController(api, catalog);
+    const controller = new PackEnablementController(api, () => catalog);
     controller.start();
     await settle(controller);
 
@@ -97,7 +97,7 @@ describe("pack enablement controller", () => {
     const api = new FakeEnablementApi();
     const site = onlySite();
     api.permissions.granted.add(site.permissionPattern);
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = new PackEnablementController(api, () => testCatalog());
 
     controller.start();
     await settle(controller);
@@ -135,7 +135,9 @@ describe("pack enablement controller", () => {
     for (const [id, script] of first.api.scripting.registrations) {
       restoredApi.scripting.registrations.set(id, structuredClone(script));
     }
-    const restored = new PackEnablementController(restoredApi, testCatalog());
+    const restored = new PackEnablementController(restoredApi, () =>
+      testCatalog(),
+    );
 
     expect(restored.authority.authorize(identity())).toBeUndefined();
     restored.start();
@@ -159,7 +161,7 @@ describe("pack enablement controller", () => {
       ...expectedRegistration(site),
       js: ["unexpected.js"],
     });
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = new PackEnablementController(api, () => testCatalog());
 
     controller.start();
     await settle(controller);
@@ -184,7 +186,7 @@ describe("pack enablement controller", () => {
       site.registrationId,
       expectedRegistration(site),
     );
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = new PackEnablementController(api, () => testCatalog());
 
     controller.start();
     await settle(controller);
@@ -247,7 +249,7 @@ describe("pack enablement controller", () => {
       site.registrationId,
       expectedRegistration(site),
     );
-    const controller = new PackEnablementController(api, testCatalog());
+    const controller = new PackEnablementController(api, () => testCatalog());
 
     controller.start();
     await settle(controller);
@@ -278,7 +280,7 @@ describe("pack enablement controller", () => {
     const catalog = testCatalog();
     const site = catalog.sites[0];
     if (site === undefined) throw new Error("missing site fixture");
-    const controller = new PackEnablementController(api, {
+    const controller = new PackEnablementController(api, () => ({
       sites: catalog.sites,
       match() {
         return [site, site];
@@ -286,7 +288,7 @@ describe("pack enablement controller", () => {
       resolve(record) {
         return catalog.resolve(record);
       },
-    });
+    }));
     controller.start();
     await settle(controller);
 
@@ -303,7 +305,7 @@ async function setup() {
   const site = catalog.sites[0];
   if (site === undefined) throw new Error("missing site fixture");
   const revoke = vi.fn<(origin: string) => void>();
-  const controller = new PackEnablementController(api, catalog);
+  const controller = new PackEnablementController(api, () => catalog);
   controller.setHooks({ revokeOrigin: revoke });
   controller.start();
   await settle(controller);

@@ -1,4 +1,3 @@
-import { isJiraSiteOrigin } from "./deployment.js";
 import {
   JIRA_FINGERPRINT,
   JIRA_SINGLE_USE_TOOLS,
@@ -13,9 +12,17 @@ import { JIRA_CONTEXT_PATH } from "./validation.js";
 
 const APPLICATION = /^jira(?:\s|$)/iu;
 
-/** Rejects any page that is not an enabled Jira Data Center deployment. */
+/**
+ * Rejects any page that is not an enabled Jira Data Center deployment.
+ *
+ * Which origin that is comes from the extension, not from this pack: the
+ * content runtime is registered only for the exact origin the user configured
+ * and the browser granted, and every request is built from this snapshot's own
+ * origin. The check here is therefore structural — a canonical HTTPS origin —
+ * plus Jira's own application identity and context path.
+ */
 export function inspectJiraEnvelope(snapshot: JiraSemanticSnapshot): void {
-  if (!isJiraSiteOrigin(snapshot.origin)) {
+  if (!isCanonicalHttpsOrigin(snapshot.origin)) {
     throw unavailable("unsupported_origin");
   }
   if (!APPLICATION.test(snapshot.application)) {
@@ -70,6 +77,27 @@ function isSingleUse(tool: JiraToolName): tool is JiraSingleUseToolName {
 
 function optional(key: string, value: string | undefined): object {
   return value === undefined ? {} : { [key]: value };
+}
+
+function isCanonicalHttpsOrigin(value: unknown): boolean {
+  if (
+    typeof value !== "string" ||
+    value.length > 2_048 ||
+    value.includes("*")
+  ) {
+    return false;
+  }
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.username === "" &&
+      parsed.password === "" &&
+      parsed.origin === value
+    );
+  } catch {
+    return false;
+  }
 }
 
 function rethrowCancellation(error: unknown): void {

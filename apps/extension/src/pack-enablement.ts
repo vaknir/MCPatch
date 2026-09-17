@@ -12,8 +12,16 @@ import {
   type PackEnablementHooks,
   type PackEnablementRuntime,
   type PackSiteCatalog,
+  type PackSiteCatalogFactory,
   type ReviewedPackSite,
 } from "./enablement-model.js";
+import {
+  EMPTY_ORIGIN_CONFIG,
+  ORIGIN_CONFIG_STORAGE_KEY,
+  parseOriginConfigState,
+  type OriginConfigState,
+} from "./configured-origins.js";
+import { provesExactOrigins } from "./permission-proof.js";
 import { showEnablementAction, validActionTabId } from "./enablement-action.js";
 import { reconcileContentScripts } from "./enablement-registration.js";
 import {
@@ -27,7 +35,8 @@ import { recordForSite } from "./reviewed-pack-catalog.js";
 
 export class PackEnablementController implements PackEnablementRuntime {
   readonly #api: ChromeEnablementApi;
-  readonly #catalog: PackSiteCatalog;
+  readonly #createCatalog: PackSiteCatalogFactory;
+  #catalog: PackSiteCatalog;
   readonly #effective = new Map<string, ReviewedPackSite>();
   readonly #pendingSites = new Set<string>();
   readonly #requested = new Map<string, EnabledPackRecord>();
@@ -40,9 +49,10 @@ export class PackEnablementController implements PackEnablementRuntime {
     authorize: (identity: PageSenderIdentity) => this.#authorize(identity),
   };
 
-  constructor(api: ChromeEnablementApi, catalog: PackSiteCatalog) {
+  constructor(api: ChromeEnablementApi, createCatalog: PackSiteCatalogFactory) {
     this.#api = api;
-    this.#catalog = catalog;
+    this.#createCatalog = createCatalog;
+    this.#catalog = createCatalog(EMPTY_ORIGIN_CONFIG.sites);
   }
 
   start(): void {
@@ -62,7 +72,11 @@ export class PackEnablementController implements PackEnablementRuntime {
       this.#invalidateAndReconcile(),
     );
     this.#api.storage.onChanged.addListener((changes, area) => {
-      if (area === "local" && Object.hasOwn(changes, ENABLEMENT_STORAGE_KEY)) {
+      if (
+        area === "local" &&
+        (Object.hasOwn(changes, ENABLEMENT_STORAGE_KEY) ||
+          Object.hasOwn(changes, ORIGIN_CONFIG_STORAGE_KEY))
+      ) {
         this.#invalidateAndReconcile();
       }
     });
@@ -228,6 +242,7 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#api.storage.local.setAccessLevel({
       accessLevel: "TRUSTED_CONTEXTS",
     });
+    this.#catalog = this.#createCatalog((await this.#readOriginConfig()).sites);
     const stored = await this.#readState();
     const resolved = stored.enabled
       .map((record) => this.#catalog.resolve(record))
@@ -266,23 +281,43 @@ export class PackEnablementController implements PackEnablementRuntime {
     await this.#api.storage.local.set({ [ENABLEMENT_STORAGE_KEY]: state });
   }
 
+  async #readOriginConfig(): Promise<OriginConfigState> {
+    const container = await this.#api.storage.local.get(
+      ORIGIN_CONFIG_STORAGE_KEY,
+    );
+    const descriptor = Object.getOwnPropertyDescriptor(
+      container,
+      ORIGIN_CONFIG_STORAGE_KEY,
+    );
+    if (descriptor === undefined) return EMPTY_ORIGIN_CONFIG;
+    const state =
+      "value" in descriptor
+        ? parseOriginConfigState(descriptor.value)
+        : undefined;
+    if (state !== undefined) return state;
+    await this.#api.storage.local.remove(ORIGIN_CONFIG_STORAGE_KEY);
+    return EMPTY_ORIGIN_CONFIG;
+  }
+
+  /**
+   * Reads the complete granted-origin inventory once and requires each site's
+   * exact patterns within it. A covering all-hosts grant is refused rather than
+   * accepted as proof, so the broad optional declaration that makes
+   * runtime-configured origins expressible can never become authority itself.
+   */
   async #grantedSites(
     candidates: readonly ReviewedPackSite[],
   ): Promise<readonly ReviewedPackSite[]> {
-    const grants = new Map<string, boolean>();
-    for (const site of candidates) {
-      const key = site.permissionPatterns.join("\u0000");
-      let granted = grants.get(key);
-      if (granted === undefined) {
-        granted = await this.#api.permissions.contains({
-          origins: site.permissionPatterns,
-        });
-        grants.set(key, granted);
-      }
+    if (candidates.length === 0) return Object.freeze([]);
+    let granted: readonly string[];
+    try {
+      granted = (await this.#api.permissions.getAll()).origins ?? [];
+    } catch {
+      return Object.freeze([]);
     }
     return Object.freeze(
-      candidates.filter(
-        (site) => grants.get(site.permissionPatterns.join("\u0000")) === true,
+      candidates.filter((site) =>
+        provesExactOrigins(granted, site.permissionPatterns),
       ),
     );
   }

@@ -115,24 +115,42 @@ context path.
 ## Configuring a deployment origin
 
 Jira Data Center is self-hosted, so its exact HTTPS origin is a deployment fact
-rather than a reviewed constant. Pack Manifest v1 accepts exact origins only,
-and the extension grants authority only for an origin present in both
-`DECLARED_OPTIONAL_ORIGINS` and `optional_host_permissions`.
+that only the user knows. The shipped manifest declares one synthetic `.invalid`
+origin as a marker; the real origin is configured in the extension at runtime,
+with no rebuild.
 
-The shipped build therefore declares one synthetic `.invalid` origin: the pack
-is compiled, validated, and fully tested, but it can never become page authority
-until an operator opts in. To enable it for one instance:
+Configuration lives in extension storage under `mcpatch.origins.v1`. From the
+extension's service-worker console:
 
-1. replace `JIRA_PLACEHOLDER_ORIGIN` in [`src/deployment.ts`](src/deployment.ts)
-   with the instance base origin, for example `https://jira.example.com`;
-2. add `https://jira.example.com/*` to `optional_host_permissions` in
-   [`apps/extension/manifest.json`](../../apps/extension/manifest.json); and
-3. rebuild the extension and enable the pack from the toolbar action on a Jira
-   page.
+```js
+await chrome.storage.local.set({
+  "mcpatch.origins.v1": {
+    stateVersion: 1,
+    sites: [
+      {
+        publisher: "jira",
+        id: "jira-data-center",
+        origin: "https://jira.example.com",
+      },
+    ],
+  },
+});
+```
 
-`apps/extension/tests/bundled-jira.test.ts` fails if those two lists disagree.
-Runtime-selected origins are a separate trust decision tracked by
-[ADR 0014](../../docs/adr/0014-registry-discovery-and-origin-authority.md).
+The extension then offers the pack on that origin. Clicking the toolbar action
+on a Jira page requests **only** `https://jira.example.com/*` — never the broad
+pattern the manifest declares — and the pack is enabled once the browser grant
+and the registered content script agree.
+
+Up to eight deployments can be configured at once. Removing an entry revokes the
+pack's authority on that origin at the next reconciliation. Configuration is a
+request, not authority: an origin here grants nothing by itself.
+
+There is no configuration UI yet, so this suits a self-built or
+enterprise-deployed extension rather than a consumer install. The trust
+reasoning is [ADR 0015](../../docs/adr/0015-configurable-pack-origins.md), which
+extends [ADR 0014](../../docs/adr/0014-registry-discovery-and-origin-authority.md)
+to reviewed bundled packs.
 
 ## Manifest digest
 

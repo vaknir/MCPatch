@@ -1,12 +1,12 @@
 import {
-  JIRA_PLACEHOLDER_ORIGIN,
   createJiraRestClient,
   type JiraFetch,
   type JiraRestClient,
   type JiraSemanticSnapshot,
 } from "../../src/index.js";
 
-export const JIRA_TEST_ORIGIN: string = JIRA_PLACEHOLDER_ORIGIN;
+/** A configured deployment origin, as the extension would bind at runtime. */
+export const JIRA_TEST_ORIGIN = "https://jira.corp.example.com";
 
 export function signal(): AbortSignal {
   return new AbortController().signal;

@@ -1,7 +1,7 @@
 import { MCPatch } from "@mcpatch/sdk/browser";
 import type { MCPatchDefinition } from "@mcpatch/sdk/runtime";
 
-import { JIRA_SITE_ORIGINS } from "./deployment.js";
+import { JIRA_ORIGIN_PLACEHOLDER, JIRA_PATH_PREFIX } from "./deployment.js";
 import { createJiraDocumentSource } from "./document-source.js";
 import {
   JIRA_ADD_COMMENT,
@@ -125,10 +125,12 @@ const mcp = new MCPatch<JiraSite>({
   // Reviewed manifest identity; enforced by tests/digest.test.ts.
   digest:
     "sha256:d077f6277030c6f74ab12d0a7ec49e495c3d6208682f8a3a838e4a650f947eb0",
-  matches: JIRA_SITE_ORIGINS.map((origin) => ({
-    origin,
-    paths: [{ kind: "prefix", path: "/" }] as const,
-  })),
+  matches: [
+    {
+      origin: JIRA_ORIGIN_PLACEHOLDER,
+      paths: [{ kind: "prefix", path: JIRA_PATH_PREFIX }] as const,
+    },
+  ],
 });
 
 mcp.tool(

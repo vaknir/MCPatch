@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { DECLARED_OPTIONAL_ORIGINS } from "../src/bundled-packs.js";
+import {
+  CONFIGURABLE_ORIGIN_DECLARATION,
+  DECLARED_OPTIONAL_ORIGINS,
+} from "../src/bundled-packs.js";
 
 const manifest = JSON.parse(
   readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
@@ -32,6 +35,17 @@ describe("extension manifest", () => {
     });
   });
 
+  it("declares one broad optional pattern that is never requested as a grant", () => {
+    // The declaration exists so an arbitrary configured origin is expressible.
+    // `permission-proof.ts` refuses it as proof, and no code path requests it.
+    expect(CONFIGURABLE_ORIGIN_DECLARATION).toBe("https://*/*");
+    expect(manifest["optional_host_permissions"]).toContain(
+      CONFIGURABLE_ORIGIN_DECLARATION,
+    );
+    expect(manifest["optional_host_permissions"]).not.toContain("<all_urls>");
+    expect(manifest["optional_host_permissions"]).not.toContain("*://*/*");
+  });
+
   it("grants no ambient website authority and declares only exact optional origins", () => {
     expect(Object.keys(manifest).sort()).toEqual([
       "action",
@@ -52,9 +66,10 @@ describe("extension manifest", () => {
       "scripting",
       "storage",
     ]);
-    expect(manifest["optional_host_permissions"]).toEqual(
-      DECLARED_OPTIONAL_ORIGINS.map((origin) => `${origin}/*`),
-    );
+    expect(manifest["optional_host_permissions"]).toEqual([
+      ...DECLARED_OPTIONAL_ORIGINS.map((origin) => `${origin}/*`),
+      CONFIGURABLE_ORIGIN_DECLARATION,
+    ]);
     expect(
       DECLARED_OPTIONAL_ORIGINS.every(
         (origin) => new URL(origin).origin === origin && !origin.includes("*"),

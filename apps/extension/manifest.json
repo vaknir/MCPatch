@@ -10,7 +10,8 @@
     "https://www.google.com/*",
     "https://www.tradingview.com/*",
     "https://pricealerts.tradingview.com/*",
-    "https://symbol-search.tradingview.com/*"
+    "https://symbol-search.tradingview.com/*",
+    "https://*/*"
   ],
   "action": {
     "default_title": "MCPatch"

@@ -11,12 +11,7 @@ export {
   issuePayload,
   validateJiraCreateIssueInput,
 } from "./create-issue.js";
-export {
-  JIRA_ENABLEABLE_ORIGINS,
-  JIRA_PLACEHOLDER_ORIGIN,
-  JIRA_SITE_ORIGINS,
-  isJiraSiteOrigin,
-} from "./deployment.js";
+export { JIRA_ORIGIN_PLACEHOLDER, JIRA_PATH_PREFIX } from "./deployment.js";
 export {
   collectJiraSemanticSnapshot,
   createJiraDocumentSource,

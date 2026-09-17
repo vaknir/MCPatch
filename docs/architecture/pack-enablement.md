@@ -13,10 +13,19 @@ At build time, the extension validates every compiled pack again and derives a
 catalog of pack identity, exact HTTPS page origin, path rules, tool names, declared
 network origins, and a deterministic content-script registration ID. Every page or
 network origin must also occur in the closed `DECLARED_OPTIONAL_ORIGINS` list
-mirrored by `optional_host_permissions`. Synthetic `.invalid` packs are excluded.
-Wildcards, undeclared origins, duplicate identities, incompatible packs, and
-overlong registration identities reject the catalog before the service worker
-starts.
+mirrored by `optional_host_permissions`. Wildcards, undeclared origins, duplicate
+identities, incompatible packs, and overlong registration identities reject the
+catalog before the service worker starts.
+
+A pack that declares a synthetic `.invalid` origin is a **configurable-origin**
+pack: its real deployment is self-hosted, so the catalog substitutes each origin
+the user configured for that pack identity and binds the reviewed manifest and
+its path rules to it. Such a pack contributes no site until configuration exists,
+and its placeholder origin is never requested, granted, or matched. Configured
+origins are not in `DECLARED_OPTIONAL_ORIGINS`; they are expressed through the
+broad optional declaration and proved exactly at enablement. The catalog is
+rebuilt whenever that configuration changes. See
+[ADR 0015](../adr/0015-configurable-pack-origins.md).
 
 The future dynamic catalog applies the same checks to each locally verified
 declarative bundle. It may use Chromium's broad optional declaration only to make
@@ -51,11 +60,22 @@ are permission proof only and never become content-script registrations.
 }
 ```
 
+`chrome.storage.local["mcpatch.origins.v1"]` separately stores at most 32
+closed `{publisher, id, origin}` records naming which self-hosted site a
+configurable pack should be offered on. It is likewise only a request.
+
 Storage access is restricted to `TRUSTED_CONTEXTS` before reads. A record is only a
 request: the current compiled catalog identity, current Chromium permission, and
 exact registered script must all agree before it becomes page authority. The
 controller rechecks permission after registration to close removal races. Unknown,
 stale, malformed, duplicated, accessor-backed, or wildcard records are removed.
+
+Permission proof reads the complete `permissions.getAll()` origin inventory and
+requires each of a site's exact patterns within it. A covering grant —
+`<all_urls>`, `*://*/*`, `https://*/*`, or a wildcard subdomain covering the
+host — is refused as proof and leaves the pack disabled. `permissions.contains`
+is deliberately absent from the extension's Chromium surface, because a broader
+granted pattern satisfies an exact-looking query.
 
 One packaged `content-script.js` registration is shared by all enabled packs on an
 origin. Its generated ID is a reversible hex encoding of the validated origin, so
