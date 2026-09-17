@@ -136,7 +136,7 @@ export async function removeJiraIssueLink(
   if (!before.some((link) => link.id === input.linkId)) {
     throw new JiraPackError("EXECUTION_FAILED", "unknown_issue_link");
   }
-  await client.remove(`/issueLink/${input.linkId}`, signal);
+  await client.remove(`/issueLink/${input.linkId}`, {}, signal);
   const after = await readLinks(client, input.issueKey, signal);
   const removed = !after.some((link) => link.id === input.linkId);
   return Object.freeze({

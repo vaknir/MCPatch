@@ -36,6 +36,45 @@ export {
   validateJiraSearchInput,
 } from "./issues.js";
 export {
+  createJiraSprint,
+  listJiraBoards,
+  listJiraSprintIssues,
+  listJiraSprints,
+  validateJiraCreateSprintInput,
+  validateJiraListBoardsInput,
+  validateJiraListSprintIssuesInput,
+  validateJiraListSprintsInput,
+} from "./agile.js";
+export {
+  listJiraAttachments,
+  parseJiraAttachment,
+  validateJiraListAttachmentsInput,
+} from "./attachments.js";
+export {
+  deleteJiraIssue,
+  validateJiraDeleteIssueInput,
+} from "./delete-issue.js";
+export {
+  getJiraUser,
+  listJiraIssueLinkTypes,
+  validateJiraGetUserInput,
+} from "./metadata.js";
+export {
+  createJiraVersion,
+  listJiraVersions,
+  parseJiraVersion,
+  validateJiraCreateVersionInput,
+  validateJiraListVersionsInput,
+} from "./versions.js";
+export {
+  addJiraWorklog,
+  listJiraWorklogs,
+  parseJiraWorklog,
+  toJiraInstant,
+  validateJiraAddWorklogInput,
+  validateJiraListWorklogsInput,
+} from "./worklogs.js";
+export {
   assignJiraIssue,
   unassignJiraIssue,
   validateJiraAssignIssueInput,
@@ -59,7 +98,20 @@ export {
 export { jiraBrowserPack, jiraPack } from "./manifest.js";
 export {
   JIRA_ADD_COMMENT,
+  JIRA_ADD_WORKLOG,
+  JIRA_AGILE_PREFIX,
   JIRA_ASSIGN_ISSUE,
+  JIRA_CREATE_SPRINT,
+  JIRA_CREATE_VERSION,
+  JIRA_DELETE_ISSUE,
+  JIRA_GET_USER,
+  JIRA_LIST_ATTACHMENTS,
+  JIRA_LIST_BOARDS,
+  JIRA_LIST_ISSUE_LINK_TYPES,
+  JIRA_LIST_SPRINTS,
+  JIRA_LIST_SPRINT_ISSUES,
+  JIRA_LIST_VERSIONS,
+  JIRA_LIST_WORKLOGS,
   JIRA_CREATE_ISSUE,
   JIRA_CURRENT_CONTEXT,
   JIRA_FINGERPRINT,
@@ -82,6 +134,34 @@ export {
 export type {
   JiraAddCommentInput,
   JiraAddCommentResult,
+  JiraAddWorklogInput,
+  JiraAddWorklogResult,
+  JiraAttachment,
+  JiraBoard,
+  JiraCreateSprintInput,
+  JiraCreateSprintResult,
+  JiraCreateVersionInput,
+  JiraCreateVersionResult,
+  JiraDeleteIssueInput,
+  JiraDeleteIssueResult,
+  JiraGetUserInput,
+  JiraGetUserResult,
+  JiraIssueLinkType,
+  JiraListAttachmentsResult,
+  JiraListBoardsInput,
+  JiraListBoardsResult,
+  JiraListIssueLinkTypesResult,
+  JiraListSprintIssuesInput,
+  JiraListSprintIssuesResult,
+  JiraListSprintsInput,
+  JiraListSprintsResult,
+  JiraListVersionsInput,
+  JiraListVersionsResult,
+  JiraListWorklogsResult,
+  JiraSprint,
+  JiraSprintState,
+  JiraVersion,
+  JiraWorklogEntry,
   JiraAssignIssueInput,
   JiraAssignIssueResult,
   JiraComment,
@@ -128,7 +208,7 @@ export {
   validateJiraProjectKey,
 } from "./projects.js";
 export { createJiraRestClient } from "./rest.js";
-export type { JiraFetch, JiraRestClient } from "./rest.js";
+export type { JiraFetch, JiraRestApi, JiraRestClient } from "./rest.js";
 export { createJiraSite } from "./site.js";
 export type { JiraSite, JiraSnapshotSource } from "./site.js";
 export {

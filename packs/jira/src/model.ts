@@ -1,7 +1,8 @@
 export const JIRA_FINGERPRINT = "jira-datacenter-rest2-v1" as const;
 
-/** Every request this pack may issue is rooted at this fixed REST prefix. */
+/** The two fixed REST roots this pack may reach on the enabled origin. */
 export const JIRA_REST_PREFIX = "/rest/api/2" as const;
+export const JIRA_AGILE_PREFIX = "/rest/agile/1.0" as const;
 
 export const JIRA_CURRENT_CONTEXT = "jira.current_context" as const;
 export const JIRA_GET_ISSUE = "jira.get_issue" as const;
@@ -18,10 +19,26 @@ export const JIRA_REMOVE_ISSUE_LINK = "jira.remove_issue_link" as const;
 export const JIRA_UPDATE_ISSUE = "jira.update_issue" as const;
 export const JIRA_ASSIGN_ISSUE = "jira.assign_issue" as const;
 export const JIRA_UNASSIGN_ISSUE = "jira.unassign_issue" as const;
+export const JIRA_DELETE_ISSUE = "jira.delete_issue" as const;
+export const JIRA_LIST_WORKLOGS = "jira.list_worklogs" as const;
+export const JIRA_ADD_WORKLOG = "jira.add_worklog" as const;
+export const JIRA_LIST_ATTACHMENTS = "jira.list_attachments" as const;
+export const JIRA_LIST_ISSUE_LINK_TYPES = "jira.list_issue_link_types" as const;
+export const JIRA_GET_USER = "jira.get_user" as const;
+export const JIRA_LIST_VERSIONS = "jira.list_versions" as const;
+export const JIRA_CREATE_VERSION = "jira.create_version" as const;
+export const JIRA_LIST_BOARDS = "jira.list_boards" as const;
+export const JIRA_LIST_SPRINTS = "jira.list_sprints" as const;
+export const JIRA_LIST_SPRINT_ISSUES = "jira.list_sprint_issues" as const;
+export const JIRA_CREATE_SPRINT = "jira.create_sprint" as const;
 
 export const JIRA_TOOLS = Object.freeze([
   JIRA_ADD_COMMENT,
+  JIRA_ADD_WORKLOG,
   JIRA_CREATE_ISSUE,
+  JIRA_CREATE_SPRINT,
+  JIRA_CREATE_VERSION,
+  JIRA_DELETE_ISSUE,
   JIRA_LINK_ISSUES,
   JIRA_ASSIGN_ISSUE,
   JIRA_REMOVE_ISSUE_LINK,
@@ -30,19 +47,34 @@ export const JIRA_TOOLS = Object.freeze([
   JIRA_UPDATE_ISSUE,
   JIRA_CURRENT_CONTEXT,
   JIRA_GET_ISSUE,
+  JIRA_GET_USER,
+  JIRA_LIST_ATTACHMENTS,
+  JIRA_LIST_BOARDS,
   JIRA_LIST_COMMENTS,
   JIRA_LIST_ISSUE_LINKS,
+  JIRA_LIST_ISSUE_LINK_TYPES,
   JIRA_LIST_PROJECTS,
+  JIRA_LIST_SPRINTS,
+  JIRA_LIST_SPRINT_ISSUES,
   JIRA_LIST_TRANSITIONS,
+  JIRA_LIST_VERSIONS,
+  JIRA_LIST_WORKLOGS,
   JIRA_SEARCH_ISSUES,
 ] as const);
 
 export type JiraToolName = (typeof JIRA_TOOLS)[number];
 
-/** Non-idempotent tools are consumed once per document context. */
+/**
+ * Tools that append, create, or destroy are consumed once per document context.
+ * Everything else sets a named end state and stays repeatable.
+ */
 export const JIRA_SINGLE_USE_TOOLS = Object.freeze([
   JIRA_ADD_COMMENT,
+  JIRA_ADD_WORKLOG,
   JIRA_CREATE_ISSUE,
+  JIRA_CREATE_SPRINT,
+  JIRA_CREATE_VERSION,
+  JIRA_DELETE_ISSUE,
   JIRA_LINK_ISSUES,
 ] as const);
 
@@ -296,6 +328,198 @@ export interface JiraLinkIssuesResult {
   readonly linkType: string;
 }
 
+export interface JiraDeleteIssueInput {
+  readonly issueKey: string;
+  readonly deleteSubtasks?: boolean;
+}
+
+/**
+ * Delete has no `*_unconfirmed` state on purpose: a post-delete read cannot
+ * tell "gone" from "unreachable" through this pack's payload-free errors, so
+ * Jira's own successful DELETE status is the postcondition rather than a
+ * readback that could report a deletion that did not happen.
+ */
+export interface JiraDeleteIssueResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "deleted";
+  readonly issueKey: string;
+  readonly summary: string;
+  readonly deletedSubtasks: number;
+}
+
+export interface JiraWorklogEntry {
+  readonly id: string;
+  readonly author?: JiraUser;
+  readonly started: string;
+  readonly timeSpent: string;
+  readonly timeSpentSeconds: number;
+  readonly comment?: string;
+}
+
+export interface JiraListWorklogsResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly issueKey: string;
+  readonly total: number;
+  readonly worklogs: readonly JiraWorklogEntry[];
+}
+
+export interface JiraAddWorklogInput {
+  readonly issueKey: string;
+  readonly timeSpent: string;
+  readonly startedAt?: string;
+  readonly comment?: string;
+}
+
+export interface JiraAddWorklogResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "added";
+  readonly issueKey: string;
+  readonly worklogId: string;
+  readonly timeSpent: string;
+  readonly timeSpentSeconds: number;
+}
+
+/** Attachment metadata only; this pack never transfers attachment bytes. */
+export interface JiraAttachment {
+  readonly id: string;
+  readonly filename: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly created: string;
+  readonly author?: JiraUser;
+}
+
+export interface JiraListAttachmentsResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly issueKey: string;
+  readonly attachments: readonly JiraAttachment[];
+}
+
+export interface JiraIssueLinkType {
+  readonly id: string;
+  readonly name: string;
+  readonly inward: string;
+  readonly outward: string;
+}
+
+export interface JiraListIssueLinkTypesResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly linkTypes: readonly JiraIssueLinkType[];
+}
+
+export interface JiraGetUserInput {
+  readonly username: string;
+}
+
+export interface JiraGetUserResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly name: string;
+  readonly displayName: string;
+  readonly active: boolean;
+}
+
+export interface JiraVersion {
+  readonly id: string;
+  readonly name: string;
+  readonly released: boolean;
+  readonly archived: boolean;
+  readonly releaseDate?: string;
+  readonly description?: string;
+}
+
+export interface JiraListVersionsInput {
+  readonly projectKey: string;
+  readonly limit?: number;
+}
+
+export interface JiraListVersionsResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly projectKey: string;
+  readonly versions: readonly JiraVersion[];
+}
+
+export interface JiraCreateVersionInput {
+  readonly projectKey: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly releaseDate?: string;
+}
+
+export interface JiraCreateVersionResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "created";
+  readonly projectKey: string;
+  readonly versionId: string;
+  readonly name: string;
+}
+
+export interface JiraBoard {
+  readonly id: string;
+  readonly name: string;
+  readonly type: string;
+}
+
+export interface JiraListBoardsInput {
+  readonly query?: string;
+  readonly limit?: number;
+}
+
+export interface JiraListBoardsResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly boards: readonly JiraBoard[];
+}
+
+export type JiraSprintState = "active" | "closed" | "future";
+
+export interface JiraSprint {
+  readonly id: string;
+  readonly name: string;
+  readonly state: JiraSprintState;
+  readonly startDate?: string;
+  readonly endDate?: string;
+  readonly goal?: string;
+}
+
+export interface JiraListSprintsInput {
+  readonly boardId: string;
+  readonly state?: JiraSprintState;
+  readonly limit?: number;
+}
+
+export interface JiraListSprintsResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly boardId: string;
+  readonly sprints: readonly JiraSprint[];
+}
+
+export interface JiraListSprintIssuesInput {
+  readonly sprintId: string;
+  readonly limit?: number;
+}
+
+export interface JiraListSprintIssuesResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly sprintId: string;
+  readonly total: number;
+  readonly issues: readonly JiraIssueSummary[];
+}
+
+export interface JiraCreateSprintInput {
+  readonly boardId: string;
+  readonly name: string;
+  readonly goal?: string;
+  readonly startDate?: string;
+  readonly endDate?: string;
+}
+
+export interface JiraCreateSprintResult {
+  readonly fingerprint: typeof JIRA_FINGERPRINT;
+  readonly state: "created";
+  readonly boardId: string;
+  readonly sprintId: string;
+  readonly name: string;
+}
+
 export type JiraErrorCode =
   "CANCELLED" | "EXECUTION_FAILED" | "TOOL_UNAVAILABLE";
 
@@ -310,6 +534,7 @@ export type JiraErrorReason =
   | "link_action_unavailable"
   | "missing_value"
   | "no_updatable_field"
+  | "subtasks_present"
   | "unknown_issue_link"
   | "request_failed"
   | "transition_action_unavailable"

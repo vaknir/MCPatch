@@ -1,6 +1,6 @@
 import type { JsonObject } from "@mcpatch/sdk/runtime";
 
-import { JIRA_REST_PREFIX, JiraPackError } from "./model.js";
+import { JIRA_AGILE_PREFIX, JIRA_REST_PREFIX, JiraPackError } from "./model.js";
 import { abortIfNeeded } from "./validation.js";
 
 const MAX_RESPONSE_BYTES = 512 * 1024;
@@ -22,8 +22,7 @@ export type JiraFetch = (input: string, init: RequestInit) => Promise<Response>;
  * `networkPolicy.extensionRequests` governs extension-issued cross-origin
  * requests, which this pack never makes.
  */
-export interface JiraRestClient {
-  readonly baseUrl: string;
+export interface JiraRestApi {
   get(
     path: string,
     query: Readonly<Record<string, string>>,
@@ -31,7 +30,22 @@ export interface JiraRestClient {
   ): Promise<unknown>;
   post(path: string, body: JsonObject, signal: AbortSignal): Promise<unknown>;
   put(path: string, body: JsonObject, signal: AbortSignal): Promise<unknown>;
-  remove(path: string, signal: AbortSignal): Promise<unknown>;
+  remove(
+    path: string,
+    query: Readonly<Record<string, string>>,
+    signal: AbortSignal,
+  ): Promise<unknown>;
+}
+
+/**
+ * Core calls are rooted at `/rest/api/2`; `agile` is the one other fixed root
+ * this pack may reach, because boards and sprints have no core equivalent. Both
+ * are compile-time constants on the same enabled origin, so the surface stays
+ * two closed roots rather than a caller-selectable API path.
+ */
+export interface JiraRestClient extends JiraRestApi {
+  readonly baseUrl: string;
+  readonly agile: JiraRestApi;
 }
 
 export function createJiraRestClient(
@@ -40,9 +54,23 @@ export function createJiraRestClient(
   fetchRequest: JiraFetch,
 ): JiraRestClient {
   if (typeof fetchRequest !== "function") requestFailed();
-  const prefix = `${contextPath}${JIRA_REST_PREFIX}`;
-  const client: JiraRestClient = {
+  return Object.freeze({
+    ...createApi(origin, `${contextPath}${JIRA_REST_PREFIX}`, fetchRequest),
     baseUrl: `${origin}${contextPath}`,
+    agile: createApi(
+      origin,
+      `${contextPath}${JIRA_AGILE_PREFIX}`,
+      fetchRequest,
+    ),
+  });
+}
+
+function createApi(
+  origin: string,
+  prefix: string,
+  fetchRequest: JiraFetch,
+): JiraRestApi {
+  const api: JiraRestApi = {
     get: async (path, query, signal) =>
       request(
         fetchRequest,
@@ -64,15 +92,15 @@ export function createJiraRestClient(
         writeInit("PUT", body),
         signal,
       ),
-    remove: async (path, signal) =>
+    remove: async (path, query, signal) =>
       request(
         fetchRequest,
-        requestUrl(origin, prefix, path, {}),
+        requestUrl(origin, prefix, path, query),
         deleteInit(),
         signal,
       ),
   };
-  return Object.freeze(client);
+  return Object.freeze(api);
 }
 
 function requestUrl(

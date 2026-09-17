@@ -21,10 +21,49 @@ import {
 } from "./links.js";
 import { updateJiraIssue } from "./update-issue.js";
 import {
+  createJiraSprint,
+  listJiraBoards,
+  listJiraSprintIssues,
+  listJiraSprints,
+  validateJiraCreateSprintInput,
+} from "./agile.js";
+import { listJiraAttachments } from "./attachments.js";
+import {
+  deleteJiraIssue,
+  validateJiraDeleteIssueInput,
+} from "./delete-issue.js";
+import { getJiraUser, listJiraIssueLinkTypes } from "./metadata.js";
+import {
+  createJiraVersion,
+  listJiraVersions,
+  validateJiraCreateVersionInput,
+} from "./versions.js";
+import {
+  addJiraWorklog,
+  listJiraWorklogs,
+  validateJiraAddWorklogInput,
+} from "./worklogs.js";
+import {
   JIRA_ADD_COMMENT,
+  JIRA_ADD_WORKLOG,
   JIRA_CREATE_ISSUE,
+  JIRA_CREATE_SPRINT,
+  JIRA_CREATE_VERSION,
+  JIRA_DELETE_ISSUE,
   JIRA_LINK_ISSUES,
   JiraPackError,
+  type JiraAddWorklogResult,
+  type JiraCreateSprintResult,
+  type JiraCreateVersionResult,
+  type JiraDeleteIssueResult,
+  type JiraGetUserResult,
+  type JiraListAttachmentsResult,
+  type JiraListBoardsResult,
+  type JiraListIssueLinkTypesResult,
+  type JiraListSprintIssuesResult,
+  type JiraListSprintsResult,
+  type JiraListVersionsResult,
+  type JiraListWorklogsResult,
   type JiraAddCommentResult,
   type JiraAssignIssueResult,
   type JiraCreateIssueResult,
@@ -114,6 +153,51 @@ export interface JiraSite {
     input: unknown,
     signal: AbortSignal,
   ): Promise<JiraUnassignIssueResult>;
+  deleteIssue(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraDeleteIssueResult>;
+  listWorklogs(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListWorklogsResult>;
+  addWorklog(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraAddWorklogResult>;
+  listAttachments(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListAttachmentsResult>;
+  listIssueLinkTypes(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListIssueLinkTypesResult>;
+  getUser(input: unknown, signal: AbortSignal): Promise<JiraGetUserResult>;
+  listVersions(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListVersionsResult>;
+  createVersion(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraCreateVersionResult>;
+  listBoards(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListBoardsResult>;
+  listSprints(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListSprintsResult>;
+  listSprintIssues(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListSprintIssuesResult>;
+  createSprint(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraCreateSprintResult>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -251,6 +335,102 @@ class ReviewedJiraSite implements JiraSite {
     signal: AbortSignal,
   ): Promise<JiraUnassignIssueResult> {
     return unassignJiraIssue(await this.#client(signal), input, signal);
+  }
+
+  async deleteIssue(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraDeleteIssueResult> {
+    const checked = validateJiraDeleteIssueInput(input);
+    return this.#once(JIRA_DELETE_ISSUE, signal, (client) =>
+      deleteJiraIssue(client, checked, signal),
+    );
+  }
+
+  async listWorklogs(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListWorklogsResult> {
+    return listJiraWorklogs(await this.#client(signal), input, signal);
+  }
+
+  async addWorklog(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraAddWorklogResult> {
+    const checked = validateJiraAddWorklogInput(input);
+    return this.#once(JIRA_ADD_WORKLOG, signal, (client) =>
+      addJiraWorklog(client, checked, signal),
+    );
+  }
+
+  async listAttachments(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListAttachmentsResult> {
+    return listJiraAttachments(await this.#client(signal), input, signal);
+  }
+
+  async listIssueLinkTypes(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListIssueLinkTypesResult> {
+    return listJiraIssueLinkTypes(await this.#client(signal), input, signal);
+  }
+
+  async getUser(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraGetUserResult> {
+    return getJiraUser(await this.#client(signal), input, signal);
+  }
+
+  async listVersions(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListVersionsResult> {
+    return listJiraVersions(await this.#client(signal), input, signal);
+  }
+
+  async createVersion(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraCreateVersionResult> {
+    const checked = validateJiraCreateVersionInput(input);
+    return this.#once(JIRA_CREATE_VERSION, signal, (client) =>
+      createJiraVersion(client, checked, signal),
+    );
+  }
+
+  async listBoards(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListBoardsResult> {
+    return listJiraBoards(await this.#client(signal), input, signal);
+  }
+
+  async listSprints(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListSprintsResult> {
+    return listJiraSprints(await this.#client(signal), input, signal);
+  }
+
+  async listSprintIssues(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraListSprintIssuesResult> {
+    return listJiraSprintIssues(await this.#client(signal), input, signal);
+  }
+
+  async createSprint(
+    input: unknown,
+    signal: AbortSignal,
+  ): Promise<JiraCreateSprintResult> {
+    const checked = validateJiraCreateSprintInput(input);
+    return this.#once(JIRA_CREATE_SPRINT, signal, (client) =>
+      createJiraSprint(client, checked, signal),
+    );
   }
 
   subscribe(listener: () => void): () => void {

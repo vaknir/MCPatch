@@ -20,9 +20,16 @@ Reads (`READ`):
 - `jira.list_comments` reads at most 50 comments with author identity,
   timestamps, and a bounded body excerpt;
 - `jira.list_transitions` reads the workflow transitions the signed-in user may
-  currently apply to one issue; and
+  currently apply to one issue;
 - `jira.list_issue_links` reads one issue's links with each link's exact id,
-  type, direction, and the issue on the other side.
+  type, direction, and the issue on the other side;
+- `jira.list_issue_link_types` reads the link types this deployment defines;
+- `jira.list_worklogs` reads at most 50 worklog entries of one issue;
+- `jira.list_attachments` reads attachment **metadata** of one issue;
+- `jira.get_user` reads one user's username, display name, and active state;
+- `jira.list_versions` reads at most 50 versions of one project; and
+- `jira.list_boards`, `jira.list_sprints`, and `jira.list_sprint_issues` read
+  agile boards, their sprints, and one sprint's issues.
 
 Actions (`ACTION`, each behind an argument-bound one-time approval):
 
@@ -36,15 +43,29 @@ Actions (`ACTION`, each behind an argument-bound one-time approval):
 - `jira.assign_issue` and `jira.unassign_issue` set or clear one issue's
   assignee;
 - `jira.link_issues` links two exact existing issues with one named link type;
-  and
 - `jira.remove_issue_link` removes one link by exact id, but only when that link
-  is currently on the issue the approval named.
+  is currently on the issue the approval named;
+- `jira.add_worklog` logs one bounded duration against one issue;
+- `jira.create_version` creates one unreleased version in one project;
+- `jira.create_sprint` creates one future sprint on one exact board; and
+- `jira.delete_issue` permanently deletes one exact issue.
 
-`jira.add_comment`, `jira.create_issue`, and `jira.link_issues` are not
-idempotent, so each is consumed once per document context and then withdrawn
-from discovery. A retrying agent cannot silently duplicate a comment, an issue,
-or a link. The other actions set a named end state rather than appending, so
-they stay repeatable and re-validate their preconditions on every attempt.
+Seven actions append, create, or destroy — `jira.add_comment`,
+`jira.add_worklog`, `jira.create_issue`, `jira.create_sprint`,
+`jira.create_version`, `jira.link_issues`, and `jira.delete_issue` — so each is
+consumed once per document context and then withdrawn from discovery. A
+retrying agent cannot silently duplicate or re-destroy. The other actions set a
+named end state rather than appending, so they stay repeatable and re-validate
+their preconditions on every attempt.
+
+`jira.delete_issue` is the only irreversible tool here. It reads the target
+first, so the result reports the summary that was destroyed, and it refuses an
+issue that has subtasks unless `deleteSubtasks: true` is in the approved
+arguments — the server's own cascade default is never inferred. It has no
+`*_unconfirmed` state on purpose: a post-delete read cannot tell "gone" from
+"unreachable" through payload-free errors, so Jira's successful DELETE status is
+the postcondition rather than a readback that could report a deletion that did
+not happen.
 
 Every action that writes then reads back. When the write succeeded but the
 confirming read did not agree or was unavailable, the result says so explicitly
@@ -64,8 +85,11 @@ Setting `labels` replaces the issue's label set.
 Page reads use only Jira's own `ajs-*` metadata. Cookies, tokens, storage,
 generated class names, and page body text are never collected or returned.
 
-Every call is a same-origin request under the fixed `/rest/api/2` prefix of the
-enabled site, so the pack declares `networkPolicy.extensionRequests: "none"` and
+Every call is a same-origin request under one of two fixed REST roots of the
+enabled site — `/rest/api/2`, and `/rest/agile/1.0` for boards and sprints,
+which have no core equivalent. Both are compile-time constants, so the surface
+is two closed roots rather than a caller-selectable API path. The pack declares
+`networkPolicy.extensionRequests: "none"` and
 no tool holds `EXTERNAL_NETWORK`. Same-origin session actions are not a manifest
 permission class ([ADR 0011](../../docs/adr/0011-reviewed-authenticated-session-actions.md)),
 and `networkPolicy.extensionRequests` governs extension-issued cross-origin
@@ -120,11 +144,21 @@ value to write back into `src/manifest.ts`.
 
 ## Not included
 
-These MCP Atlassian tools are deliberately absent and need their own review:
-issue delete, worklogs, attachment download, agile boards and sprints, versions,
-batch creation, search-fields, user profile lookup, and Jira Cloud's account-id
-user model and ADF comment bodies.
+Four gaps against MCP Atlassian's Jira surface remain, each for a stated
+reason rather than for lack of time:
 
-Field updates beyond the five named ones are absent by design rather than by
-omission: a generic field-id map would put an opaque blob in front of the user
-at approval time. Widening the set means adding named, bounded fields here.
+- **Attachment download.** Moving arbitrary file bytes across MCP is a different
+  capability class from typed field reads. It needs its own reviewed contract
+  with a size and media-type boundary, like the bounded image-result contract
+  packs use today. `jira.list_attachments` reports what is attached instead.
+- **Arbitrary field update by id.** A generic field-id map would put an opaque
+  blob in front of the user at approval time. Widening `jira.update_issue`
+  means adding named, bounded fields to its closed schema.
+- **Batch issue creation.** One approval covering N issues defeats the point of
+  argument-bound approval. Repeat `jira.create_issue` instead.
+- **Sprint state changes and field discovery.** Starting or closing a sprint is
+  a distinct consequential action needing its own contract, and `search_fields`
+  exists to find field ids, which this pack does not accept.
+
+Jira Cloud's account-id user model and ADF comment bodies are also out of scope;
+this pack targets Data Center and Server.

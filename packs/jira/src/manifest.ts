@@ -5,16 +5,28 @@ import { JIRA_SITE_ORIGINS } from "./deployment.js";
 import { createJiraDocumentSource } from "./document-source.js";
 import {
   JIRA_ADD_COMMENT,
+  JIRA_ADD_WORKLOG,
   JIRA_ASSIGN_ISSUE,
   JIRA_CREATE_ISSUE,
+  JIRA_CREATE_SPRINT,
+  JIRA_CREATE_VERSION,
   JIRA_CURRENT_CONTEXT,
+  JIRA_DELETE_ISSUE,
   JIRA_FINGERPRINT,
   JIRA_GET_ISSUE,
+  JIRA_GET_USER,
   JIRA_LINK_ISSUES,
+  JIRA_LIST_ATTACHMENTS,
+  JIRA_LIST_BOARDS,
   JIRA_LIST_COMMENTS,
   JIRA_LIST_ISSUE_LINKS,
+  JIRA_LIST_ISSUE_LINK_TYPES,
   JIRA_LIST_PROJECTS,
+  JIRA_LIST_SPRINTS,
+  JIRA_LIST_SPRINT_ISSUES,
   JIRA_LIST_TRANSITIONS,
+  JIRA_LIST_VERSIONS,
+  JIRA_LIST_WORKLOGS,
   JIRA_REMOVE_ISSUE_LINK,
   JIRA_SEARCH_ISSUES,
   JIRA_TRANSITION_ISSUE,
@@ -112,7 +124,7 @@ const mcp = new MCPatch<JiraSite>({
   version: "0.1.0",
   // Reviewed manifest identity; enforced by tests/digest.test.ts.
   digest:
-    "sha256:3cc8e7a49828ca1922ab3d61462ced2ed57cbe0a4933c28a09e747ed4cafab2c",
+    "sha256:d077f6277030c6f74ab12d0a7ec49e495c3d6208682f8a3a838e4a650f947eb0",
   matches: JIRA_SITE_ORIGINS.map((origin) => ({
     origin,
     paths: [{ kind: "prefix", path: "/" }] as const,
@@ -676,6 +688,474 @@ mcp.tool(
   (input, { site, signal }) => site.removeIssueLink(input, signal),
 );
 
+const USER_OUTPUT_PROPERTIES = {
+  name: { type: "string" },
+  displayName: { type: "string" },
+} as const;
+
+const BOARD_ID_SCHEMA = {
+  type: "string",
+  minLength: 1,
+  maxLength: 19,
+} as const;
+
+mcp.tool(
+  {
+    name: JIRA_LIST_WORKLOGS,
+    description:
+      "Read at most 50 worklog entries of one Jira issue with author, start time, logged duration, and a bounded comment excerpt.",
+    risk: "read",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      required: ["issueKey"],
+      properties: { issueKey: ISSUE_KEY_SCHEMA, limit: LIMIT_SCHEMA },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "issueKey", "total", "worklogs"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        issueKey: { type: "string" },
+        total: { type: "integer" },
+        worklogs: {
+          type: "array",
+          maxItems: JIRA_MAX_PAGE_SIZE,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "started", "timeSpent", "timeSpentSeconds"],
+            properties: {
+              id: { type: "string" },
+              author: USER_SCHEMA,
+              started: { type: "string" },
+              timeSpent: { type: "string" },
+              timeSpentSeconds: { type: "integer" },
+              comment: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listWorklogs(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_LIST_ATTACHMENTS,
+    description:
+      "Read the attachment metadata of one Jira issue: filename, media type, size, creation time, and author. Attachment content is never transferred.",
+    risk: "read",
+    inputSchema: ISSUE_KEY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "issueKey", "attachments"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        issueKey: { type: "string" },
+        attachments: {
+          type: "array",
+          maxItems: 128,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "filename", "mimeType", "sizeBytes", "created"],
+            properties: {
+              id: { type: "string" },
+              filename: { type: "string" },
+              mimeType: { type: "string" },
+              sizeBytes: { type: "integer" },
+              created: { type: "string" },
+              author: USER_SCHEMA,
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listAttachments(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_LIST_ISSUE_LINK_TYPES,
+    description:
+      "Read the issue link types this Jira deployment defines, so a link action can name an exact server type rather than guess one.",
+    risk: "read",
+    inputSchema: EMPTY_INPUT_SCHEMA,
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "linkTypes"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        linkTypes: {
+          type: "array",
+          maxItems: 64,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "name", "inward", "outward"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              inward: { type: "string" },
+              outward: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listIssueLinkTypes(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_GET_USER,
+    description:
+      "Read one Jira user's stable username, display name, and active state. No email address, avatar, or group membership is returned.",
+    risk: "read",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 1,
+      required: ["username"],
+      properties: {
+        username: { type: "string", minLength: 1, maxLength: 255 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "name", "displayName", "active"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        ...USER_OUTPUT_PROPERTIES,
+        active: { type: "boolean" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.getUser(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_LIST_VERSIONS,
+    description:
+      "Read at most 50 versions of one Jira project with release and archive state, release date, and a bounded description excerpt.",
+    risk: "read",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      required: ["projectKey"],
+      properties: { projectKey: PROJECT_KEY_SCHEMA, limit: LIMIT_SCHEMA },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "projectKey", "versions"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        projectKey: { type: "string" },
+        versions: {
+          type: "array",
+          maxItems: JIRA_MAX_PAGE_SIZE,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "name", "released", "archived"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              released: { type: "boolean" },
+              archived: { type: "boolean" },
+              releaseDate: { type: "string" },
+              description: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listVersions(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_LIST_BOARDS,
+    description:
+      "Read at most 50 Jira agile boards the signed-in user can see, optionally narrowed by a bounded name substring.",
+    risk: "read",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      properties: { query: NAME_SCHEMA, limit: LIMIT_SCHEMA },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "boards"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        boards: {
+          type: "array",
+          maxItems: JIRA_MAX_PAGE_SIZE,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "name", "type"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listBoards(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_LIST_SPRINTS,
+    description:
+      "Read at most 50 sprints of one exact Jira board, optionally narrowed to active, closed, or future sprints.",
+    risk: "read",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 3,
+      required: ["boardId"],
+      properties: {
+        boardId: BOARD_ID_SCHEMA,
+        state: { enum: ["active", "closed", "future"] },
+        limit: LIMIT_SCHEMA,
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "boardId", "sprints"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        boardId: { type: "string" },
+        sprints: {
+          type: "array",
+          maxItems: JIRA_MAX_PAGE_SIZE,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "name", "state"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              state: { enum: ["active", "closed", "future"] },
+              startDate: { type: "string" },
+              endDate: { type: "string" },
+              goal: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listSprints(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_LIST_SPRINT_ISSUES,
+    description:
+      "Read at most 50 issues of one exact Jira sprint as typed summaries without raw Jira response data.",
+    risk: "read",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      required: ["sprintId"],
+      properties: { sprintId: BOARD_ID_SCHEMA, limit: LIMIT_SCHEMA },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "sprintId", "total", "issues"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        sprintId: { type: "string" },
+        total: { type: "integer" },
+        issues: {
+          type: "array",
+          maxItems: JIRA_MAX_PAGE_SIZE,
+          items: ISSUE_SUMMARY_SCHEMA,
+        },
+      },
+    },
+  },
+  (input, { site, signal }) => site.listSprintIssues(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_ADD_WORKLOG,
+    description:
+      "Log one bounded amount of work against one exact Jira issue after one-time approval, with an optional start time and comment.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 4,
+      required: ["issueKey", "timeSpent"],
+      properties: {
+        issueKey: ISSUE_KEY_SCHEMA,
+        timeSpent: { type: "string", minLength: 2, maxLength: 24 },
+        startedAt: { type: "string", minLength: 24, maxLength: 24 },
+        comment: {
+          type: "string",
+          minLength: 1,
+          maxLength: JIRA_MAX_TEXT_LENGTH,
+        },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "fingerprint",
+        "state",
+        "issueKey",
+        "worklogId",
+        "timeSpent",
+        "timeSpentSeconds",
+      ],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: { const: "added" },
+        issueKey: { type: "string" },
+        worklogId: { type: "string" },
+        timeSpent: { type: "string" },
+        timeSpentSeconds: { type: "integer" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.addWorklog(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_CREATE_VERSION,
+    description:
+      "Create one unreleased Jira version in one exact project after one-time approval, with an optional description and release date.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 4,
+      required: ["projectKey", "name"],
+      properties: {
+        projectKey: PROJECT_KEY_SCHEMA,
+        name: { type: "string", minLength: 1, maxLength: 255 },
+        description: { type: "string", minLength: 1, maxLength: 1024 },
+        releaseDate: { type: "string", minLength: 10, maxLength: 10 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "projectKey", "versionId", "name"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: { const: "created" },
+        projectKey: { type: "string" },
+        versionId: { type: "string" },
+        name: { type: "string" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.createVersion(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_CREATE_SPRINT,
+    description:
+      "Create one future sprint on one exact Jira board after one-time approval. It never starts, closes, or reorders a sprint.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 5,
+      required: ["boardId", "name"],
+      properties: {
+        boardId: BOARD_ID_SCHEMA,
+        name: { type: "string", minLength: 1, maxLength: 255 },
+        goal: { type: "string", minLength: 1, maxLength: 1024 },
+        startDate: { type: "string", minLength: 24, maxLength: 24 },
+        endDate: { type: "string", minLength: 24, maxLength: 24 },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fingerprint", "state", "boardId", "sprintId", "name"],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: { const: "created" },
+        boardId: { type: "string" },
+        sprintId: { type: "string" },
+        name: { type: "string" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.createSprint(input, signal),
+);
+
+mcp.tool(
+  {
+    name: JIRA_DELETE_ISSUE,
+    description:
+      "Permanently delete one exact Jira issue after one-time approval. Cascading subtask deletion must be requested explicitly.",
+    risk: "action",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      maxProperties: 2,
+      required: ["issueKey"],
+      properties: {
+        issueKey: ISSUE_KEY_SCHEMA,
+        deleteSubtasks: { type: "boolean" },
+      },
+    },
+    outputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "fingerprint",
+        "state",
+        "issueKey",
+        "summary",
+        "deletedSubtasks",
+      ],
+      properties: {
+        fingerprint: { const: JIRA_FINGERPRINT },
+        state: { const: "deleted" },
+        issueKey: { type: "string" },
+        summary: { type: "string" },
+        deletedSubtasks: { type: "integer" },
+      },
+    },
+  },
+  (input, { site, signal }) => site.deleteIssue(input, signal),
+);
+
 export const jiraBrowserPack = mcp.build({
   fixtures: [
     {
@@ -770,6 +1250,78 @@ export const jiraBrowserPack = mcp.build({
       id: "page-only-remove-issue-link",
       tool: JIRA_REMOVE_ISSUE_LINK,
       input: { issueKey: "ABC-1", linkId: "30001" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-worklogs",
+      tool: JIRA_LIST_WORKLOGS,
+      input: { issueKey: "ABC-1" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-add-worklog",
+      tool: JIRA_ADD_WORKLOG,
+      input: { issueKey: "ABC-1", timeSpent: "2h" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-attachments",
+      tool: JIRA_LIST_ATTACHMENTS,
+      input: { issueKey: "ABC-1" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-issue-link-types",
+      tool: JIRA_LIST_ISSUE_LINK_TYPES,
+      input: {},
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-get-user",
+      tool: JIRA_GET_USER,
+      input: { username: "jdoe" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-versions",
+      tool: JIRA_LIST_VERSIONS,
+      input: { projectKey: "ABC" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-create-version",
+      tool: JIRA_CREATE_VERSION,
+      input: { projectKey: "ABC", name: "1.2.0" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-boards",
+      tool: JIRA_LIST_BOARDS,
+      input: { limit: 5 },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-sprints",
+      tool: JIRA_LIST_SPRINTS,
+      input: { boardId: "12" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-list-sprint-issues",
+      tool: JIRA_LIST_SPRINT_ISSUES,
+      input: { sprintId: "34" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-create-sprint",
+      tool: JIRA_CREATE_SPRINT,
+      input: { boardId: "12", name: "Sprint 9" },
+      expect: { kind: "error", code: "TOOL_NOT_FOUND" },
+    },
+    {
+      id: "page-only-delete-issue",
+      tool: JIRA_DELETE_ISSUE,
+      input: { issueKey: "ABC-1" },
       expect: { kind: "error", code: "TOOL_NOT_FOUND" },
     },
   ],

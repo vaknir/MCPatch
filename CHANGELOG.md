@@ -12,19 +12,28 @@ All notable MCPatch changes are documented here. The format follows
   MCP Atlassian server through the user's existing browser session instead of an
   Atlassian Cloud API token. It exposes bounded `jira.current_context`,
   `jira.get_issue`, `jira.search_issues`, `jira.list_projects`,
-  `jira.list_comments`, `jira.list_transitions`, and `jira.list_issue_links`
-  reads plus approved `jira.add_comment`, `jira.transition_issue`,
-  `jira.create_issue`, `jira.update_issue`, `jira.assign_issue`,
-  `jira.unassign_issue`, `jira.link_issues`, and `jira.remove_issue_link`
-  actions. Every call is one same-origin request under the fixed `/rest/api/2`
-  prefix, so the pack requests no `EXTERNAL_NETWORK` authority. `jira.update_issue`
+  `jira.list_comments`, `jira.list_transitions`, `jira.list_issue_links`,
+  `jira.list_issue_link_types`, `jira.list_worklogs`, `jira.list_attachments`,
+  `jira.get_user`, `jira.list_versions`, `jira.list_boards`,
+  `jira.list_sprints`, and `jira.list_sprint_issues` reads plus approved
+  `jira.add_comment`, `jira.transition_issue`, `jira.create_issue`,
+  `jira.update_issue`, `jira.assign_issue`, `jira.unassign_issue`,
+  `jira.link_issues`, `jira.remove_issue_link`, `jira.add_worklog`,
+  `jira.create_version`, `jira.create_sprint`, and `jira.delete_issue` actions.
+  Every call is one same-origin request under two fixed REST roots,
+  `/rest/api/2` and `/rest/agile/1.0`, so the pack requests no
+  `EXTERNAL_NETWORK` authority. `jira.update_issue`
   takes named bounded fields rather than a field-id map, so every approved value
   stays visible in the approval hash; assignment is split into two tools so no
   username can collide with an "unassign" sentinel; `jira.remove_issue_link`
   proves the link id is on the approved issue before deleting it; transitions are
-  validated against the transitions the server currently offers; non-idempotent
-  writes are consumed once per document context; and an unconfirmed write is
-  reported rather than retried. Because Jira Data
+  validated against the transitions the server currently offers; appending,
+  creating, and destroying actions are consumed once per document context; and
+  an unconfirmed write is reported rather than retried. `jira.delete_issue`
+  reads its target first, reports the summary it destroyed, and refuses to
+  cascade into subtasks unless that is in the approved arguments.
+  `jira.list_attachments` reports metadata only; attachment bytes are a separate
+  capability class that this pack does not transfer. Because Jira Data
   Center is self-hosted, the shipped build declares one synthetic `.invalid`
   deployment origin and therefore grants no browser authority until an operator
   adds their own instance origin to `packs/jira/src/deployment.ts` and the

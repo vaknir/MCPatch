@@ -57,8 +57,11 @@ is part of the fingerprint.
 
 ## Network contract
 
-Every tool call is one same-origin request under the fixed `/rest/api/2` prefix
-of the enabled origin, so the pack declares
+Every tool call is one same-origin request under one of two fixed REST roots of
+the enabled origin: `/rest/api/2`, and `/rest/agile/1.0` for boards and sprints,
+which have no core-API equivalent. Both are compile-time constants reached
+through separate namespaces on the client, so the surface stays two closed roots
+rather than a caller-selectable API path. The pack declares
 `networkPolicy.extensionRequests: "none"` and no tool carries
 `EXTERNAL_NETWORK`. The browser attaches the session cookie itself; MCPatch never
 reads, stores, or returns it.
@@ -208,13 +211,68 @@ the point: a link id alone addresses every link in the instance, so without the
 precondition an approval for one issue would carry authority over any other.
 An unavailable confirming read returns `removed_unconfirmed`.
 
+### `jira.list_worklogs` and `jira.add_worklog`
+
+The read returns at most 50 entries with author, start time, logged duration and
+a bounded comment excerpt. The action appends exactly one entry: `timeSpent`
+must match Jira's own duration grammar, an optional `startedAt` is a strict
+UTC ISO-8601 instant converted to Jira's `+0000` form, and estimate adjustment
+stays on Jira's `auto` default. Setting a remaining estimate or rewriting an
+existing entry is not expressible.
+
+### `jira.list_attachments`
+
+Reports attachment metadata — filename, media type, size, creation time, author
+— and never the bytes or the content URL. Transferring arbitrary file content
+across MCP is a different capability class from typed field reads and needs its
+own reviewed contract with a size and media-type boundary, as the bounded
+image-result contract does for chart captures.
+
+### `jira.list_issue_link_types` and `jira.get_user`
+
+Two discovery reads that make other tools approvable with exact values instead
+of guesses: link types for `jira.link_issues`, and a user's stable username for
+`jira.assign_issue`. `get_user` returns username, display name and active state
+only; email address, avatar and group membership are dropped at the projection.
+
+### `jira.list_versions` and `jira.create_version`
+
+The read returns at most 50 versions with release and archive state. The action
+creates one version from named bounded fields; it cannot release, archive,
+reorder, move or delete one.
+
+### `jira.list_boards`, `jira.list_sprints`, `jira.list_sprint_issues`, `jira.create_sprint`
+
+The three reads are bounded and scoped to one exact board or sprint;
+`list_sprint_issues` returns the same typed summaries as `search_issues`, so an
+agent sees one issue shape everywhere. Sprint state arrives from the server in
+any case and is normalized to `active`, `closed` or `future`; an unrecognized
+state fails closed. `create_sprint` creates one future sprint on one exact
+board and never starts, closes or reorders one — a sprint state change is its
+own consequential action and needs its own contract.
+
+### `jira.delete_issue`
+
+The only irreversible tool in the pack, and the only one with no `*_unconfirmed`
+state. It reads the target first, so the approval carries the exact key and the
+result reports the summary that was destroyed. An issue with subtasks is refused
+unless `deleteSubtasks: true` is among the approved arguments, so the server's
+own cascade default is never silently inherited.
+
+There is no readback, deliberately: this pack's errors are payload-free, so a
+post-delete read cannot distinguish "gone" from "unreachable", and reporting
+`deleted` on an unreachable instance would assert something unknown. Jira's own
+successful DELETE status is the postcondition instead.
+
 ## Single-use writes
 
-`jira.add_comment`, `jira.create_issue`, and `jira.link_issues` are not
-idempotent. Each is consumed once per document context and then withdrawn from
-discovery, so a retrying agent cannot silently duplicate a comment, an issue, or
-a link. Argument validation runs before consumption, so a rejected malformed call
-does not burn the capability.
+Seven actions append, create, or destroy: `jira.add_comment`,
+`jira.add_worklog`, `jira.create_issue`, `jira.create_sprint`,
+`jira.create_version`, `jira.link_issues`, and `jira.delete_issue`. Each is
+consumed once per document context and then withdrawn from discovery, so a
+retrying agent cannot silently duplicate a comment, worklog, issue, sprint,
+version or link, nor re-attempt a destroyed issue. Argument validation runs
+before consumption, so a rejected malformed call does not burn the capability.
 
 The remaining actions set a named end state rather than appending, so repeating
 one converges instead of accumulating. They stay repeatable and re-validate
@@ -239,10 +297,14 @@ context through the common lifecycle.
 
 ## Explicit non-goals
 
-- deleting issues, editing arbitrary fields by id, or driving transition screens;
-- worklogs, attachments, watchers, and issue-property access;
-- agile boards, sprints, versions, and batch creation;
-- Jira Cloud's account-id user model and ADF comment bodies; and
+- transferring attachment bytes, which is a separate capability class needing
+  its own size and media-type contract;
+- editing arbitrary fields by id, driving transition screens, or batch creating
+  issues under one approval;
+- starting, closing, reordering, or deleting sprints, and releasing, archiving
+  or deleting versions;
+- watchers, issue properties, field-id discovery, and Jira Cloud's account-id
+  user model and ADF comment bodies; and
 - reading or exporting credentials, cookies, storage, headers, or request logs.
 
 Each requires its own reviewed contract rather than a generic request escape
