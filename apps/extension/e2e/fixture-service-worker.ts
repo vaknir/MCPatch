@@ -8,7 +8,12 @@ import {
   startExtensionRuntime,
   type ExtensionRuntimeApi,
 } from "../src/runtime.js";
-import { FIXTURE_MARKER, FIXTURE_ORIGIN } from "./fixture-constants.js";
+import {
+  FIXTURE_LOCAL_TOOL,
+  FIXTURE_MARKER,
+  FIXTURE_ORIGIN,
+} from "./fixture-constants.js";
+import { fixtureLocalBundle } from "./fixture-local-bundle.js";
 import { fixturePack } from "./fixture-pack.js";
 
 declare const chrome: Omit<ChromeEnablementApi, "lifecycle"> & {
@@ -36,7 +41,18 @@ void FIXTURE_MARKER;
 startExtensionRuntime(chrome.runtime, {
   compiledPacks: packs,
   compiledPackRuntimeOptions: runtimeOptions,
-  pageAuthority: enablement.authority,
+  pageAuthority: {
+    authorize(identity) {
+      const authorization = enablement.authority.authorize(identity);
+      if (authorization === undefined) return undefined;
+      return Object.freeze({
+        packTools: new Set([...authorization.packTools, FIXTURE_LOCAL_TOOL]),
+      });
+    },
+  },
+  onPackRuntime(runtime) {
+    void runtime.replaceDeclarativeDefinitions([fixtureLocalBundle]);
+  },
   onPageContextOwner(owner) {
     enablement.setHooks({
       revokeOrigin(origin) {

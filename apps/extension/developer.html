@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en" data-theme="business">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCPatch developer mode</title>
+    <link rel="stylesheet" href="approval.css" />
+  </head>
+  <body class="bg-base-200 min-h-screen p-4 sm:p-8">
+    <main class="mx-auto grid max-w-5xl gap-6">
+      <header>
+        <p
+          class="text-base-content/60 text-sm font-semibold tracking-wide uppercase"
+        >
+          MCPatch
+        </p>
+        <h1 class="text-3xl font-bold">Local pack developer mode</h1>
+        <p class="text-base-content/70 mt-2 max-w-3xl">
+          Import data-only declarative packs for local testing. Local packs are
+          unsigned, unreviewed, and never become marketplace-trusted content.
+        </p>
+      </header>
+
+      <div role="alert" class="alert alert-warning">
+        <span class="badge badge-warning badge-outline">Unsigned</span>
+        <span>
+          Review every digest, origin, tool, risk, and permission. A changed
+          digest always requires another confirmation.
+        </span>
+      </div>
+
+      <section class="card bg-base-100 shadow" aria-labelledby="mode-title">
+        <div class="card-body">
+          <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <h2 id="mode-title" class="card-title">Developer mode</h2>
+              <p class="text-base-content/70">
+                Turning this off disables every local pack and removes its live
+                browser authority before cleanup.
+              </p>
+            </div>
+            <label class="flex cursor-pointer items-center gap-3">
+              <span class="font-semibold">Allow local unsigned packs</span>
+              <input id="developer-mode" type="checkbox" class="toggle" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card bg-base-100 shadow" aria-labelledby="import-title">
+        <div class="card-body gap-4">
+          <h2 id="import-title" class="card-title">Import a local .mcpack</h2>
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Bundle file</legend>
+            <input
+              id="pack-file"
+              type="file"
+              accept=".mcpack,application/json"
+              class="file-input w-full"
+              disabled
+            />
+            <p class="label">
+              MCPatch reads only the file you select. It does not scan folders,
+              follow URLs, or watch the filesystem.
+            </p>
+          </fieldset>
+        </div>
+      </section>
+
+      <section
+        id="preview"
+        class="card bg-base-100 shadow"
+        hidden
+        aria-labelledby="preview-title"
+      >
+        <div class="card-body gap-5">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge badge-warning">UNSIGNED_LOCAL_DEVELOPMENT</span>
+            <h2 id="preview-title" class="card-title">
+              Confirm this exact bundle
+            </h2>
+          </div>
+          <p id="replacement" role="alert" class="alert alert-warning" hidden>
+            This replaces a local pack with the same publisher and ID. Existing
+            authority is revoked before the changed bytes become active.
+          </p>
+          <dl class="grid gap-3 sm:grid-cols-[9rem_1fr]">
+            <dt class="font-semibold">Pack</dt>
+            <dd id="preview-name" class="break-all"></dd>
+            <dt class="font-semibold">Version</dt>
+            <dd id="preview-version"></dd>
+            <dt class="font-semibold">Digest</dt>
+            <dd id="preview-digest" class="font-mono text-xs break-all"></dd>
+            <dt class="font-semibold">Origins</dt>
+            <dd><ul id="preview-origins" class="list"></ul></dd>
+          </dl>
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Tool</th>
+                  <th>Risk</th>
+                  <th>Permissions</th>
+                </tr>
+              </thead>
+              <tbody id="preview-tools"></tbody>
+            </table>
+          </div>
+          <div class="card-actions justify-end">
+            <button id="cancel-import" type="button" class="btn">Cancel</button>
+            <button id="confirm-import" type="button" class="btn btn-primary">
+              Grant origins and install
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="card bg-base-100 shadow"
+        aria-labelledby="installed-title"
+      >
+        <div class="card-body gap-4">
+          <h2 id="installed-title" class="card-title">Installed local packs</h2>
+          <p id="empty-packs" class="text-base-content/70">
+            No local packs installed.
+          </p>
+          <ul id="installed-packs" class="list"></ul>
+        </div>
+      </section>
+
+      <p id="status" role="status" class="alert" hidden></p>
+    </main>
+    <script type="module" src="developer-page.js"></script>
+  </body>
+</html>

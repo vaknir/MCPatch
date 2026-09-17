@@ -144,6 +144,7 @@ export class FakeStorage implements ChromeStorageApi {
   accessLevels: string[] = [];
   log: string[] = [];
   throwAccess = false;
+  throwSet = false;
 
   constructor() {
     this.local = {
@@ -160,6 +161,7 @@ export class FakeStorage implements ChromeStorageApi {
         this.onChanged.emit({ [key]: { oldValue } }, "local");
       },
       set: async (items) => {
+        if (this.throwSet) throw new Error("storage set failed");
         this.log.push("storage.set");
         for (const [key, value] of Object.entries(items)) {
           const oldValue = this.data[key];

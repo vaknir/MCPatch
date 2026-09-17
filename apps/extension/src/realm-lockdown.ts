@@ -25,6 +25,10 @@
  *   are removed, so the only network channel left is the wrapped `fetch`.
  * - `Document.prototype.cookie` becomes a throwing accessor, so pack code
  *   cannot read or write cookies.
+ * - Mutable navigation primitives are removed and the captured assign entry
+ *   point is reserved for approved actions. Chromium's unforgeable Location
+ *   methods remain part of the reviewed bundled-code trust boundary; unsigned
+ *   local packs are declarative data and cannot invoke them.
  *
  * Every replacement is frozen and non-configurable, so pack code cannot
  * `delete`, redefine, or walk a prototype back to the original. The isolated

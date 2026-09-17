@@ -8,6 +8,12 @@ All notable MCPatch changes are documented here. The format follows
 
 ### Added
 
+- An extension-owned local pack developer mode that previews and confirms
+  unsigned declarative bundles, requests exact HTTPS origins from a trusted user
+  gesture, persists bounded validated records, and routes enabled tools through
+  the packaged interpreter, bridge, and MCP path with fail-closed lifecycle
+  reconciliation.
+
 - A strict `mcpatch pack` community workflow for creating, validating, testing,
   inspecting, and reproducibly building data-only declarative packs, with inert
   fixture execution, Git source attribution, atomic no-overwrite publication, and

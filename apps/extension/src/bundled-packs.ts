@@ -29,8 +29,10 @@ export const PACK_RUNTIME_OPTIONS: CompiledPackRuntimeOptions = Object.freeze({
   ] as const),
 });
 
-// This closed list must mirror manifest.json optional_host_permissions. A reviewed
-// pack cannot become user-enableable unless its exact origin is present in both.
+// This closed list bounds reviewed compiled-pack authority. The manifest declares
+// only the broader optional HTTPS request envelope needed for exact origins that
+// are discovered from validated local/community packs at runtime; no origin is
+// granted until the extension requests that exact pattern from a user gesture.
 export const DECLARED_OPTIONAL_ORIGINS = Object.freeze([
   GOOGLE_FLIGHTS_ORIGIN,
   TRADINGVIEW_ORIGIN,

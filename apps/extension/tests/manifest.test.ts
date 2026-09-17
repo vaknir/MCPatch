@@ -32,7 +32,7 @@ describe("extension manifest", () => {
     });
   });
 
-  it("grants no ambient website authority and declares only exact optional origins", () => {
+  it("grants no ambient website authority and requests discovered HTTPS origins only at runtime", () => {
     expect(Object.keys(manifest).sort()).toEqual([
       "action",
       "background",
@@ -42,6 +42,7 @@ describe("extension manifest", () => {
       "minimum_chrome_version",
       "name",
       "optional_host_permissions",
+      "options_ui",
       "permissions",
       "version",
     ]);
@@ -53,15 +54,17 @@ describe("extension manifest", () => {
       "scripting",
       "storage",
     ]);
-    expect(manifest["optional_host_permissions"]).toEqual(
-      DECLARED_OPTIONAL_ORIGINS.map((origin) => `${origin}/*`),
-    );
+    expect(manifest["optional_host_permissions"]).toEqual(["https://*/*"]);
     expect(
       DECLARED_OPTIONAL_ORIGINS.every(
         (origin) => new URL(origin).origin === origin && !origin.includes("*"),
       ),
     ).toBe(true);
     expect(manifest["action"]).toEqual({ default_title: "MCPatch" });
+    expect(manifest["options_ui"]).toEqual({
+      page: "developer.html",
+      open_in_tab: true,
+    });
     expect(manifest).not.toHaveProperty("optional_permissions");
     expect(manifest).not.toHaveProperty("host_permissions");
     expect(manifest).not.toHaveProperty("content_scripts");
@@ -77,6 +80,15 @@ describe("extension manifest", () => {
     expect(manifest).not.toHaveProperty("web_accessible_resources");
     expect(manifest).not.toHaveProperty("externally_connectable");
     expect(JSON.stringify(manifest)).not.toContain("approval.html");
+  });
+
+  it("keeps the local developer surface unreachable from web content", () => {
+    expect(manifest).not.toHaveProperty("web_accessible_resources");
+    expect(manifest).not.toHaveProperty("externally_connectable");
+    expect(manifest["options_ui"]).toEqual({
+      page: "developer.html",
+      open_in_tab: true,
+    });
   });
 
   it("derives one stable ID from a committed public identity", () => {

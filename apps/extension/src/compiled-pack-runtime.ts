@@ -24,11 +24,14 @@ import {
 } from "./compiled-pack-projection.js";
 import {
   validateCompiledPacks,
+  validateDeclarativeRuntimePacks,
   validateRuntimeOptions,
   type CompiledPackSubject,
   type CompiledPackRuntimeOptions,
   type ValidatedCompiledPackRuntimeOptions,
   type ValidatedCompiledPack,
+  type ValidatedDeclarativePack,
+  type ValidatedRuntimePack,
 } from "./compiled-pack-validation.js";
 import type { BridgeApplicationMessage } from "./native-session-model.js";
 
@@ -45,7 +48,9 @@ export class CompiledPackRuntime {
   readonly #calls: CompiledPackCallDispatcher;
   readonly #contexts = new Map<string, ActiveContext>();
   readonly #lastRevisions = new Map<string, number>();
-  #packs: readonly ValidatedCompiledPack[];
+  #compiledPacks: readonly ValidatedCompiledPack[];
+  #declarativePacks: readonly ValidatedDeclarativePack[] = Object.freeze([]);
+  #packs: readonly ValidatedRuntimePack[];
 
   constructor(
     send: MessageSender,
@@ -63,6 +68,7 @@ export class CompiledPackRuntime {
     this.#send = send;
     this.#options = checkedOptions;
     this.#calls = new CompiledPackCallDispatcher(send);
+    this.#compiledPacks = packs;
     this.#packs = packs;
   }
 
@@ -133,8 +139,23 @@ export class CompiledPackRuntime {
   replaceDefinitions(definitions: readonly CompiledPackSubject[]): boolean {
     const packs = validateCompiledPacks(definitions, this.#options);
     this.closeAll("pack_disabled");
-    this.#packs = packs ?? Object.freeze([]);
-    return packs !== undefined;
+    this.#compiledPacks = packs ?? Object.freeze([]);
+    return packs !== undefined && this.#replaceCombined();
+  }
+
+  async replaceDeclarativeDefinitions(
+    bundles: readonly unknown[],
+  ): Promise<boolean> {
+    const packs = await validateDeclarativeRuntimePacks(bundles, this.#options);
+    if (
+      packs !== undefined &&
+      sameDeclarativePacks(this.#declarativePacks, packs)
+    ) {
+      return true;
+    }
+    this.closeAll("pack_disabled");
+    this.#declarativePacks = packs ?? Object.freeze([]);
+    return packs !== undefined && this.#replaceCombined();
   }
 
   disablePack(publisher: string, id: string): boolean {
@@ -145,6 +166,16 @@ export class CompiledPackRuntime {
     if (packs.length === this.#packs.length) return false;
     this.closeAll("pack_disabled");
     this.#packs = Object.freeze(packs);
+    this.#compiledPacks = Object.freeze(
+      packs.filter(
+        (pack): pack is ValidatedCompiledPack => pack.kind === "compiled",
+      ),
+    );
+    this.#declarativePacks = Object.freeze(
+      packs.filter(
+        (pack): pack is ValidatedDeclarativePack => pack.kind === "declarative",
+      ),
+    );
     return true;
   }
 
@@ -179,4 +210,49 @@ export class CompiledPackRuntime {
     this.#calls.abortContext(context);
     return this.#send(contextClosed(context, reason));
   }
+
+  #replaceCombined(): boolean {
+    const packs: ValidatedRuntimePack[] = [
+      ...this.#compiledPacks,
+      ...this.#declarativePacks,
+    ];
+    const identities = new Set<string>();
+    if (packs.length > 64) {
+      this.#packs = Object.freeze([]);
+      return false;
+    }
+    for (const pack of packs) {
+      const identity = `${pack.manifest.publisher}/${pack.manifest.id}`;
+      if (identities.has(identity)) {
+        this.#packs = Object.freeze([]);
+        return false;
+      }
+      identities.add(identity);
+    }
+    this.#packs = Object.freeze(packs);
+    return true;
+  }
+}
+
+function sameDeclarativePacks(
+  left: readonly ValidatedDeclarativePack[],
+  right: readonly ValidatedDeclarativePack[],
+): boolean {
+  if (left.length !== right.length) return false;
+  const fingerprints = (packs: readonly ValidatedDeclarativePack[]) =>
+    packs
+      .map(({ manifest }) =>
+        JSON.stringify([
+          manifest.publisher,
+          manifest.id,
+          manifest.version,
+          manifest.digest,
+        ]),
+      )
+      .sort();
+  const leftFingerprints = fingerprints(left);
+  const rightFingerprints = fingerprints(right);
+  return leftFingerprints.every(
+    (fingerprint, index) => fingerprint === rightFingerprints[index],
+  );
 }

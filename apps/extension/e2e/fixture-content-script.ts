@@ -4,6 +4,13 @@ import { MCPATCH_PAGE_PORT_NAME } from "../src/page-context-model.js";
 import { FIXTURE_MARKER, FIXTURE_ORIGIN } from "./fixture-constants.js";
 import { createFixturePageAdapter } from "./fixture-page-adapter.js";
 import { lockRealm } from "../src/realm-lockdown.js";
+import { DeclarativeDomAdapter } from "../src/declarative-dom-adapter.js";
+import {
+  createDeclarativePageAdapter,
+  DeclarativePackRuntime,
+} from "../src/declarative-pack-runtime.js";
+import { CompositePageAdapter } from "../src/local-pack-page-adapter.js";
+import { fixtureLocalBundle } from "./fixture-local-bundle.js";
 
 declare const chrome: { readonly runtime: ChromePageClientRuntimeApi };
 
@@ -13,15 +20,57 @@ if (globalThis.location.pathname === "/malformed") {
   const port = chrome.runtime.connect({ name: MCPATCH_PAGE_PORT_NAME });
   port.postMessage("{malformed-fixture-frame");
 } else {
+  globalThis.document.documentElement.dataset["fixtureRuntime"] = "loaded";
   // Lock the isolated realm before any pack code runs, exactly as the
   // production content script does, declaring the fixture origin as the only
   // allowed request origin.
-  lockRealm(globalThis as unknown as Parameters<typeof lockRealm>[0], {
-    allowedOrigins: [FIXTURE_ORIGIN],
+  try {
+    lockRealm(globalThis as unknown as Parameters<typeof lockRealm>[0], {
+      allowedOrigins: [FIXTURE_ORIGIN],
+    });
+  } catch (error: unknown) {
+    globalThis.document.documentElement.dataset["fixtureRuntime"] =
+      error instanceof Error ? `${error.name}:${error.message}` : "lock-failed";
+    throw error;
+  }
+  void startFixtureRuntime().then(
+    () => {
+      globalThis.document.documentElement.dataset["fixtureRuntime"] = "ready";
+    },
+    (error: unknown) => {
+      globalThis.document.documentElement.dataset["fixtureRuntime"] =
+        error instanceof Error ? `${error.name}:${error.message}` : "failed";
+    },
+  );
+}
+
+async function startFixtureRuntime(): Promise<void> {
+  const binding = Object.freeze({
+    bundleDigest: fixtureLocalBundle.manifest.digest,
+    contextId: "local.fixture",
+    contextRevision: 1,
+    documentId: "local-document.fixture",
+    origin: FIXTURE_ORIGIN,
+    path: globalThis.location.pathname,
+    tabId: 0,
+  });
+  const declarative = await DeclarativePackRuntime.create({
+    binding,
+    bundle: fixtureLocalBundle,
+    currentBinding() {
+      return globalThis.location.origin === binding.origin &&
+        globalThis.location.pathname === binding.path
+        ? binding
+        : undefined;
+    },
+    document: new DeclarativeDomAdapter(globalThis.document),
   });
   const runtime = new PageContentRuntime(
     chrome.runtime,
-    createFixturePageAdapter(globalThis.document),
+    new CompositePageAdapter([
+      createFixturePageAdapter(globalThis.document),
+      createDeclarativePageAdapter(declarative),
+    ]),
     {
       expectedOrigin: globalThis.location.origin,
       lifecycle: globalThis,

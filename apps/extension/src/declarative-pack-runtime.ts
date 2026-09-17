@@ -3,10 +3,11 @@ import {
   canonicalizePageLocation,
   computeDeclarativePackBundleDigest,
   packMatchesLocation,
+  parseDeclarativePackBundleContent,
   parseDeclarativePackBundle,
-  validateDeclarativePackBundle,
   type DeclarativeOperation,
   type DeclarativePackBundle,
+  type DeclarativePackBundleContent,
   type PackToolManifest,
 } from "@mcpatch/sdk/runtime";
 
@@ -53,10 +54,12 @@ interface RuntimeTool {
   readonly operation: DeclarativeOperation;
 }
 
+type RuntimeBundle = DeclarativePackBundle | DeclarativePackBundleContent;
+
 /** One validated bundle bound to one exact browser document and route. */
 export class DeclarativePackRuntime {
   readonly #binding: DeclarativeRuntimeBinding;
-  readonly #bundle: DeclarativePackBundle;
+  readonly #bundle: RuntimeBundle;
   readonly #currentBinding: () => DeclarativeRuntimeBinding | undefined;
   readonly #document: DeclarativeDocumentAdapter;
   readonly #limits: DeclarativeRuntimeLimits;
@@ -66,7 +69,7 @@ export class DeclarativePackRuntime {
 
   private constructor(
     options: DeclarativePackRuntimeOptions,
-    bundle: DeclarativePackBundle,
+    bundle: RuntimeBundle,
     limits: DeclarativeRuntimeLimits,
   ) {
     this.#binding = freezeBinding(options.binding);
@@ -80,9 +83,9 @@ export class DeclarativePackRuntime {
   static async create(
     options: DeclarativePackRuntimeOptions,
   ): Promise<DeclarativePackRuntime> {
-    let bundle: DeclarativePackBundle;
+    let bundle: RuntimeBundle;
     try {
-      bundle = parseDeclarativePackBundle(options.bundle);
+      bundle = parseRuntimeBundle(options.bundle);
     } catch {
       throw new DeclarativeRuntimeError("STALE_CONTEXT");
     }
@@ -193,7 +196,9 @@ export class DeclarativePackRuntime {
 
   async #revalidate(signal: AbortSignal): Promise<void> {
     signal.throwIfAborted();
-    if (validateDeclarativePackBundle(this.#bundle) !== undefined) {
+    try {
+      parseRuntimeBundle(this.#bundle);
+    } catch {
       throw new DeclarativeRuntimeError("STALE_CONTEXT");
     }
     let digest: string;
@@ -262,9 +267,7 @@ export function createDeclarativePageAdapter(
   };
 }
 
-function operationMap(
-  bundle: DeclarativePackBundle,
-): ReadonlyMap<string, RuntimeTool> {
+function operationMap(bundle: RuntimeBundle): ReadonlyMap<string, RuntimeTool> {
   const manifests = new Map(
     bundle.manifest.tools.map((tool) => [tool.name, tool]),
   );
@@ -336,10 +339,21 @@ function freezeBinding(
 
 function bindingMatchesManifest(
   binding: DeclarativeRuntimeBinding,
-  bundle: DeclarativePackBundle,
+  bundle: RuntimeBundle,
 ): boolean {
   const page = canonicalizePageLocation(`${binding.origin}${binding.path}`);
   return page.ok && packMatchesLocation(bundle.manifest, page.location);
+}
+
+function parseRuntimeBundle(value: unknown): RuntimeBundle {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    Object.hasOwn(value, "publisherSignature")
+  ) {
+    return parseDeclarativePackBundle(value);
+  }
+  return parseDeclarativePackBundleContent(value);
 }
 
 function safeCurrentBinding(

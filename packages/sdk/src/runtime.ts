@@ -50,6 +50,9 @@ export type {
 } from "./tool-result.js";
 export {
   computeDeclarativePackBundleDigest,
+  MAX_DECLARATIVE_BUNDLE_BYTES,
+  parseDeclarativePackBundleContent,
+  parseDeclarativePackBundleContentBytes,
   parseDeclarativePackBundle,
   validateDeclarativePackBundle,
 } from "./declarative-bundle.js";

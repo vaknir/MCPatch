@@ -13,6 +13,8 @@ import {
   MAX_BUNDLE_OBJECT_FIELDS,
   MAX_BUNDLE_STRING_CODE_POINTS,
   MAX_DECLARATIVE_BUNDLE_BYTES,
+  parseDeclarativePackBundleContent,
+  parseDeclarativePackBundleContentBytes,
   parseDeclarativePackBundle,
   parseDeclarativePackBundleBytes,
   publisherKeyId,
@@ -135,6 +137,26 @@ describe("Declarative Pack Bundle v1", () => {
     ).toEqual(bundle);
     expect(Object.isFrozen(bundle)).toBe(true);
     expect(Object.isFrozen(bundle.operations.program)).toBe(true);
+  });
+
+  it("parses unsigned content only through the explicit developer-content API", async () => {
+    const content = await withComputedDigest(fixtureBundle());
+    const bytes = new TextEncoder().encode(JSON.stringify(content));
+    const parsed = parseDeclarativePackBundleContentBytes(bytes);
+
+    expect(parseDeclarativePackBundleContent(content)).toEqual(content);
+    expect(parsed).toEqual(content);
+    expect(Object.isFrozen(parsed)).toBe(true);
+    expect(Object.isFrozen(parsed.manifest)).toBe(true);
+    expect(() => parseDeclarativePackBundle(content)).toThrow(
+      /publisherSignature/u,
+    );
+    expect(() =>
+      parseDeclarativePackBundleContent({
+        ...content,
+        publisherSignature: fixtureBundle().publisherSignature,
+      }),
+    ).toThrow(/UNKNOWN_FIELD/u);
   });
 
   it("keeps array order significant and rejects duplicate keys before object semantics", () => {

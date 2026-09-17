@@ -57,6 +57,8 @@ export {
   canonicalizeDeclarativePackBundle,
   computeDeclarativePackBundleDigest,
   decodeDeclarativePackBundle,
+  parseDeclarativePackBundleContent,
+  parseDeclarativePackBundleContentBytes,
   parseDeclarativePackBundle,
   parseDeclarativePackBundleBytes,
   publisherKeyId,
