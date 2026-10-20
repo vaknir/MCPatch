@@ -1,5 +1,8 @@
 # MCPatch
 
+> [!IMPORTANT]
+> **Independent study and personal-use project.** MCPatch is experimental work for learning, research, and personal use. It is not an employer product, a hosted production-service offering, or a commitment of support. Use integrations only with systems and accounts you are authorized to access, and read the threat model and security limitations first.
+
 MCPatch turns websites into safe, typed agent capabilities without granting an
 agent unrestricted browser access.
 
