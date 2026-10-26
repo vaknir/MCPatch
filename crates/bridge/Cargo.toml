@@ -30,7 +30,7 @@ tracing-subscriber = { version = "=0.3.23", default-features = false, features =
 url = "=2.5.8"
 
 [target.'cfg(unix)'.dependencies]
-libc = "=0.2.189"
+libc = "=0.2.191"
 
 [target.'cfg(windows)'.dependencies]
 firehazard = "=0.0.0-2022-09-10"
