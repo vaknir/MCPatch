@@ -24,7 +24,7 @@
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/cli": "4.3.3",
-    "daisyui": "5.7.37",
+    "daisyui": "5.7.50",
     "eslint": "10.10.0",
     "prettier": "3.9.6",
     "tailwindcss": "4.3.3",

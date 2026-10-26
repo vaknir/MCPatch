@@ -176,8 +176,8 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
       daisyui:
-        specifier: 5.7.37
-        version: 5.7.37
+        specifier: 5.7.50
+        version: 5.7.50
       eslint:
         specifier: 10.10.0
         version: 10.10.0(jiti@2.7.0)
@@ -225,8 +225,8 @@ importers:
         specifier: 24.13.4
         version: 24.13.4
       daisyui:
-        specifier: ^5.7.37
-        version: 5.7.37
+        specifier: ^5.7.50
+        version: 5.7.50
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -1003,8 +1003,8 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  daisyui@5.7.37:
-    resolution: {integrity: sha512-PVcdAcL0ni6/wmcNwvldARZuO0HdzxtjVEAT86ie9GMgFjwmqIWeXsPaM2/eYqLb4WMexqj146C5Z1xmzZDnjg==}
+  daisyui@5.7.50:
+    resolution: {integrity: sha512-+/LRqnTCoc7s/bJEKKwtJSwzeXCVdAmRdNmZeZzgHCaQ9PJyl7j+2V2U32GQDMyD+VDkP9e/+JGoC72Y1hLk7w==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -2165,7 +2165,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  daisyui@5.7.37: {}
+  daisyui@5.7.50: {}
 
   debug@4.4.3:
     dependencies:
